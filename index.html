@@ -1471,15 +1471,19 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   };
   // a place's name on the globe grows with the screen: 18 px on a small one, 26 at 1280 wide, 34 on a big one;
   // the line under it is 0.8 of that
-  const namePx = () => clamp(Math.round(view.ref / 50), 18, 36);
+  const basePx = () => clamp(Math.round(view.ref / 50), 18, 36);
   // Free flight has nothing else on the screen, so its names are bigger: 43 px on a big screen
   const freePx = () => clamp(Math.round(view.ref / 40), 20, 46);
   const subPx = (o) => Math.round(o.size * 0.8);
   // A flag beside a name: as tall as the name and its line under it. In a flight it is twice that while the map is
   // at its closest (on the ground, where a landing is named), so a bird or a coat of arms on it can be made out, and
   // back to that size once the map is at half that scale (climbing, or the view pulled back to show a place).
+  // The name grows with its flag, half as much (one and a half times on the ground), and so does the paper edge
+  // round its letters, so the name is not lost beside the flag.
   const flagUp = () => (S.mode === 'fly' && S.game !== 'free' ? 1 + clamp((view.H0 / cam.H - 0.5) / 0.5, 0, 1) : 1);
-  const flagH = (o) => Math.round((o.size + 8) * 1.6 * flagUp());
+  const nameUp = () => 1 + 0.5 * (flagUp() - 1);
+  const namePx = () => Math.round(basePx() * nameUp());
+  const flagH = (px) => Math.round((px + 8) * 1.6 * flagUp());        // px: the name's size before it grew
   // A place name, with its flag beside it when there is one, and a smaller line under it.
   // A flag that is in dispute (Afghanistan's) gets an asterisk by the country's name, and under a
   // country's own name a line that says so.
@@ -1490,12 +1494,12 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   }
   function nameplate(c, str, x, y, cls, sub, alpha, size) {
     [str, sub] = disputed(c, str, sub);
-    const o = Object.assign({ size: size || namePx() }, STYLE[cls] || STYLE.name);
+    const o = Object.assign({ size: size || namePx(), edge: size ? 3.5 : 3.5 * nameUp() }, STYLE[cls] || STYLE.name);
     ctx.globalAlpha = alpha;
     const flag = c && c.flag ? c.flag : null;
     ctx.font = (o.italic ? 'italic ' : '') + (o.weight || 700) + ' ' + o.size + 'px ' + DISPLAY;
     if ('letterSpacing' in ctx) ctx.letterSpacing = o.track || '0.05em';
-    const tw = ctx.measureText(str).width, fh = flagH(o), fw = flag ? (flag.width / flag.height) * fh : 0;
+    const tw = ctx.measureText(str).width, fh = flagH(size || basePx()), fw = flag ? (flag.width / flag.height) * fh : 0;
     const so = Object.assign({}, o, { size: subPx(o), weight: 700 });
     let sw = 0;
     if (sub) { ctx.font = (so.italic ? 'italic ' : '') + '700 ' + so.size + 'px ' + DISPLAY; sw = ctx.measureText(sub).width; }
@@ -1529,11 +1533,11 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     let w = ctx.measureText(str).width;
     const ss = subPx(o);
     if (sub) { ctx.font = '700 ' + ss + 'px ' + DISPLAY; w = Math.max(w, ctx.measureText(sub).width); }
-    const fh = flagH(o), mid = sub ? (o.size + 1) / 2 : 0, half = o.size * 0.8;
+    const fh = flagH(basePx()), mid = sub ? (o.size + 1) / 2 : 0, half = o.size * 0.8;
     if (c && c.flag) w += (c.flag.width / c.flag.height) * fh + 8;
     // rise and drop: how far what is drawn reaches above and below the name's line. up and down: the room kept for it
     const rise = c && c.flag ? fh / 2 - mid : o.size * 0.4, drop = c && c.flag ? mid + fh / 2 : sub ? o.size + 1 + ss * 0.4 : o.size * 0.4;
-    return { half: w / 2 + 6, up: Math.max(half, rise + 2), down: Math.max(sub ? o.size + 1 + ss * 0.8 : half, drop + 2), rise, drop };
+    return { half: w / 2 + 6, up: Math.max(half, rise + 2), down: Math.max(sub ? o.size + 1 + ss * 0.8 : half, drop + 2), rise, drop, px: o.size };
   }
   function settle(x, y, box, ax, ay, alpha) {
     const beside = (b) => Math.abs(b.x - x) < b.half + box.half;
@@ -1581,9 +1585,9 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       if (dy === OVER && bird.down) { const me = project(unit(bird.lon, bird.lat)); below = !!me && me[1] < s[1]; }
       const want = dy === UNDER ? s[1] + UNDER_GAP * view.mk + box.up
         : dy === OVER ? (below ? s[1] + NEAR * view.mk + box.up : s[1] - NEAR * view.mk - box.down)
-        : s[1] + (dy || 0);
+        : s[1] + (typeof dy === 'function' ? dy() : dy || 0);
       const y = settle(x, want, box, s[0], s[1], alpha);
-      Object.assign(placed[placed.length - 1], { name: str, flag: !!(c && c.flag), ax: s[0], ay: s[1], rise: box.rise, drop: box.drop });      // for the tests
+      Object.assign(placed[placed.length - 1], { name: str, flag: !!(c && c.flag), ax: s[0], ay: s[1], rise: box.rise, drop: box.drop, px: box.px });      // for the tests
       nameplate(c, str, x, y, cls, sub, alpha);
     }, true);
     return f;
@@ -1664,9 +1668,11 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     ring(p, r / view.mk + 96, r / view.mk, PAPER, 3, 0.9);
     sfx.show();
     lookAt(p);
-    // its name stays on it until the postcard is delivered (a sea's below the ring, a tiny country's above its dot)
+    // its name stays on it until the postcard is delivered (a sea's below the ring, whatever the name's size then;
+    // a tiny country's by its dot as a capital's is by its pin). Shown again after another wrong landing: one name, not two
+    if (t.label) t.label.secs = 0;
     if (t.it.kind === 'k') t.label = label(c, c.cap[0], p, 'name', 0, c.name, OVER, here);
-    else t.label = label(c.water ? null : c, c.name, p, c.water ? 'sea' : 'name', 0, null, c.water ? 22 + namePx() / 2 : c.tiny ? -22 : 0, here);
+    else t.label = label(c.water ? null : c, c.name, p, c.water ? 'sea' : 'name', 0, null, c.water ? () => 22 + namePx() / 2 : c.tiny ? OVER : 0, here);
   }
   function countAgainst(t) {
     t.misses++;
@@ -1701,7 +1707,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   const LOOK_HOLD = 1.6;       // seconds the view rests on the place
   function lookAt(p) {
     const me = unit(bird.lon, bird.lat), Hb = heightFor(bird.a), saved = Object.assign({}, cam);
-    const away = !fits(me, Hb, [p], 70, Math.max(70, 5 * namePx()));       // room for its name at either side
+    const away = !fits(me, Hb, [p], 70, Math.max(70, 5 * basePx()));       // room for its name at either side
     Object.assign(cam, saved);
     if (!away) return 0;
     const ang = Math.acos(clamp(dot(me, p), -1, 1));
@@ -2523,8 +2529,9 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       flash(c, 1, FLASH);
       S.drops.push({ p, t: S.t });
       const there = !c.tiny && project(c.u), on = there && there[0] > 50 && there[0] < view.w - 50 && there[1] > 50 && there[1] < view.h - view.deck - 30;
-      // at its middle when that is in sight and far enough from the bird for the name and flag to stand clear of it; else under the bird
-      const clear = on && Math.hypot(there[0] - view.w / 2, there[1] - view.gy) > flagH({ size: namePx() }) / 2 + UNDER_GAP * view.mk + 40;
+      // at its middle when that is in sight and the name and flag stand clear of the bird there; else under the bird
+      const box = plateBox(c, c.name, 'name'), me = birdBox(project(p) || [view.w / 2, view.gy]);
+      const clear = on && (Math.abs(there[0] - me.x) >= box.half + me.half || there[1] - box.up >= me.y + me.down || there[1] + box.down <= me.y - me.up);
       label(c, c.name, clear ? c.u : p, 'name', GROUND, null, clear ? 0 : UNDER);
       ring(p, 4, 22, INK, 2.5, 0.45);
     }
