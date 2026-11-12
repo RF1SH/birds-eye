@@ -1,0 +1,26 @@
+Bird's Eye
+Copyright (c) 2026 Ryan Fishman. All rights reserved.
+
+The game (its code, design, text and original artwork) is proprietary. No permission is given to copy, modify,
+redistribute, sell or build on it, in whole or in part, without the written permission of the copyright holder.
+You may play the game at its official address for your own enjoyment.
+
+This repository is public only so that the website can be served from it. Reading the files here, or copying the
+repository on GitHub in the ways GitHub's terms of service allow, gives no right to use them anywhere else.
+
+Material from others is not covered by this notice. It stays under its own terms:
+
+- Map outlines: Natural Earth, 1:50m and 1:10m (public domain). naturalearthdata.com
+- Flags: flagcdn.com, Flagpedia (public domain).
+- City populations and positions: United Nations, Department of Economic and Social Affairs, Population Division,
+  World Urbanization Prospects: The 2025 Revision, File 21. Licensed under CC BY 3.0 IGO.
+  population.un.org/wup
+- Country populations: World Bank, Population, total (SP.POP.TOTL), 2024. Licensed under CC BY 4.0.
+  data.worldbank.org/indicator/SP.POP.TOTL
+- How hard each country and capital is to find: derived from the slepemapy.cz Adaptive Geography Practice data
+  sets (Papoušek, Pelánek and Stanislav, Masaryk University), which are made available under the Open Database
+  License (ODbL) 1.0. The derived file data/slepemapy.json is offered under the same license.
+  opendatacommons.org/licenses/odbl/1-0
+- How well known each location is: page-view statistics of English Wikipedia, Wikimedia Foundation.
+- Memory model: FSRS version 5 with its published default weights (the open-spaced-repetition project).
+- Typefaces: Barlow Condensed and B612, loaded from Google Fonts under their own open licenses.
