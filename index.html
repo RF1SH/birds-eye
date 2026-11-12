@@ -2413,7 +2413,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     for (const r of T.results) { run = r.right ? run + 1 : 0; most = Math.max(most, run); }
     $('daycard').innerHTML = '<div class="top"><div><h2>Ranked</h2><div class="date">' + (T.best && n ? 'Your best so far.' : 'Your best: ' + save.endless.toLocaleString('en') + ' points') + '</div></div>' +
       '<div class="score">' + T.score.toLocaleString('en') + '<span>points</span></div></div>' +
-      '<div class="tiles"><div><b>' + n + '</b><span>locations</span></div><div><b>' + right + '</b><span>correct</span></div><div><b>' + most + '</b><span>correct in a row</span></div></div>' +
+      '<div class="tiles"><div><b>' + n + '</b><span>locations</span></div><div><b>' + right + '</b><span>correct</span></div><div><b>' + most + '</b><span>in a row</span></div></div>' +
       (n ? '<div class="squares">' + squaresHtml(T.results) + '</div>' : '') +
       '<div class="row"><button class="go" id="trip-again" type="button">Play again</button><button class="alt" id="trip-stats" type="button">Flight stats</button><button class="alt" id="trip-share" type="button">Share</button><button class="alt" id="trip-home" type="button">Home <kbd>H</kbd></button></div>';
   }
