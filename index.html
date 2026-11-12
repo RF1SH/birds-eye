@@ -2522,7 +2522,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     // The flight of every round that has one (a round left with its clue showing has none, nor has a trip saved before
     // flights were kept). The globe shows the last round flown; the others are picked on the card.
     S.legs = null; S.focus = null; S.rowOn = undefined;
-    const legs = T.results.map((r, i) => !r.path ? null : { from: unit(r.from[0], r.from[1]), to: unit(...(r.goal || goalOf(T.rounds[i], r.from[0], r.from[1]))), land: unit(r.land[0], r.land[1]), ans: r.p, pts: r.path.map((q) => [unit(q[0], q[1]), q[2]]), tier: r.tier, right: r.right });
+    const legs = T.results.map((r, i) => !r.path ? null : { from: unit(r.from[0], r.from[1]), to: unit(...(r.goal || goalOf(T.rounds[i], r.from[0], r.from[1]))), land: unit(r.land[0], r.land[1]), ans: r.p, point: T.rounds[i].kind !== 'country' && T.rounds[i].kind !== 'flag', pts: r.path.map((q) => [unit(q[0], q[1]), q[2]]), tier: r.tier, right: r.right });
     if (legs.some(Boolean)) S.legs = legs; else atlasNames = atlasNames.slice(-12);          // no flights kept: the last twelve answers, on a globe that holds still
     $('daycard').classList.remove('wide');
     if (T.endless) endlessEnd(); else dayCard(T);
@@ -3360,7 +3360,8 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     if (s0) { ctx.beginPath(); ctx.arc(s0[0], s0[1], 4 * u, 0, 7); ctx.fillStyle = PAPER; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 1.5 * u; ctx.stroke(); }
   }
   // What the names on a title or results globe keep off: the capital pins of a Study flight, and on a trip's globe the
-  // dot where the round picked came down (when that is right at the answer, the answer's own dot and name stand there).
+  // dot where the round picked came down, so a name never hides the verdict that dot wears. (A city's name stands
+  // round its dot anyway: when you came down right on the city, that dot is the city's, see placeNames.)
   function nameBoxes() {
     const boxes = [];
     for (const d of S.drops) {
@@ -3369,7 +3370,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       if (s) boxes.push({ x: s[0], y: s[1], half: 10 });
     }
     if (S.mode === 'over' && S.trip && S.legs) {
-      const L = S.legs[S.focus], s = L && project(L.land), t = L && project(L.to);
+      const L = S.legs[S.focus], s = L && project(L.land), t = L && L.point && project(L.ans);
       if (s && !(t && Math.hypot(s[0] - t[0], s[1] - t[1]) < 14 * view.ui)) boxes.push({ x: s[0], y: s[1], half: 8 * view.ui });
     }
     return boxes;
@@ -3396,12 +3397,17 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       if (!at) { if (!held) a.spot = undefined; continue; }
       boxes.push({ x: at[0], y: at[1], half });
       if (!paint) continue;
-      if (at[0] !== s[0] || at[1] !== s[1]) {
+      // A city's own dot: a trip's answer paper-white, Study's capital not delivered red. Where a round came down right on
+      // the city, the dot of that landing stands for both, so the verdict it wears is not hidden under the city's dot
+      // (the player, of a correct landing on Havana: "wondering why havana wasn't green"). The name stands by that dot
+      // with no line of its own to it.
+      const L = rounds && a.city && S.legs[a.i], came = L && project(L.land), onIt = !!came && Math.hypot(came[0] - s[0], came[1] - s[1]) < 14 * view.ui;
+      if ((at[0] !== s[0] || at[1] !== s[1]) && !onIt) {
         ctx.strokeStyle = INK; ctx.lineWidth = view.ui;
         ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(at[0] - Math.sign(at[0] - s[0]) * half * 0.6, at[1] - Math.sign(at[1] - s[1]) * 6 * view.ui); ctx.stroke();
         ctx.beginPath(); ctx.arc(s[0], s[1], 2 * view.ui, 0, 7); ctx.fillStyle = INK; ctx.fill();
       }
-      if (a.city) { ctx.beginPath(); ctx.arc(s[0], s[1], 4 * view.ui, 0, 7); ctx.fillStyle = a.lost ? BAD : PAPER; ctx.fill(); ctx.strokeStyle = a.lost ? PAPER : INK; ctx.lineWidth = 1.5 * view.ui; ctx.stroke(); }          // a trip's answer: paper-white. Study's capital not delivered: red
+      if (a.city && !onIt) { ctx.beginPath(); ctx.arc(s[0], s[1], 4 * view.ui, 0, 7); ctx.fillStyle = a.lost ? BAD : PAPER; ctx.fill(); ctx.strokeStyle = a.lost ? PAPER : INK; ctx.lineWidth = 1.5 * view.ui; ctx.stroke(); }
       text(name, at[0], at[1], Object.assign({ size, edge: 3 }, a.lost ? { fill: BAD, italic: a.water } : a.water ? STYLE.sea : a.helped ? STYLE.helped : {}));
     }
   }
