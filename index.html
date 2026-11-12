@@ -1679,7 +1679,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
         ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(ex, ey); ctx.stroke();
         ctx.beginPath(); ctx.arc(s[0], s[1], 2.2 * view.mk, 0, 7); ctx.fillStyle = INK; ctx.fill(); ctx.globalAlpha = 1;
       }
-      Object.assign(placed[placed.length - 1], { name: str, flag: !!(c && c.flag), ax: s[0], ay: s[1], rise: box.rise, drop: box.drop, px: box.px });      // for the tests
+      Object.assign(placed[placed.length - 1], { name: str, sub: sub || '', flag: !!(c && c.flag), ax: s[0], ay: s[1], rise: box.rise, drop: box.drop, px: box.px });      // for the tests
       nameplate(c, str, x, y, cls, sub, alpha);
     }, true);
     return f;
@@ -2638,7 +2638,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     if (it.kind === 'k') {
       // The letter goes on to the city itself, and the view pulls back if the city is out of sight.
       const city = unit(c.cap[1], c.cap[2]);
-      const sub = (spot ? c.name : c.name + ', ' + fmtKm(off)) + (c.capNote ? ' (' + c.capNote + ')' : '');
+      const sub = (spot ? c.name : c.name + ', ' + fmtKm(off) + ' away') + (c.capNote ? ' (' + c.capNote + ')' : '');          // "France, 120 km away": a distance says what it is (the player's pick, as the number by the line to a capital)
       S.drops.push({ p: city, from: p, t: S.t, city: c.cap[0], km: capKm(c) });
       flash(c, 1, FLASH);
       label(c, c.cap[0], city, 'name', GROUND, sub, OVER);
