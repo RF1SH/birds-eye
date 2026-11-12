@@ -1744,7 +1744,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     S.history.push(it.c.id);
     const isNew = memOf(it).box === 0;
     S.sinceNew = isNew ? 0 : S.sinceNew + 1;
-    S.tickets.push({ it, node, age: 0, isNew, misses: 0, shown: false, warm: false, from: [bird.lon, bird.lat], fromAir: !bird.down });
+    S.tickets.push({ it, node, age: 0, isNew, misses: 0, shown: false, warm: false, from: [bird.lon, bird.lat], fromTop: bird.at === '*' });      // the first of a flight: picked up at the top, before any landing
     sfx.call();
     measure();
   }
@@ -2217,14 +2217,18 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     for (const r of R.c.fine) for (let i = 0; i < r.length; i += 2) { const d = kmBetween(lon, lat, r[i] / 100, r[i + 1] / 100); if (d < best) { best = d; at = [r[i] / 100, r[i + 1] / 100]; } }
     return at;
   }
+  // the cheapest day: each round's cheapest flight, flown from where the last one ended (never under 10)
+  function dayNeed(T) {
+    let need = 0, at = T.start;
+    for (const R of T.rounds) { const to = goalOf(R, at[0], at[1]); need += tripPar(kmBetween(at[0], at[1], to[0], to[1])); at = to; }
+    return Math.max(10, need);
+  }
   function tripStart(kind) {
     const T = S.trip = kind === 'endless' ? { endless: true, start: TRIP_START, rounds: [], used: new Set() } : makeTrip(today());
     T.results = []; T.i = -1; T.score = 0; T.at = T.start;
     if (T.endless) { T.need = 0; S.cap = S.energy = ENDLESS_TANK; }
     else {
-      let need = 0, at = T.start;
-      for (const R of T.rounds) { const to = goalOf(R, at[0], at[1]); need += tripPar(kmBetween(at[0], at[1], to[0], to[1])); at = to; }      // the cheapest day: each round from where the last one ended
-      T.need = Math.max(10, need);
+      T.need = dayNeed(T);
       S.cap = S.energy = Math.round(TRIP_TANK * T.need);
       // a trip begun earlier today is carried on: its rounds and points, the energy left, and the bird where it stood
       tripSettle();
@@ -2299,15 +2303,17 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       T.ready = true;
       const btn = ticketsEl.querySelector('.next');
       if (!btn) return;
-      btn.textContent = T.endless ? (S.energy > 0.5 ? 'Next location' : 'See your score') : T.i < 4 ? 'Next location' : 'See your day';
+      btn.textContent = tripMore(T) ? 'Next location' : T.endless ? 'See your score' : 'See your day';
       btn.classList.add('ready');
     }
   }
+  // another round? Not without energy to take off with (a Day Trip that runs dry ends there, the rounds left "Not reached")
+  const tripMore = (T) => S.energy > 0.5 && (T.endless || T.i < 4);
   function tripNext() {
     const T = S.trip;
     if (!T || !T.ready) return;
     T.ready = false;
-    if (T.endless ? S.energy > 0.5 : T.i < 4) tripCount(T.i + 1); else tripEnd();
+    if (tripMore(T)) tripCount(T.i + 1); else tripEnd();
   }
   function tripLand(here, lon, lat) {
     const T = S.trip;
@@ -2445,11 +2451,12 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   function tripSave() {
     const T = S.trip;
     save.trips[T.day] = { score: T.score, rounds: T.results.map((r) => ({ kind: r.kind, name: r.name, country: r.country, a2: r.a2, pop: r.pop, right: r.right, tier: r.tier, d: r.d, closeness: r.closeness, speed: r.speed, secs: r.secs, energy: r.energy, pts: r.pts, at: r.at, path: r.path, from: r.from, goal: r.goal, land: r.land })),
-      at: [Math.round(bird.lon * 1000) / 1000, Math.round(bird.lat * 1000) / 1000], energy: Math.round(S.energy * 100) / 100, open: inRound() ? T.i : undefined };
+      at: [Math.round(bird.lon * 1000) / 1000, Math.round(bird.lat * 1000) / 1000], energy: Math.round(S.energy * 100) / 100, open: inRound() ? T.i : undefined, over: T.done || undefined };
     for (const d in save.trips) if (d !== T.day) for (const r of save.trips[d].rounds) { delete r.path; delete r.from; delete r.goal; delete r.land; }      // only today's card can be opened again
     persist();
   }
-  const tripDone = () => { const t = save.trips[today()]; return !!t && t.rounds.length >= 5; };
+  // today's trip is flown: all five rounds, or it ended early with the energy gone (until 2026-11-12 that one said "Carry on" for ever)
+  const tripDone = () => { const t = save.trips[today()]; return !!t && (t.rounds.length >= 5 || !!t.over); };
   // A round left with its clue showing scores 0: the stopwatch cannot be stopped by leaving, any more than by pausing.
   function tripSettle() {
     const t = save.trips[today()];
@@ -2601,8 +2608,10 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     if (t.label) t.label.secs = 0;                     // the name it wore since it was shown: the delivery writes its own
     const off = it.kind === 'k' ? kmBetween(lon, lat, c.cap[1], c.cap[2]) : 0;
     const spot = it.kind === 'k' && (c.tiny || off <= capKm(c) / 3);
-    // par for the distance from where the letter was picked up; the first letter, picked up at the top, has none
-    const par = t.fromAir ? 0 : parFor(kmBetween(t.from[0], t.from[1], lon, lat));
+    // par for the distance from where the postcard was picked up. The first of a flight, picked up at the top, has none:
+    // that height was free. Any later one has it, also when the bird was already off the ground again as it came (it paid
+    // for that climb: until 2026-11-12 taking off within 0.6 s of a delivery lost the next postcard's whole par)
+    const par = t.fromTop ? 0 : parFor(kmBetween(t.from[0], t.from[1], lon, lat));
     let gain = clean ? SLACK * par + 1 + BONUS * Math.pow(BONUS_FADE, S.n) + (spot ? BULLSEYE : 0) : par;
     S.lastGain = gain;
     // How well it was known: flown straight to (a new one too: then it was known already) is Good, or
@@ -3680,7 +3689,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   // Ground speed in km a second at a height, flying flat out.
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   const setBird = (lon, lat, a, down) => Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down });
-  window.birdsEye = { names: () => atlasNames, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), parFor, capKm, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds,
+  window.birdsEye = { names: () => atlasNames, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), parFor, capKm, dayNeed, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds,
     project: projectLL, unproject, speedAt, placed, seen: () => seen, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
