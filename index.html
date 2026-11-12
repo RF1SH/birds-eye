@@ -220,12 +220,12 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
 @keyframes board { from { transform: translateY(10px); opacity: 0; } }
 @keyframes leave { to { transform: translateY(-10px); opacity: 0; } }
 /* a landing within 1 km: a postmark stamped above the bird */
-#spoton { position: absolute; z-index: 3; pointer-events: none; zoom: var(--ui, 1); transform: translate(-50%, -100%) rotate(-8deg);
+#spoton { position: absolute; z-index: 3; pointer-events: none; zoom: var(--ui, 1); transform: translate(-50%, 0) rotate(-8deg);
   padding: 6px 16px 8px; border: 4px double var(--good); border-radius: 6px; background: rgba(255,253,246,.92);
   color: var(--good); font: italic 800 44px/1 var(--display); text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; }
 #spoton.go { animation: stamp 2.2s cubic-bezier(.2,.9,.3,1.2) forwards; }
-@keyframes stamp { 0% { transform: translate(-50%, -100%) rotate(-8deg) scale(2.2); opacity: 0; } 12% { transform: translate(-50%, -100%) rotate(-8deg) scale(1); opacity: 1; }
-  80% { opacity: 1; } 100% { transform: translate(-50%, -100%) rotate(-8deg) scale(1); opacity: 0; } }
+@keyframes stamp { 0% { transform: translate(-50%, 0) rotate(-8deg) scale(2.2); opacity: 0; } 12% { transform: translate(-50%, 0) rotate(-8deg) scale(1); opacity: 1; }
+  80% { opacity: 1; } 100% { transform: translate(-50%, 0) rotate(-8deg) scale(1); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { #spoton.go { animation: stamp-fade 2.2s forwards; } @keyframes stamp-fade { 0%, 80% { opacity: 1; } 100% { opacity: 0; } } }
 /* One box beside the postcard for what the flight has scored. Study: the postcards delivered. Day Trip and Ranked:
    the rounds, the stopwatch and the points, with a hairline between them. */
@@ -284,7 +284,11 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
 .ticket.result .plus.wrong { color: var(--bad); }
 .ticket.result .parts b { color: var(--ink); }
 #daycard { width: min(660px, 100%); }
+#daycard tr.on td { background: var(--paper-shade); }
+#daycard [data-i] { cursor: pointer; }
+.squares i.on { outline: 2px solid var(--ink); outline-offset: 2px; }
 #daycard.wide { width: min(780px, 100%); }
+#stage.side #daycard:not(.wide) { width: min(660px, calc(52vw / var(--ui, 1))); }
 #daycard { padding: 20px 22px 18px; background: var(--paper); border: var(--b2z) solid var(--ink); border-radius: 3px; pointer-events: auto; }
 #daycard .top { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px; }
 #daycard h2 { margin: 0; font: 700 34px/1 var(--display); }
@@ -601,7 +605,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     rootStyle.setProperty('--b2z', ((b2 + 0.02) / view.ui).toFixed(4) + 'px'); rootStyle.setProperty('--b1z', ((b1 + 0.02) / view.ui).toFixed(4) + 'px');
     const con = $('console'), deb = $('debrief'), box = stage.getBoundingClientRect();
     // the day's card: under the globe on a narrow screen, beside it (on the left) on a wide one, so it never squeezes the globe
-    const day = $('daycard'), side = !day.hidden && w > 900 && w > 1.5 * h;
+    const day = $('daycard'), side = !day.hidden && w > 900 && w > 1.4 * h;
     stage.classList.toggle('side', side);
     const bar = !con.hidden ? con : !deb.hidden ? deb : !day.hidden && !side ? day : null;
     view.deck = bar ? box.bottom - bar.getBoundingClientRect().top + 10 : 0;
@@ -1066,7 +1070,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       if (fl.c.water || fl.c.order === undefined) continue;
       // pulses: 1 fades out; 0 holds, then fades in its last fifth (a Day Trip answer); more blink
       const k = fl.t / fl.secs, a = fl.pulses === 0 ? (k < 0.8 ? 1 : (1 - k) / 0.2) : fl.pulses === 1 ? 1 - k : 0.5 + 0.5 * Math.cos(k * fl.pulses * 2 * Math.PI);
-      fill(L.ranges[fl.c.order], colour(fl.col || PAPER, clamp(a, 0, 1) * (fl.col ? 0.75 : 0.95)));
+      fill(L.ranges[fl.c.order], colour(fl.col || PAPER, clamp(a, 0, 1) * (fl.k || (fl.col ? 0.75 : 0.95))));
     }
     gl.disable(gl.BLEND);
     fill(L.lakes, colour(SEA));
@@ -1418,7 +1422,8 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     tickets: [], last: null, history: [], spawnAt: 0, sinceNew: 2, recent: [], turn: 0, endAt: 0,
     log: new Map(), drops: [], look: null, gain: 0, fails: new Map(),
   };
-  const atlas = { lon: -20, lat: 18, spin: 6, idle: 0, from: null, to: null, k: 1 };
+  const REST = 2.5, END_REST = 4;       // seconds a globe holds still before it starts to turn: the title's, and Study's end globe on the start of the flight
+  const atlas = { lon: -20, lat: 18, spin: 6, idle: 0, rest: REST, from: null, to: null, k: 1 };
   // Height on the camera: 0 on the ground, 1 at the top, evenly spaced in the logarithm.
   const heightFor = (a) => Math.exp(lerp(Math.log(view.H0), Math.log(view.H1), clamp(a, 0, 1)));
   // Speed on screen, flying flat out, in pixels a second.
@@ -1535,6 +1540,47 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   // name is on the side away from the bird and off the thread between them. A name further than FAR from its place
   // gets a line back to it. All of them grow with the screen.
   const UNDER = 'under', OVER = 'over', UNDER_GAP = 30, NEAR = 16, FAR = 34;
+  // A country's own name. Inside the country when it has room there: the name and flag take less than a third of the
+  // country as drawn and lie in it. Else beside it, clear of its shape and tied to it with a line: above it, below it or
+  // at a side, whichever covers least of it, then least of other land (over the sea, as an atlas does), clear of the
+  // bird, the side away from the bird first. So a small country is never hidden under its own name. Found again when
+  // the map's scale changes.
+  const AREA = 'area';
+  function areaSpot(f, c, s, box) {
+    const key = Math.round(Math.log(cam.pxRad) * 6) + (bird.down ? 'd' : 'a');
+    if (f.spotKey === key) return f.spot;
+    f.spotKey = key;
+    const at = (x, y) => { const ll = unproject(x, y), r = ll && regionAt(ll[0], ll[1]); return r && r.c ? (r.c === c ? 10 : 0.5) : 0; };
+    const inC = (x, y) => at(x, y) === 10;
+    // how much of the country a name at (cx, cy) would hide (15 points of it are tried), and whether it lies mostly on other land
+    const cover = (cx, cy) => { let own = 0, other = 0; for (let i = 0; i < 5; i++) for (let j = 0; j < 3; j++) { const v = at(cx - box.half + 6 + (2 * box.half - 12) * i / 4, cy - box.rise + (box.rise + box.drop) * j / 2); if (v === 10) own++; else if (v) other++; } return [own, other]; };
+    const scale = cam.pxRad / R_KM, room = c.km * scale * scale;
+    if (2 * box.half * (box.rise + box.drop) <= room / 3 && cover(s[0], s[1])[0] >= 11) return (f.spot = [0, 0]);
+    const step = 6 * view.mk, gap = NEAR * view.mk, ext = [[0, -1], [0, 1], [-1, 0], [1, 0]].map(([dx, dy]) => {
+      let far = 0, out = 0;
+      for (let n = 1; n < 90 && out < 3; n++) { if (inC(s[0] + dx * n * step, s[1] + dy * n * step)) { far = n * step; out = 0; } else out++; }
+      return far;
+    });
+    const me = bird.down ? project(unit(bird.lon, bird.lat)) : null;
+    const cands = [[0, -ext[0] - gap - box.drop], [0, ext[1] + gap + box.rise], [-ext[2] - gap - box.half, 0], [ext[3] + gap + box.half, 0]];
+    if (me && me[1] < s[1]) cands.unshift(cands.splice(1, 1)[0]);       // the bird is above: under the country first
+    let best = null, low = 1e9;
+    cands.forEach(([dx, dy], i) => {
+      // a country is not round: step further out until the name hides none of it (ten steps at most)
+      const ux = Math.sign(dx), uy = Math.sign(dy);
+      let own = 0, other = 0, k = 0;
+      for (; k <= 10; k++) { [own, other] = cover(s[0] + dx + ux * k * 2 * step, s[1] + dy + uy * k * 2 * step); if (!own) break; }
+      dx += ux * Math.min(k, 10) * 2 * step; dy += uy * Math.min(k, 10) * 2 * step;
+      const x = s[0] + dx, y = s[1] + dy, m = 8 * view.mk;
+      if (x - box.half < 4 || x + box.half > view.w - 4 || y - box.rise < 4 || y + box.drop > view.h - view.deck - 4) return;
+      // clear of the bird and of the names already up; then hiding none of the country; then over the sea rather than on
+      // other land (when it is mostly sea); then above or below before a side; then the nearer
+      const hit = placed.some((b) => Math.abs(x - b.x) < box.half + b.half + m && y - box.rise < b.y + b.down + m && y + box.drop > b.y - b.up - m);
+      const score = (hit ? 5000 : 0) + own * 10 + (other > 5 ? 6 : 0) + i + 3 * k;
+      if (score < low) { low = score; best = [dx, dy]; }
+    });
+    return (f.spot = best || [0, 0]);
+  }
   function plateBox(c, str, cls, sub) {
     [str, sub] = disputed(c, str, sub);
     const o = Object.assign({ size: namePx() }, STYLE[cls] || STYLE.name);
@@ -1549,7 +1595,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     const rise = c && c.flag ? fh / 2 - mid : o.size * 0.4, drop = c && c.flag ? mid + fh / 2 : sub ? o.size + 1 + ss * 0.4 : o.size * 0.4;
     return { half: w / 2 + 6, up: Math.max(half, rise + 2), down: Math.max(sub ? o.size + 1 + ss * 0.8 : half, drop + 2), rise, drop, px: o.size };
   }
-  function settle(x, y, box, ax, ay, alpha) {
+  function settle(x, y, box, ax, ay, alpha, quiet) {
     const beside = (b) => Math.abs(b.x - x) < b.half + box.half;
     const free = (yy) => !placed.some((b) => beside(b) && yy - box.up < b.y + b.down && yy + box.down > b.y - b.up);
     let at = y;
@@ -1566,7 +1612,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     // name is next to it anyway.
     const underBird = placed[0] && placed[0].bird && Math.abs(ax - placed[0].x) < placed[0].half && ay > placed[0].y - placed[0].up && ay < placed[0].y + placed[0].down;
     const away = Math.max(at - box.rise - ay, ay - at - box.drop);          // from the place to the nearer edge of what is drawn
-    if (away > FAR * view.mk && !underBird) {
+    if (away > FAR * view.mk && !underBird && !quiet) {
       const edge = at < ay ? at + box.drop + 3 : at - box.rise - 3;
       ctx.globalAlpha = alpha;
       ctx.strokeStyle = INK; ctx.lineWidth = 1.2 * view.mk;
@@ -1575,6 +1621,32 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       ctx.globalAlpha = 1;
     }
     return at;
+  }
+  // The line that leaves the bird while it stands on the ground: Study's route to a capital, or a trip's line from the
+  // landing to the answer.
+  function lineFromBird() {
+    if (S.mode !== 'fly' || !bird.down) return null;
+    const v = S.trip && S.trip.reveal, t = S.tickets[0];
+    if (S.trip) return v && !v.area ? [v.from, v.to] : null;
+    return t && t.it.kind === 'k' && (t.shown || t.warm) ? [unit(bird.lon, bird.lat), pointOf(t.it)] : null;
+  }
+  // Where a name under the bird sits: its top UNDER_GAP below the bird's place on the ground. A name never sits on the
+  // line that leaves the bird, nor on the city at its end (a capital right below you was hidden under its country's
+  // name): when the line runs through that spot the name stands above the bird instead, clear of the bird and of the
+  // Zs it breathes out when it dozes off.
+  const ZZZ_TOP = 62;
+  function underY(s, x, box) {
+    const y = s[1] + UNDER_GAP * view.mk + box.up, L = lineFromBird();
+    if (!L) return y;
+    const len = Math.acos(clamp(dot(L[0], L[1]), -1, 1)) * cam.pxRad, far = Math.hypot(box.half, y + box.down - s[1]) + 12 * view.mk;
+    let crossed = false;
+    for (let d = 6; d <= len && d <= far && !crossed; d += 6) {
+      const q = project(slerp(L[0], L[1], d / len)), pad = (d > len - 6 ? 12 : 6) * view.mk;         // more room round the city itself
+      crossed = !!q && Math.abs(q[0] - x) < box.half + pad && q[1] > y - box.up - pad && q[1] < y + box.down + pad;
+    }
+    if (!crossed) return y;
+    const bb = birdBox(s);
+    return Math.min(bb.y - bb.up, s[1] - birdLift() - ZZZ_TOP) - box.down - 1;
   }
   // A name pinned to a place on the globe; it follows the globe as it turns and hides round the back.
   // With secs = GROUND it stays while the bird is on the ground, and fades once it takes off.
@@ -1591,16 +1663,22 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       }
       const s = project(p);
       if (!s) return;
-      const box = plateBox(c, str, cls, sub), x = s[0] + clamp(clamp(s[0], box.half + 4, view.w - box.half - 4) - s[0], -box.half, box.half);
+      const box = plateBox(c, str, cls, sub), spot = dy === AREA ? areaSpot(f, c, s, box) : null, sx = s[0] + (spot ? spot[0] : 0), x = sx + clamp(clamp(sx, box.half + 4, view.w - box.half - 4) - sx, -box.half, box.half);
       if (dy === OVER && bird.down) { const me = project(unit(bird.lon, bird.lat)); below = !!me && me[1] < s[1]; }
-      const want = dy === UNDER ? s[1] + UNDER_GAP * view.mk + box.up
+      const want = spot ? s[1] + spot[1] : dy === UNDER ? underY(s, x, box)
         : dy === OVER ? (below ? s[1] + NEAR * view.mk + box.up : s[1] - NEAR * view.mk - box.down)
         : s[1] + (typeof dy === 'function' ? dy() : dy || 0);
       // never out over space, and never without what it names: under the bird it goes when the bird does
       const dot = 10 * view.mk;
       alpha *= Math.min(rimIn({ x, y: want, half: box.half, up: box.rise, down: box.drop }), rimIn(dy === UNDER ? birdBox(s) : { x: s[0], y: s[1], half: dot, up: dot, down: dot }));
       if (alpha <= 0) return;
-      const y = settle(x, want, box, s[0], s[1], alpha);
+      const out = spot && (spot[0] || spot[1]), y = settle(x, want, box, s[0], s[1], alpha, out);
+      if (out) {         // beside its country: a line from the country to the nearer edge of the name
+        const ex = spot[0] ? x - Math.sign(spot[0]) * (box.half - 4) : x, ey = spot[0] ? y : y < s[1] ? y + box.drop + 3 : y - box.rise - 3;
+        ctx.globalAlpha = alpha; ctx.strokeStyle = INK; ctx.lineWidth = 1.2 * view.mk;
+        ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.beginPath(); ctx.arc(s[0], s[1], 2.2 * view.mk, 0, 7); ctx.fillStyle = INK; ctx.fill(); ctx.globalAlpha = 1;
+      }
       Object.assign(placed[placed.length - 1], { name: str, flag: !!(c && c.flag), ax: s[0], ay: s[1], rise: box.rise, drop: box.drop, px: box.px });      // for the tests
       nameplate(c, str, x, y, cls, sub, alpha);
     }, true);
@@ -1617,9 +1695,9 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       ctx.globalAlpha = 1;
     });
   }
-  function flash(c, pulses, secs, col) {
+  function flash(c, pulses, secs, col, k) {
     for (let i = flashes.length - 1; i >= 0; i--) if (flashes[i].c === c) flashes.splice(i, 1);
-    flashes.push({ c, t: 0, secs, pulses, col });
+    flashes.push({ c, t: 0, secs, pulses, col, k });
   }
 
   // ---------- letters ----------
@@ -1687,7 +1765,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     // a tiny country's by its dot as a capital's is by its pin). Shown again after another wrong landing: one name, not two
     if (t.label) t.label.secs = 0;
     if (t.it.kind === 'k') t.label = label(c, c.cap[0], p, 'name', 0, c.name, OVER, here);
-    else t.label = label(c.water ? null : c, c.name, p, c.water ? 'sea' : 'name', 0, null, c.water ? () => 22 + namePx() / 2 : c.tiny ? OVER : 0, here);
+    else t.label = label(c.water ? null : c, c.name, p, c.water ? 'sea' : 'name', 0, null, c.water ? () => 22 + namePx() / 2 : c.tiny ? OVER : AREA, here);
   }
   function countAgainst(t) {
     t.misses++;
@@ -1742,7 +1820,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   function takeOff() {
     if (tab === 'challenge' && runKind === 'day' && tripDone()) return;          // one trip a day (one begun is carried on)
     S.game = tab === 'challenge' ? 'trip' : tab;
-    Object.assign(S, { mode: 'fly', paused: false, t: 0, energy: TANK, n: 0, streak: 0, bestStreak: 0, firstTry: 0, fresh: 0, route: null, tour: null, tickets: [], last: null,
+    Object.assign(S, { mode: 'fly', paused: false, t: 0, energy: TANK, n: 0, streak: 0, bestStreak: 0, firstTry: 0, fresh: 0, route: null, legs: null, tickets: [], last: null,
       spawnAt: 0.4, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, gain: 0, idle: 0, fails: new Map() });
     S.log = new Map();
     S.drops = [];
@@ -2075,6 +2153,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   const fallKm = (R) => TRIP_K * (1 + 2 * hardOf(R)) * (flagged(R) ? FLAG_X : 1);
   const worth = (T, R) => T.endless ? 100 * (1 + hardOf(R)) * (flagged(R) ? FLAG_X : 1) : DAY_ACC;
   const TRIP_K = 150, CITY_KM = 50, TRIP_TANK = 3, SPOT_KM = 1, COUNT = 3, ENERGY_FLOOR = 2, ENERGY_WASTE = 14;
+  const ADDRESS = 'https://rf1sh.github.io/birds-eye/';       // where the game lives: the last line of a shared result
   const TRIP_START = [0, 0];                  // every trip and run starts here: the middle of the map, off West Africa
   const INTRO_TURN = 0.9, INTRO_ZOOM = 1.7;   // the 3-2-1: seconds to turn the globe there, then to come down
   // Measured with a scripted pilot (tests/trip_pilot.py): an efficient flight takes 1 + km / 3500 s, at
@@ -2126,13 +2205,25 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     for (const r of c.fine) for (let i = 0; i < r.length; i += 2) best = Math.min(best, kmBetween(lon, lat, r[i] / 100, r[i + 1] / 100));
     return best;
   }
+  // Where the cheapest flight to a round's answer ends, from where the round begins. A city or a capital is a point.
+  // A country is an area, never its middle (the player: "Why do they go to the center of the country? The shortest
+  // route would be just to go to the edge of the country that's closest"): the nearest point of it, and for a round
+  // that begins inside it, the spot the bird stands on. The fair time, the cheapest flight that energy use is judged
+  // against and the day's tank are all measured to this point, and the results globe draws the shortest way to it.
+  function goalOf(R, lon, lat) {
+    if (R.kind !== 'country' && R.kind !== 'flag') return [R.lon, R.lat];
+    if (reaches(R.c.where, lon, lat)) return [lon, lat];
+    let best = Infinity, at = [R.lon, R.lat];
+    for (const r of R.c.fine) for (let i = 0; i < r.length; i += 2) { const d = kmBetween(lon, lat, r[i] / 100, r[i + 1] / 100); if (d < best) { best = d; at = [r[i] / 100, r[i + 1] / 100]; } }
+    return at;
+  }
   function tripStart(kind) {
     const T = S.trip = kind === 'endless' ? { endless: true, start: TRIP_START, rounds: [], used: new Set() } : makeTrip(today());
     T.results = []; T.i = -1; T.score = 0; T.at = T.start;
     if (T.endless) { T.need = 0; S.cap = S.energy = ENDLESS_TANK; }
     else {
       let need = 0, at = T.start;
-      for (const R of T.rounds) { need += tripPar(kmBetween(at[0], at[1], R.lon, R.lat)); at = [R.lon, R.lat]; }
+      for (const R of T.rounds) { const to = goalOf(R, at[0], at[1]); need += tripPar(kmBetween(at[0], at[1], to[0], to[1])); at = to; }      // the cheapest day: each round from where the last one ended
       T.need = Math.max(10, need);
       S.cap = S.energy = Math.round(TRIP_TANK * T.need);
       // a trip begun earlier today is carried on: its rounds and points, the energy left, and the bird where it stood
@@ -2173,7 +2264,8 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   function tripShow(i) {
     const T = S.trip, R = T.rounds[i];
     T.intro = null;
-    Object.assign(T, { i, t0: S.t, e0: S.energy, from: [bird.lon, bird.lat], wait: false, count: 0, fair: fairSecs(kmBetween(bird.lon, bird.lat, R.lon, R.lat)) });
+    const goal = goalOf(R, bird.lon, bird.lat), km = kmBetween(bird.lon, bird.lat, goal[0], goal[1]);
+    Object.assign(T, { i, t0: S.t, e0: S.energy, from: [bird.lon, bird.lat], goal, km, wait: false, count: 0, fair: fairSecs(km) });
     const node = document.createElement('div'), addr = document.createElement('div');
     node.className = 'ticket ask'; addr.className = 'addr';
     const what = R.kind === 'flag' || R.kind === 'capflag' ? flagImg(R.c, 'A flag') :
@@ -2200,6 +2292,9 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       if (S.t >= T.count) tripShow(T.next);
     } else if (!T.wait) {
       showClock(S.t - T.t0);
+      // the way the bird goes, for the results globe: where it is and whether it is flapping, twenty times a second
+      if (!T.trk) { T.trk = [[T.from[0], T.from[1], 0]]; T.trkAt = S.t - 1; }
+      if (S.t - T.trkAt >= 0.05) { T.trk.push([+bird.lon.toFixed(2), +bird.lat.toFixed(2), keys.flap && S.energy > 0 && !bird.down ? 1 : 0]); T.trkAt = S.t; }
     } else if (!T.ready && T.done !== true && S.t >= T.after && !S.look) {
       T.ready = true;
       const btn = ticketsEl.querySelector('.next');
@@ -2225,29 +2320,30 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     const took = S.t - T.t0;
     const speed = right ? Math.round(20 * clamp(1 - Math.max(0, took - T.fair) / T.fair, 0, 1)) : 0;
     // energy use, when right: every point for spending no more than the cheapest flight for the leg (one climb just
-    // high enough to see the location, then a glide straight to it: par). Past that, needless flapping costs the same
+    // high enough to see the location, then a glide straight to it, for a country to its nearest point: par). Past that, needless flapping costs the same
     // on every leg, 10 points a second of it (flapping burns 7 a second), so ENERGY_WASTE of it leaves none; a short
     // hop is judged no harder than a long flight. A hop still needs a take-off, so the cheapest never counts as less
     // than ENERGY_FLOOR (the scripted pilot spends 1.6 to 2.1 on legs of 750 to 1,200 km, whose par is 0.5 to 1.9).
-    const leg = tripPar(kmBetween(T.from[0], T.from[1], R.lon, R.lat)), used = T.e0 - S.energy, cheap = Math.max(leg, ENERGY_FLOOR);
+    const leg = tripPar(T.km), used = T.e0 - S.energy, cheap = Math.max(leg, ENERGY_FLOOR);
     const energy = right ? Math.round(20 * clamp(1 - Math.max(0, used - cheap) / ENERGY_WASTE, 0, 1)) : 0;
     const pts = closeness + speed + energy;
     T.score += pts;
     T.results.push({ kind: R.kind, name: R.name, country: R.c.name, a2: R.c.a2, pop: R.city ? R.city.pop : 0, right, tier, d: Math.round(d * 10) / 10, closeness, speed, energy, used: Math.round(used * 100) / 100, secs: Math.round(took * 10) / 10, pts, p: R.p });
     Object.assign(T, { wait: true, ready: false, reveal: { from: p, to: R.p, km: R.km, right, area: countryRound } });
     T.results[T.results.length - 1].at = here.name || 'Open ocean';
+    Object.assign(T.results[T.results.length - 1], { path: (T.trk || []).concat([[lon, lat, 0]]), from: T.from.slice(), goal: T.goal.slice(), land: [lon, lat] }); T.trk = null;
     // the endless run: a right landing gives back less than the leg cost, a spot-on one nearly all of it (the ring shows it)
-    if (T.endless && right) S.energy = Math.min(S.cap, S.energy + leg * (tier === 'spot' ? REFILL_SPOT : REFILL));
+    if (T.endless && right) S.energy = Math.min(S.cap, S.energy + cheap * (tier === 'spot' ? REFILL_SPOT : REFILL));
     if (!T.endless) tripSave();
     $('count').textContent = T.score;
     $('trip-clock').hidden = true;
     // The answer, named where it is, the way Study names a delivery. A wrong landing is named in red too, unless it
     // is in the answer's own country: the answer's name already carries that country and its flag.
-    const col = right ? GOOD : BAD;
-    if (countryRound) flash(R.c, 0, 4, col);
-    if (!right && here.name && (here.sea || here.c !== R.c)) label(here.sea ? null : here.c, here.name, p, here.sea ? 'wrongsea' : 'wrong', GROUND, null, UNDER);
+    const col = right ? GOOD : tier === 'near' ? INK : BAD;        // the verdict is worn by the landing: its ring and its name
+    if (countryRound) { if (right) flash(R.c, 1, FLASH); else flash(R.c, 0, 4, null, 0.5); }      // the answer: lit as a delivery is, or held paper-white while you find it
+    if (!right && here.name && (here.sea || here.c !== R.c)) label(here.sea ? null : here.c, here.name, p, tier === 'near' ? (here.sea ? 'sea' : 'name') : here.sea ? 'wrongsea' : 'wrong', GROUND, null, UNDER);
     const sub = R.kind === 'city' ? R.c.name + ', population ~' + people(R.city.pop) : countryRound ? null : R.c.name;
-    label(R.c, R.name, R.p, 'name', GROUND, sub, countryRound ? 0 : OVER);
+    label(R.c, R.name, R.p, 'name', GROUND, sub, countryRound ? AREA : OVER);
     ring(p, 6, 30, col, 2.5, 0.5);
     (right ? (tier === 'spot' ? sfx.spot : sfx.drop) : sfx.miss)();
     const node = document.createElement('div');
@@ -2268,12 +2364,12 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   // counts, so a line to one spot of it would be untrue (and the distance scored is to its nearest edge). It is lit
   // and named, and while it is out of sight the edge arrow points to it.
   function drawReveal() {
-    const v = S.trip.reveal, col = v.right ? GOOD : BAD;
+    const v = S.trip.reveal, col = PAPER, edge = INK;
     if (v.area) { if (!onScreen(project(v.to), 34 * view.mk)) edgeArrow(unit(bird.lon, bird.lat), v.to); return; }
     if (v.km) reach(v.to, v.km, 1, col);
     arc(v.from, v.to, PAPER, 4 * view.mk); arc(v.from, v.to, INK, 2 * view.mk, [6 * view.mk, 6 * view.mk]);
     const s = project(v.to);
-    if (s) { ctx.globalAlpha = rimDot(s, 7 * view.mk); ctx.beginPath(); ctx.arc(s[0], s[1], 7 * view.mk, 0, 7); ctx.fillStyle = PAPER; ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 3 * view.mk; ctx.stroke(); ctx.globalAlpha = 1; }
+    if (s) { ctx.globalAlpha = rimDot(s, 7 * view.mk); ctx.beginPath(); ctx.arc(s[0], s[1], 7 * view.mk, 0, 7); ctx.fillStyle = PAPER; ctx.fill(); ctx.strokeStyle = edge; ctx.lineWidth = 3 * view.mk; ctx.stroke(); ctx.globalAlpha = 1; }
   }
   // The endless run: never the same place twice, countries first, then flags, capitals, capitals of
   // flags and cities, each from a growing slice of its easiest-first list.
@@ -2332,7 +2428,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   }
   function statsRow(T, i) {
     const R = T.rounds[i], r = T.results[i];
-    return '<tr><td class="n">' + (i + 1) + '</td>' + givenCell(R, true) + youCell(r) +
+    return '<tr' + (r.path ? ' data-i="' + i + '"' : '') + '><td class="n">' + (i + 1) + '</td>' + givenCell(R, true) + youCell(r) +
       '<td class="num">' + out(r.closeness, roundMax(T, i, R.kind) - 40) + '</td><td class="num">' + out(r.speed, 20) + '</td><td class="num">' + r.secs.toFixed(1) + ' s</td>' +
       '<td class="num">' + out(r.energy || 0, 20) + '</td><td class="pts">' + out(r.pts, roundMax(T, i, R.kind)) + '</td></tr>';
   }
@@ -2343,13 +2439,14 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       '<div class="scroll"><table class="stats">' + STATS_HEAD + rows + '</table></div>' +
       '<div class="row"><button class="go" id="trip-back" type="button">Back</button><button class="alt" id="trip-again" type="button">Play again</button></div>';
   }
-  const squaresHtml = (results) => results.map((r) => '<i class="' + (!r ? 'none' : r.right ? 'right' : r.tier) + '"' + (r ? ' title="' + esc(r.name) + '"' : '') + '></i>').join('');
+  const squaresHtml = (results) => results.map((r, i) => '<i class="' + (!r ? 'none' : r.right ? 'right' : r.tier) + '"' + (r ? ' title="' + esc(r.name) + '"' : '') + (r && r.path ? ' data-i="' + i + '"' : '') + '></i>').join('');
   // Today's trip is saved as it goes, so one left part-way (Home between rounds, a closed window) is carried on from the
   // next round: the rounds flown, where the bird stands, the energy left, and the round whose clue is showing, if one is.
   function tripSave() {
     const T = S.trip;
-    save.trips[T.day] = { score: T.score, rounds: T.results.map((r) => ({ kind: r.kind, name: r.name, country: r.country, a2: r.a2, pop: r.pop, right: r.right, tier: r.tier, d: r.d, closeness: r.closeness, speed: r.speed, secs: r.secs, energy: r.energy, pts: r.pts, at: r.at })),
+    save.trips[T.day] = { score: T.score, rounds: T.results.map((r) => ({ kind: r.kind, name: r.name, country: r.country, a2: r.a2, pop: r.pop, right: r.right, tier: r.tier, d: r.d, closeness: r.closeness, speed: r.speed, secs: r.secs, energy: r.energy, pts: r.pts, at: r.at, path: r.path, from: r.from, goal: r.goal, land: r.land })),
       at: [Math.round(bird.lon * 1000) / 1000, Math.round(bird.lat * 1000) / 1000], energy: Math.round(S.energy * 100) / 100, open: inRound() ? T.i : undefined };
+    for (const d in save.trips) if (d !== T.day) for (const r of save.trips[d].rounds) { delete r.path; delete r.from; delete r.goal; delete r.land; }      // only today's card can be opened again
     persist();
   }
   const tripDone = () => { const t = save.trips[today()]; return !!t && t.rounds.length >= 5; };
@@ -2413,19 +2510,26 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   function showResults(T, from) {
     S.mode = 'over'; S.landedAt = performance.now(); S.look = null;
     $('spoton').hidden = true;               // the stamp of the last landing does not stay up over the card
-    S.route = null; S.tour = null;           // Day Trip and Ranked results: no flight path, the globe holds on the answers
+    S.route = null;           // Study's path of deliveries; a trip's flights are in S.legs
     stage.classList.remove('flying'); stage.classList.add('atlas');
     keys.left = keys.right = keys.up = keys.down = keys.flap = false;
     fx.length = 0;
-    atlasNames = T.results.map((r, i) => ({ c: T.rounds[i].c, p: r.p, name: r.name, lost: !r.right && r.tier !== 'near', city: r.kind !== 'country' && r.kind !== 'flag' })).slice(-12);
+    // the answers, named in ink: an answer is never red, the dot where you came down wears the verdict
+    atlasNames = T.results.map((r, i) => ({ c: T.rounds[i].c, p: r.p, name: r.name, city: r.kind !== 'country' && r.kind !== 'flag', i }));
     const mid = norm(T.results.slice(-12).reduce((a, r) => [a[0] + r.p[0], a[1] + r.p[1], a[2] + r.p[2]], [1e-9, 0, 0]));
     const [lon, lat] = T.results.length ? lonLat(mid) : from;
     atlas.from = from; atlas.to = [lon, clamp(lat, -45, 60)]; atlas.k = 0; atlas.lon = from[0]; atlas.lat = from[1]; atlas.spin = 0; atlas.idle = 0;
+    // The flight of every round that has one (a round left with its clue showing has none, nor has a trip saved before
+    // flights were kept). The globe shows the last round flown; the others are picked on the card.
+    S.legs = null; S.focus = null; S.rowOn = undefined;
+    const legs = T.results.map((r, i) => !r.path ? null : { from: unit(r.from[0], r.from[1]), to: unit(...(r.goal || goalOf(T.rounds[i], r.from[0], r.from[1]))), land: unit(r.land[0], r.land[1]), ans: r.p, pts: r.path.map((q) => [unit(q[0], q[1]), q[2]]), tier: r.tier, right: r.right });
+    if (legs.some(Boolean)) S.legs = legs; else atlasNames = atlasNames.slice(-12);          // no flights kept: the last twelve answers, on a globe that holds still
     $('daycard').classList.remove('wide');
     if (T.endless) endlessEnd(); else dayCard(T);
     $('console').hidden = true;
     $('daycard').hidden = false;
     measure(); recolour();
+    if (S.legs) showLeg(S.legs.reduce((last, L, i) => (L ? i : last), 0));          // once the card is laid out, so the names are settled for the globe's real place on the screen
     $(T.endless ? 'trip-again' : 'trip-share').focus({ preventScroll: true });
   }
   const tripDate = (T) => new Date(T.day + 'T12:00:00Z').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
@@ -2440,11 +2544,18 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       '<div class="row"><button class="go" id="trip-share" type="button">Share</button><button class="alt" id="trip-home" type="button">Home <kbd>H</kbd></button></div>';
   }
   function shareTrip(T, btn) {
-    const text = T.endless ? "Bird's Eye Ranked: " + T.score.toLocaleString('en') + ' points\n' + shareSquares(T.results, 10) :
-      "Bird's Eye Day Trip, " + tripDate(T) + ': ' + T.score + '/1,000\n' + shareSquares(T.rounds.map((R, i) => T.results[i]), 5) + '\n' + streakText(tripStreak());
+    // what a friend needs to find the game is its address, last; a streak is worth a line from the second day
+    const streak = tripStreak(), text = (T.endless ? "Bird's Eye Ranked: " + T.score.toLocaleString('en') + ' points\n' + shareSquares(T.results, 10) :
+      "Bird's Eye Day Trip, " + tripDate(T) + ': ' + T.score + '/1,000\n' + shareSquares(T.rounds.map((R, i) => T.results[i]), 5) + (streak >= 2 ? '\n' + streakText(streak) : '')) + '\n' + ADDRESS;
     const done = () => { btn.textContent = 'Copied'; };
     if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, () => {}); else done();
   }
+  // A round is picked by pointing at its row (in Ranked, its square) or clicking it: the globe turns to that round's
+  // flight. Nothing plays by itself (the player: "who's actually going to stick around ... for it to go through all 5
+  // rounds automatically"). A row that comes up under a mouse at rest does not count as pointing at it.
+  const pickRound = (e) => { const el = e.target.closest('[data-i]'), i = el ? +el.dataset.i : -1; if (S.mode === 'over' && S.legs && S.legs[i] && S.focus !== i) showLeg(i); };
+  $('daycard').addEventListener('mousemove', (e) => { if (e.movementX || e.movementY) pickRound(e); });
+  $('daycard').addEventListener('click', pickRound);
   // one listener for the card's buttons, whichever view of it is showing
   $('daycard').addEventListener('click', (e) => {
     const b = e.target.closest('button'), T = S.trip;
@@ -2452,14 +2563,14 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     if (b.id === 'trip-home') goHome();
     else if (b.id === 'trip-again') { runKind = 'endless'; takeOff(); }
     else if (b.id === 'trip-share') shareTrip(T, b);
-    else if (b.id === 'trip-stats') { $('daycard').classList.add('wide'); rankedStats(T); measure(); $('trip-back').focus({ preventScroll: true }); }
-    else if (b.id === 'trip-back') { $('daycard').classList.remove('wide'); rankedOverview(T); measure(); $('trip-stats').focus({ preventScroll: true }); }
+    else if (b.id === 'trip-stats') { $('daycard').classList.add('wide'); rankedStats(T); S.rowOn = undefined; measure(); $('trip-back').focus({ preventScroll: true }); }
+    else if (b.id === 'trip-back') { $('daycard').classList.remove('wide'); rankedOverview(T); S.rowOn = undefined; measure(); $('trip-stats').focus({ preventScroll: true }); }
   });
   // within 1 km of the answer: "Spot on" stamped over the bird for a moment
   function spotOn() {
     const el = $('spoton'), at = project(unit(bird.lon, bird.lat));
     if (!at) return;
-    el.style.left = (at[0] / view.ui) + 'px'; el.style.top = ((at[1] - 40) / view.ui) + 'px';
+    el.style.left = (at[0] / view.ui) + 'px'; el.style.top = ((at[1] + UNDER_GAP * view.mk) / view.ui) + 'px';
     el.hidden = false; el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
     clearTimeout(spotOn.t); spotOn.t = setTimeout(() => { el.hidden = true; el.classList.remove('go'); }, 2300);
   }
@@ -2468,13 +2579,13 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   function youCell(r) {
     if (!r) return '<td class="you miss">Not reached</td>';
     const km = r.d || r.tier === 'spot' ? ' <small>' + exactKm(r.d) + '</small>' : '';
-    const what = r.at ? esc(r.at) : '<span class="tick ' + r.tier + '">' + TICK[r.tier] + '</span>';
+    const what = r.right || !r.at ? '<span class="tick ' + r.tier + '">' + (r.right ? '\u2713' : TICK[r.tier]) + '</span>' : esc(r.at);      // a correct landing: a check mark, not the answer's name again
     return '<td class="you ' + (r.right ? 'right' : r.tier === 'near' ? 'near' : 'miss') + '">' + what + km + '</td>';
   }
   const TRIP_HEAD = '<tr class="head"><td></td><td>Given</td><td>You</td><td class="pts">Points</td></tr>';
   function tripRow(T, i) {
     const R = T.rounds[i], r = T.results[i];
-    return '<tr><td class="n">' + (i + 1) + '</td>' + givenCell(R, true) + youCell(r) +
+    return '<tr' + (r && r.path ? ' data-i="' + i + '"' : '') + '><td class="n">' + (i + 1) + '</td>' + givenCell(R, true) + youCell(r) +
       '<td class="pts">' + out(r ? r.pts : 0, roundMax(T, i, R.kind)) + '</td></tr>';
   }
   // green right, yellow near, red missed (or not reached), a row of `per`
@@ -2547,7 +2658,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       // at its middle when that is in sight and the name and flag stand clear of the bird there; else under the bird
       const box = plateBox(c, c.name, 'name'), me = birdBox(project(p) || [view.w / 2, view.gy]);
       const clear = on && (Math.abs(there[0] - me.x) >= box.half + me.half || there[1] - box.up >= me.y + me.down || there[1] + box.down <= me.y - me.up);
-      label(c, c.name, clear ? c.u : p, 'name', GROUND, null, clear ? 0 : UNDER);
+      label(c, c.name, clear ? c.u : p, 'name', GROUND, null, clear ? AREA : UNDER);
       ring(p, 4, 22, INK, 2.5, 0.45);
     }
     (spot ? sfx.spot : sfx.drop)();
@@ -2561,7 +2672,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     S.said = 'correct country';
     flash(c, 1, FLASH);
     ring(p, 6, 30, PAPER, 2.5, 0.5);
-    label(t.shown ? null : c, 'Correct country', p, 'name', GROUND, fmtKm(off), UNDER);      // shown the way: the capital's name is still up, with the flag
+    label(t.shown ? null : c, c.name, p, 'name', GROUND, null, UNDER);      // shown the way: the capital's name is still up, with the flag
     if (!t.warm) {
       t.warm = true;
       sfx.thud();
@@ -2625,17 +2736,24 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       sx += p[0]; sy += p[1]; sz += p[2];
     }
     for (const d of S.drops) { sx += d.p[0] * 0.2; sy += d.p[1] * 0.2; sz += d.p[2] * 0.2; }
-    // The flight path: every delivery in order, then the postcard still aboard. The globe opens on the first
-    // stop and turns along the path, so each name comes into view, and ends on the last one.
+    // The flight path: every delivery in order, then the postcard still aboard.
     S.route = [...S.log.values()].map((r) => r.p || pointOf(r.it));
     S.routeLost = !!lost;
     if (lost) S.route.push(pointOf(lost));
-    S.tour = S.route.length > 1 ? { t: -1.6, per: clamp(18 / (S.route.length - 1), 0.5, 1.6) } : null;
-    const centre = S.tour ? S.route[0] : Math.hypot(sx, sy, sz) > 1e-6 ? norm([sx, sy, sz]) : unit(bird.lon, bird.lat);
+    // No turn along the path (played, it was "pretty jumpy ... pure confusion"). The globe opens on where the flight
+    // started and holds still there for END_REST seconds, then spins slowly and steadily as the title's does, the way
+    // the path leads (the player: "have it still ... for like the first ... 3 to 5 seconds ... you can see, like, oh,
+    // this is where I started. Oh, it's moving. Cool"). With one stop or none there is no path: it rests on what is named.
+    const path = S.route.length > 1, centre = path ? S.route[0] : Math.hypot(sx, sy, sz) > 1e-6 ? norm([sx, sy, sz]) : unit(bird.lon, bird.lat);
     const [lon, lat] = lonLat(centre);
     atlas.from = [bird.lon, bird.lat]; atlas.to = [lon, clamp(lat, -45, 60)]; atlas.k = 0;
     atlas.lon = bird.lon; atlas.lat = bird.lat;
-    atlas.spin = 0; atlas.idle = 0;
+    let turn = 1;
+    if (path) {         // east or west: toward the middle of the stops that follow the first
+      const rest = S.route.slice(1).reduce((a, q) => [a[0] + q[0], a[1] + q[1], a[2] + q[2]], [0, 0, 0]);
+      if (Math.hypot(rest[0], rest[1]) > 1e-6 && wrapLon(lonLat(norm(rest))[0] - lon) < 0) turn = -1;
+    }
+    atlas.spin = path ? 6 * turn : 0; atlas.idle = 0; atlas.rest = END_REST;
     $('d-score').textContent = S.n;
     $('d-head').textContent = S.n === 1 ? 'postcard delivered' : 'postcards delivered';
     $('d-line').textContent = isBest && S.n > 0 ? 'Your best flight so far.' : save.best ? 'Your best is ' + save.best + '.' : '';
@@ -2672,12 +2790,12 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     abandon();
     const from = S.mode === 'fly' ? [bird.lon, bird.lat] : [atlas.lon, atlas.lat];
     S.mode = 'title'; S.paused = false; S.look = null;
-    S.route = null; S.tour = null;           // the flight path ends with its results screen
+    S.route = null; S.legs = null;           // the flight path ends with its results screen
     runKind = 'day';
     S.log = new Map(); S.drops = [];
     fx.length = 0; flashes.length = 0;
     keys.left = keys.right = keys.up = keys.down = keys.flap = false;
-    atlas.from = from; atlas.to = [from[0], clamp(from[1], -45, 60)]; atlas.k = 0; atlas.spin = 6; atlas.idle = 0;
+    atlas.from = from; atlas.to = [from[0], clamp(from[1], -45, 60)]; atlas.k = 0; atlas.spin = 6; atlas.idle = 0; atlas.rest = REST;
     stage.classList.remove('flying'); stage.classList.add('atlas');
     $('console').hidden = true; $('debrief').hidden = true; $('place').hidden = true; $('daycard').hidden = true; hideFunFact();
     $('spoton').hidden = true;
@@ -2757,18 +2875,9 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
         const p = slerp(unit(...atlas.from), unit(...atlas.to), smooth(atlas.k));
         [atlas.lon, atlas.lat] = lonLat(p);
         if (atlas.k >= 1) atlas.to = null;
-      } else if (S.tour && S.mode === 'over' && S.game === 'study' && !drag.on) {
-        const T = S.tour, R = S.route;
-        T.t += dt;
-        if (T.t > 0) {
-          const f = Math.min(R.length - 1, T.t / T.per), i = Math.min(R.length - 2, Math.floor(f));
-          const [lon, lat] = lonLat(slerp(R[i], R[i + 1], smooth(f - i)));
-          atlas.lon = lon; atlas.lat = clamp(lat, -45, 60);
-          if (f >= R.length - 1) S.tour = null;
-        }
       } else if (!drag.on) {
         atlas.idle += dt;
-        if (atlas.idle > 2.5) atlas.lon = wrapLon(atlas.lon + atlas.spin * dt * clamp((atlas.idle - 2.5) / 2, 0, 1));
+        if (atlas.idle > atlas.rest) atlas.lon = wrapLon(atlas.lon + atlas.spin * dt * clamp((atlas.idle - atlas.rest) / 2, 0, 1));
       }
       bird.beat += dt * 2.2;
       bird.spread += (0.86 + 0.14 * Math.sin(bird.beat * 2.4) - bird.spread) * Math.min(1, dt * 8);
@@ -2987,6 +3096,68 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     }
     if (!capital) edgeArrow(me, p);            // a capital has its route: no arrow
   }
+  // How far the city is, written next to the line that shows it, in the lettering of a name's second line, with no
+  // box round it (the player's pick: "the 290 kilometers next to the line"; and "X km away", not just "X km"). It
+  // stands at the far end of the line you can see: next to the city when the city is in view, and where the line
+  // leaves the screen when it is not, so the number is never taken for a note about the spot it floats over (the
+  // player: "wherever it's over could be like that far away ... at the edge of the screen next to the line"). Never
+  // over the bar or the pause button, on the bird, on a name or on the city's star. To the right of the line, or
+  // above a level one, else the other side. It is drawn after the names, so they keep their spots and it takes what
+  // is free. It is there while the bird stands on the ground and goes when it takes off, as a name does.
+  const kmNote = { t: 0, a: 0, str: '' };
+  function drawRouteKm() {
+    const t = S.tickets[0], can = S.mode === 'fly' && !!t && t.it.kind === 'k' && (t.shown || t.warm) && !S.look, on = can && bird.down;
+    const dt = clamp(S.t - kmNote.t, 0, 0.1);
+    kmNote.t = S.t;
+    kmNote.a = can ? clamp(kmNote.a + (on ? dt / 0.2 : -dt / 0.35), 0, 1) : 0;
+    if (!kmNote.a) return;
+    const c = t.it.c, me = unit(bird.lon, bird.lat), p = pointOf(t.it);
+    if (on) kmNote.str = fmtKm(kmBetween(bird.lon, bird.lat, c.cap[1], c.cap[2])) + ' away';            // on the way up it fades as it stood
+    const size = Math.round(namePx() * 0.8), gap = 7 * view.mk, m = 16 * view.mk;
+    ctx.font = '700 ' + size + 'px ' + DISPLAY; if ('letterSpacing' in ctx) ctx.letterSpacing = '0.05em';
+    const tw = ctx.measureText(kmNote.str).width / 2, th = size / 2, star = project(p);
+    // on the screen: clear of its edges, of the bar at the bottom and of the pause button's corner
+    const inView = (x0, y0, x1, y1) => x0 > m && x1 < view.w - m && y0 > m && y1 < view.h - view.deck - m && !(x1 > view.w - 70 * view.ui - m && y0 < 66 * view.ui + m);
+    const ok = (x, y) => {
+      if (!inView(x - tw, y - th, x + tw, y + th)) return false;
+      if (placed.some((b) => Math.abs(x - b.x) < b.half + tw + gap && y + th + gap > b.y - b.up && y - th - gap < b.y + b.down)) return false;
+      return !star || Math.hypot(Math.max(Math.abs(x - star[0]) - tw, 0), Math.max(Math.abs(y - star[1]) - th, 0)) > 14 * view.mk;
+    };
+    const seen = (k) => { const q = project(slerp(me, p, k)); return !!q && inView(q[0], q[1], q[0], q[1]); };
+    let far = 0;          // how far along the line can be seen: to the city, or to where the line leaves the screen
+    for (let i = 1; i <= 100 && seen(i / 100); i++) far = i / 100;
+    for (let lo = far, hi = Math.min(1, far + 0.01), i = 0; i < 8 && far < 1; i++) { const mid = (lo + hi) / 2; if (seen(mid)) far = lo = mid; else hi = mid; }
+    // the clear spot nearest the far end; the other side of the line only when that is nearer by more than OTHER_SIDE
+    const end = project(slerp(me, p, far)), OTHER_SIDE = 80 * view.mk;
+    let at = null, low = Infinity;
+    for (let i = 0; i < 120 && end; i++) {
+      const k = far * (1 - i / 120), q = project(slerp(me, p, k)), q2 = project(slerp(me, p, k > 0.5 ? k - 0.01 : k + 0.01));
+      if (!q || !q2) continue;
+      const back = Math.hypot(q[0] - end[0], q[1] - end[1]);
+      if (back >= low) break;
+      let nx = -(q2[1] - q[1]), ny = q2[0] - q[0];
+      const len = Math.hypot(nx, ny) || 1;
+      nx /= len; ny /= len;
+      if (nx < -0.2 || (Math.abs(nx) <= 0.2 && ny > 0)) { nx = -nx; ny = -ny; }       // to the right of the line, or above a level one
+      const off = Math.abs(nx) * tw + Math.abs(ny) * th + gap;
+      for (const sg of [1, -1]) {
+        const x = q[0] + sg * nx * off, y = q[1] + sg * ny * off, cost = back + (sg < 0 ? OTHER_SIDE : 0);
+        if (cost < low && ok(x, y)) { low = cost; at = [x, y]; }
+      }
+    }
+    if (!at && far >= 1 && star) {          // a line shorter than the words: just past the city, in line with it; else above or below the city
+      const b = project(slerp(me, p, 0.98)) || star, len = Math.hypot(star[0] - b[0], star[1] - b[1]) || 1, ux = (star[0] - b[0]) / len, uy = (star[1] - b[1]) / len;
+      for (const [dx, dy] of [[ux, uy], [0, -1], [0, 1]]) for (let j = 0; j < 8 && !at; j++) {          // a little further out when a name is in the way
+        const r = (16 + 6 * j) * view.mk + Math.abs(dx) * tw + Math.abs(dy) * th;
+        if (ok(star[0] + dx * r, star[1] + dy * r)) at = [star[0] + dx * r, star[1] + dy * r];
+      }
+    }
+    if (!at) return;
+    ctx.globalAlpha = kmNote.a;
+    text(kmNote.str, at[0], at[1], { size, edge: 3.5 * nameUp() });
+    ctx.globalAlpha = 1;
+    placed.push({ x: at[0], y: at[1], half: tw, up: th, down: th, km: kmNote.str });          // for the tests
+  }
   // The arrow at the edge of the screen, pointing the way to a place that is out of sight: where the way there leaves
   // the screen, or meets the rim of the globe (the corner the pause button sits in counts as off the screen). None
   // while the view is turning to the place.
@@ -3119,30 +3290,136 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       ctx.globalAlpha = seen;
     }
     ctx.beginPath(); ctx.arc(x, y, r + 3.5 * K, 0, 7); ctx.fillStyle = PAPER; ctx.fill();
-    ctx.strokeStyle = INK; ctx.lineWidth = 1.4 * K; ctx.stroke();
+    ctx.strokeStyle = k > 0 ? INK : BAD; ctx.lineWidth = (k > 0 ? 1.4 : 2.4) * K; ctx.stroke();          // empty: the rim turns red, so an empty ring is not a blank disc
     ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.strokeStyle = SHADE; ctx.lineWidth = 4 * K; ctx.stroke();
     if (k > 0) {
       ctx.beginPath(); ctx.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + k * 2 * Math.PI);
-      ctx.strokeStyle = low ? (blink ? SHADE : BAD) : GOOD; ctx.lineWidth = 4 * K; ctx.lineCap = 'butt'; ctx.stroke();
+      ctx.strokeStyle = k > 1 / 2 ? GOOD : k > 1 / 3 ? token('--c0') : k > 1 / 6 ? token('--c1') : BAD; ctx.lineWidth = 4 * K; ctx.lineCap = 'butt'; ctx.stroke();          // the stopwatch's stages: green, then yellow, orange, red
     }
   }
 
   // Names on the title globe (what you know cold) and the results globe (where you delivered),
   // kept apart from each other: a name that would overlap another moves a little and is tied
   // back to its place with a short line, or waits for the globe to turn.
-  function drawAtlas() {
-    const alpha = 1 - S.blend;
-    if (alpha <= 0) return;
+  // The day's flight on the results globe (the player asked for it: "so you can see where the energy went").
+  // The way the bird went is a line that is thin where it glided and thick where it flapped (two widths, rounded where
+  // they meet). The shortest way is a row of ink dots, drawn only for the round picked, to the point the round was scored
+  // against (goalOf: a city or capital, and for a country its nearest point, never its middle). Where the bird came
+  // down is a dot: green in the answer, ink near it, red for a miss. The other rounds are the same lines, faint.
+  const THIN = 1.8, THICK = 5.5, FAINT = 0.28;
+  // The rounds a results globe holds at a time: the one picked and the two before and after it, five in all, with the
+  // names of their answers. A Day Trip is five rounds, so it is all there. A Ranked flight is twenty or more, and drawn
+  // whole it was a web of lines (looked at with a flight of 22: audit/rank1.py).
+  const HELD = 5;
+  function heldRounds() {
+    const lo = clamp(S.focus - (HELD - 1) / 2, 0, Math.max(0, S.legs.length - HELD));
+    return [lo, Math.min(S.legs.length - 1, lo + HELD - 1)];
+  }
+  // One round on the globe: it turns to the middle of that round's flight. When the answer would be out of sight from
+  // there (a landing far from it), to the middle of the flight and the answer, so what was asked can be seen and named.
+  function showLeg(i) {
+    const L = S.legs[i], mid = slerp(L.from, L.land, 0.5), all = [L.from[0] + L.land[0] + L.ans[0], L.from[1] + L.land[1] + L.ans[1], L.from[2] + L.land[2] + L.ans[2]];
+    const wide = Math.hypot(...all) > 0.3 ? norm(all) : mid, near = Math.cos(65 * RAD);          // only when all three can be seen from there
+    const [lo, la] = lonLat(dot(mid, L.ans) < Math.cos(55 * RAD) && dot(wide, L.ans) > near && dot(wide, L.from) > near && dot(wide, L.land) > near ? wide : mid);
+    S.focus = i; atlas.from = [atlas.lon, atlas.lat]; atlas.to = [lo, clamp(la, -45, 60)]; atlas.k = 0; atlas.idle = 0;
+    settleNames();
+  }
+  // The way the bird went, in plain ink with no edge round it. TWO widths and no more (the player: "a certain thickness
+  // when you were flapping and thin when you weren't ... cleaner"): thin the whole way, and over it each stretch of
+  // flapping as one thick line whose ends are rounded, so thick meets thin without a hard edge.
+  function flown(c, L, u) {
+    const n = L.pts.length, P = L.pts.map((q) => project(q[0]));
+    c.strokeStyle = INK; c.lineCap = 'round'; c.lineJoin = 'round';
+    c.lineWidth = THIN * u; c.beginPath();
+    for (let i = 0, pen = false; i < n; i++) { if (!P[i]) { pen = false; continue; } if (pen) c.lineTo(P[i][0], P[i][1]); else c.moveTo(P[i][0], P[i][1]); pen = true; }
+    c.stroke();
+    c.lineWidth = THICK * u;
+    for (let i = 0; i + 1 < n;) {          // the piece from point i to point i + 1 is thick when the bird was flapping at i + 1
+      if (!L.pts[i + 1][1] || !P[i] || !P[i + 1]) { i++; continue; }
+      c.beginPath(); c.moveTo(P[i][0], P[i][1]);
+      let j = i + 1;
+      while (j < n && L.pts[j][1] && P[j]) { c.lineTo(P[j][0], P[j][1]); j++; }
+      c.stroke(); i = j;
+    }
+    const s = project(L.land);
+    if (s) { c.beginPath(); c.arc(s[0], s[1], 5.5 * u, 0, 7); c.fillStyle = L.right ? GOOD : L.tier === 'near' ? INK : BAD; c.fill(); c.strokeStyle = PAPER; c.lineWidth = 2 * u; c.stroke(); }
+  }
+  let sheet = null;          // the faint rounds are drawn whole on a sheet of their own and laid on faintly, so that pieces which overlap do not darken
+  function drawLegs() {
+    const u = view.ui, ga = ctx.globalAlpha, focus = S.focus, [lo, hi] = heldRounds();
+    if (focus !== S.rowOn) { S.rowOn = focus; document.querySelectorAll('#daycard [data-i]').forEach((el) => el.classList.toggle('on', +el.dataset.i === focus)); }
+    if (!sheet) sheet = document.createElement('canvas');
+    if (sheet.width !== inkCanvas.width || sheet.height !== inkCanvas.height) { sheet.width = inkCanvas.width; sheet.height = inkCanvas.height; }
+    const c = sheet.getContext('2d');
+    c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, sheet.width, sheet.height); c.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+    S.legs.forEach((L, i) => { if (L && i !== focus && i >= lo && i <= hi) flown(c, L, u); });
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = ga * FAINT; ctx.drawImage(sheet, 0, 0); ctx.restore();
+    const L = S.legs[focus];
+    if (L) { arc(L.from, L.to, INK, 2.2 * u, [0.1, 6 * u]); flown(ctx, L, u); }
+    const first = S.legs.find(Boolean), s0 = lo === 0 && project(first.from);          // where the flight began
+    if (s0) { ctx.beginPath(); ctx.arc(s0[0], s0[1], 4 * u, 0, 7); ctx.fillStyle = PAPER; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 1.5 * u; ctx.stroke(); }
+  }
+  // What the names on a title or results globe keep off: the capital pins of a Study flight, and on a trip's globe the
+  // dot where the round picked came down (when that is right at the answer, the answer's own dot and name stand there).
+  function nameBoxes() {
     const boxes = [];
-    for (const d of S.drops) {                // names keep clear of the capital pins
+    for (const d of S.drops) {
       if (!d.city || S.mode === 'title') continue;
       const s = project(d.p);
       if (s) boxes.push({ x: s[0], y: s[1], half: 10 });
     }
+    if (S.mode === 'over' && S.trip && S.legs) {
+      const L = S.legs[S.focus], s = L && project(L.land), t = L && project(L.to);
+      if (s && !(t && Math.hypot(s[0] - t[0], s[1] - t[1]) < 14 * view.ui)) boxes.push({ x: s[0], y: s[1], half: 8 * view.ui });
+    }
+    return boxes;
+  }
+  // Each name at its place, or at the first free spot round it, tied back to its place with a short line. A name never
+  // hangs over the globe's rim: a spot counts as free only when the whole name is inside it. While a results globe
+  // turns to a round, `held` is on: a name stands only on the spot it will have when the turn ends (settleNames), and
+  // is left out for a moment if that spot is not free on the way, so no name hops from side to side of its place.
+  function placeNames(boxes, paint, held) {
+    const rounds = S.mode === 'over' && S.trip && S.legs ? heldRounds() : null;
+    for (const a of atlasNames) {
+      const s = project(a.p);
+      if (!s || dot(a.p, cam.n) < cam.cos0 + 0.08 || (rounds && (a.i < rounds[0] || a.i > rounds[1]))) { a.spot = undefined; continue; }          // round the back, too close to the rim to read, or not one of the rounds held
+      const name = a.name || a.c.name, size = Math.round((a.lost ? 17 : 15) * view.ui), q = size / 13;
+      ctx.font = (a.water ? 'italic 600 ' : '700 ') + size + 'px ' + DISPLAY;
+      const half = ctx.measureText(name).width / 2 + 4;
+      const free = (x, y) => rimIn({ x, y, half, up: 9 * q, down: 9 * q }) > 0.15 && !boxes.some((b) => Math.abs(b.x - x) < b.half + half && Math.abs(b.y - y) < 15 * q);
+      const spots = a.city ? [[0, -14 * q], [0, 14 * q], [half + 8, 0], [-half - 8, 0]] : [[0, 0], [0, -16 * q], [0, 16 * q], [half + 10, 0], [-half - 10, 0], [0, -30 * q], [0, 30 * q]];
+      const keep = !held ? undefined : a.fix !== undefined ? a.fix : a.spot;
+      let at = null;
+      for (const i of keep !== undefined ? [keep] : spots.keys()) {
+        if (free(s[0] + spots[i][0], s[1] + spots[i][1])) { at = [s[0] + spots[i][0], s[1] + spots[i][1]]; a.spot = i; break; }
+      }
+      if (!at) { if (!held) a.spot = undefined; continue; }
+      boxes.push({ x: at[0], y: at[1], half });
+      if (!paint) continue;
+      if (at[0] !== s[0] || at[1] !== s[1]) {
+        ctx.strokeStyle = INK; ctx.lineWidth = view.ui;
+        ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(at[0] - Math.sign(at[0] - s[0]) * half * 0.6, at[1] - Math.sign(at[1] - s[1]) * 6 * view.ui); ctx.stroke();
+        ctx.beginPath(); ctx.arc(s[0], s[1], 2 * view.ui, 0, 7); ctx.fillStyle = INK; ctx.fill();
+      }
+      if (a.city) { ctx.beginPath(); ctx.arc(s[0], s[1], 4 * view.ui, 0, 7); ctx.fillStyle = a.lost ? BAD : PAPER; ctx.fill(); ctx.strokeStyle = a.lost ? PAPER : INK; ctx.lineWidth = 1.5 * view.ui; ctx.stroke(); }          // a trip's answer: paper-white. Study's capital not delivered: red
+      text(name, at[0], at[1], Object.assign({ size, edge: 3 }, a.lost ? { fill: BAD, italic: a.water } : a.water ? STYLE.sea : a.helped ? STYLE.helped : {}));
+    }
+  }
+  // The spot each name will have when the turn that has just begun ends: the names are placed for the view as it will be.
+  function settleNames() {
+    const was = [atlas.lon, atlas.lat, S.blend];
+    [atlas.lon, atlas.lat] = atlas.to; S.blend = 0; placeCamera();
+    placeNames(nameBoxes(), false, false);
+    for (const a of atlasNames) a.fix = a.spot;
+    [atlas.lon, atlas.lat, S.blend] = was; placeCamera();
+  }
+  function drawAtlas() {
+    const alpha = 1 - S.blend;
+    if (alpha <= 0) return;
     ctx.globalAlpha = alpha;
     if (S.mode === 'over' && S.game === 'study' && S.route) {         // the flight path, dotted, red to the postcard that was not delivered
       for (let i = 0; i + 1 < S.route.length; i++)
-        arc(S.route[i], S.route[i + 1], S.routeLost && i === S.route.length - 2 ? BAD : 'rgba(255,253,246,.95)', 2.4 * view.ui, [0.1, 7 * view.ui]);
+        arc(S.route[i], S.route[i + 1], S.routeLost && i === S.route.length - 2 ? BAD : INK, 2.2 * view.ui, [0.1, 6 * view.ui]);
       S.route.forEach((q, i) => {
         const s = project(q);
         if (!s) return;
@@ -3151,29 +3428,10 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
         ctx.strokeStyle = INK; ctx.lineWidth = 1.2 * view.ui; ctx.stroke();
       });
     }
-    for (const a of atlasNames) {
-      const s = project(a.p);
-      if (!s) continue;
-      const toward = dot(a.p, cam.n);
-      if (toward < cam.cos0 + 0.08) continue;                   // too close to the rim to read
-      const name = a.name || a.c.name, size = Math.round((a.lost ? 17 : 15) * view.ui), q = size / 13;
-      ctx.font = (a.water ? 'italic 600 ' : '700 ') + size + 'px ' + DISPLAY;
-      const half = ctx.measureText(name).width / 2 + 4;
-      const free = (x, y) => !boxes.some((b) => Math.abs(b.x - x) < b.half + half && Math.abs(b.y - y) < 15 * q);
-      let at = null;
-      for (const [dx, dy] of a.city ? [[0, -14 * q], [0, 14 * q], [half + 8, 0], [-half - 8, 0]] : [[0, 0], [0, -16 * q], [0, 16 * q], [half + 10, 0], [-half - 10, 0], [0, -30 * q], [0, 30 * q]]) {
-        if (free(s[0] + dx, s[1] + dy)) { at = [s[0] + dx, s[1] + dy]; break; }
-      }
-      if (!at) continue;
-      boxes.push({ x: at[0], y: at[1], half });
-      if (at[0] !== s[0] || at[1] !== s[1]) {
-        ctx.strokeStyle = INK; ctx.lineWidth = view.ui;
-        ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(at[0] - Math.sign(at[0] - s[0]) * half * 0.6, at[1] - Math.sign(at[1] - s[1]) * 6 * view.ui); ctx.stroke();
-        ctx.beginPath(); ctx.arc(s[0], s[1], 2 * view.ui, 0, 7); ctx.fillStyle = INK; ctx.fill();
-      }
-      if (a.city) { ctx.beginPath(); ctx.arc(s[0], s[1], 4 * view.ui, 0, 7); ctx.fillStyle = BAD; ctx.fill(); ctx.strokeStyle = PAPER; ctx.lineWidth = 1.5 * view.ui; ctx.stroke(); }
-      text(name, at[0], at[1], Object.assign({ size, edge: 3 }, a.lost ? { fill: BAD, italic: a.water } : a.water ? STYLE.sea : a.helped ? STYLE.helped : {}));
-    }
+    const legs = S.mode === 'over' && S.trip && S.legs;
+    if (legs) drawLegs();
+    const boxes = nameBoxes();
+    placeNames(boxes, true, !!(legs && atlas.to));
     if (hover && !boxes.some((b) => Math.abs(b.x - hover.x) < b.half && Math.abs(b.y - hover.y) < 12)) {
       nameplate(hover.c, hover.name, hover.x, hover.y - 18 * view.ui, hover.sea ? 'sea' : 'name', null, 1, Math.round(17 * view.ui));
     }
@@ -3204,7 +3462,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       for (let i = 0; i <= 24; i++) { const s = project(slerp(v.from, v.to, i / 24)); if (s) placed.push({ x: s[0], y: s[1], half: 8, up: 6, down: 6 }); }
     }
     for (const f of fx) if (f.top) f.draw(Math.min(1, f.t / f.secs));
-    if (S.mode === 'fly') drawHud();
+    if (S.mode === 'fly') { drawRouteKm(); drawHud(); }
   }
   // Free flight: the name (and flag) of what is under the bird's shadow, just below it.
   let below = null;
@@ -3327,7 +3585,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     if (now) sanded.set(outside);
     if (S.mode !== 'title') return;
     titleNames();
-    if (all) { atlas.spin = 6; atlas.idle = Math.min(atlas.idle, 2.5); return; }       // it starts turning again gently
+    if (all) { atlas.spin = 6; atlas.idle = Math.min(atlas.idle, REST); return; }       // it starts turning again gently
     const mids = where.map((r) => unit(...REGION_VIEW[r])), m = norm(mids.reduce((a, q) => [a[0] + q[0], a[1] + q[1], a[2] + q[2]], [0, 0, 0]));
     const fits = mids.every((q) => dot(q, m) > Math.cos(FIT * RAD));
     let to = lonLat(m);
@@ -3365,7 +3623,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   inkCanvas.addEventListener('pointerdown', (e) => {
     if (S.mode === 'fly') return;
     drag.on = true; drag.x = e.clientX; drag.y = e.clientY;
-    atlas.to = null; atlas.idle = 0; S.tour = null;         // turning the globe by hand ends the turn along the path
+    atlas.to = null; atlas.idle = 0;         // turning the globe by hand ends a turn it was making
     stage.classList.add('dragging');
     inkCanvas.setPointerCapture(e.pointerId);
   });
@@ -3416,7 +3674,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   // Ground speed in km a second at a height, flying flat out.
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   const setBird = (lon, lat, a, down) => Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down });
-  window.birdsEye = { names: () => atlasNames, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), parFor, capKm, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target,
+  window.birdsEye = { names: () => atlasNames, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), parFor, capKm, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds,
     project: projectLL, unproject, speedAt, placed, seen: () => seen, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
