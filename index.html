@@ -2152,7 +2152,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   const flagged = (R) => R.kind === 'flag' || R.kind === 'capflag';
   const fallKm = (R) => TRIP_K * (1 + 2 * hardOf(R)) * (flagged(R) ? FLAG_X : 1);
   const worth = (T, R) => T.endless ? 100 * (1 + hardOf(R)) * (flagged(R) ? FLAG_X : 1) : DAY_ACC;
-  const TRIP_K = 150, CITY_KM = 50, TRIP_TANK = 3, SPOT_KM = 1, COUNT = 3, ENERGY_FLOOR = 2, ENERGY_WASTE = 14;
+  const TRIP_K = 150, CITY_KM = 50, SPOT_KM = 15, COUNT = 3, ENERGY_FLOOR = 2, ENERGY_WASTE = 14;
   const ADDRESS = 'https://rf1sh.github.io/birds-eye/';       // where the game lives: the last line of a shared result
   const TRIP_START = [0, 0];                  // every trip and run starts here: the middle of the map, off West Africa
   const INTRO_TURN = 0.9, INTRO_ZOOM = 1.7;   // the 3-2-1: seconds to turn the globe there, then to come down
@@ -2165,8 +2165,11 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   // Par, measured the same way, is right up to about 13,000 km; past that, reaching the far side of
   // the world costs up to 3 more.
   const tripPar = (km) => parFor(km) + 3 * clamp((km - 13000) / 3000, 0, 1);
-  const exactKm = (km) => (km < 10 ? km.toFixed(1) : Math.round(km).toLocaleString('en')) + ' km';     // competitive: every km shows
-  const today = () => new Date().toISOString().slice(0, 10);
+  const exactKm = (km) => Math.max(1, Math.round(km)).toLocaleString('en') + ' km';     // competitive: every km shows. Whole km: a pixel on the ground is 1 to 1.6 km
+  // The day is the player's own calendar day, as Wordle's is: everyone gets the same five for the same date, each from
+  // their own midnight. (Until 2026-11-12 it was London's: the trip changed at 7 pm in New York, and a trip at 6 pm one
+  // day and 8 pm the next broke the streak.)
+  const today = () => { const d = new Date(), two = (n) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()); };
   const KINDS_TRIP = { country: 'Country', flag: 'Flag', capital: 'Capital', capflag: 'Capital of', city: 'City' };
   const TICK = { spot: '✓', right: '✓', near: '', miss: '✗' };
   const NEAR_KM = 200;          // a miss closer than this still scores well, so it gets no ✗
@@ -2217,27 +2220,21 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     for (const r of R.c.fine) for (let i = 0; i < r.length; i += 2) { const d = kmBetween(lon, lat, r[i] / 100, r[i + 1] / 100); if (d < best) { best = d; at = [r[i] / 100, r[i + 1] / 100]; } }
     return at;
   }
-  // the cheapest day: each round's cheapest flight, flown from where the last one ended (never under 10)
-  function dayNeed(T) {
-    let need = 0, at = T.start;
-    for (const R of T.rounds) { const to = goalOf(R, at[0], at[1]); need += tripPar(kmBetween(at[0], at[1], to[0], to[1])); at = to; }
-    return Math.max(10, need);
-  }
+  // What a round's flight is judged against: the cheapest flight to where the round is measured to (its par, and a hop
+  // still needs a take-off, so never under ENERGY_FLOOR: the scripted pilot spends 1.6 to 2.1 on legs of 750 to 1,200 km).
+  const cheapFor = (km) => Math.max(tripPar(km), ENERGY_FLOOR);
   function tripStart(kind) {
     const T = S.trip = kind === 'endless' ? { endless: true, start: TRIP_START, rounds: [], used: new Set() } : makeTrip(today());
     T.results = []; T.i = -1; T.score = 0; T.at = T.start;
-    if (T.endless) { T.need = 0; S.cap = S.energy = ENDLESS_TANK; }
+    if (T.endless) S.cap = S.energy = ENDLESS_TANK;
     else {
-      T.need = dayNeed(T);
-      S.cap = S.energy = Math.round(TRIP_TANK * T.need);
-      // a trip begun earlier today is carried on: its rounds and points, the energy left, and the bird where it stood
+      // a trip begun earlier today is carried on: its rounds and points, and the bird where it stood
       tripSettle();
       const was = save.trips[today()];
       if (was) {
         T.results = was.rounds.map((r, i) => Object.assign({ p: T.rounds[i].p }, r));
         T.score = was.score;
         if (was.at) T.at = was.at;
-        if (Number.isFinite(was.energy)) S.energy = clamp(was.energy, 0, S.cap);
       }
     }
     $('trip-pips').hidden = !!T.endless;
@@ -2256,6 +2253,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     const T = S.trip;
     if (T.endless && !T.rounds[i]) T.rounds[i] = endlessRound(i);
     Object.assign(T, { wait: true, ready: false, count: S.t + COUNT, next: i, reveal: null });
+    if (!T.endless) { S.cap = S.energy = 1; T.cheap = 0; }          // a Day Trip's ring is full again for the round to come
     $('trip-clock').hidden = false; $('trip-secs').textContent = '0.0 s'; $('trip-bar').style.width = '0%';
     const node = document.createElement('div');
     node.className = 'ticket ask';
@@ -2268,8 +2266,13 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   function tripShow(i) {
     const T = S.trip, R = T.rounds[i];
     T.intro = null;
-    const goal = goalOf(R, bird.lon, bird.lat), km = kmBetween(bird.lon, bird.lat, goal[0], goal[1]);
-    Object.assign(T, { i, t0: S.t, e0: S.energy, from: [bird.lon, bird.lat], goal, km, wait: false, count: 0, fair: fairSecs(km) });
+    const goal = goalOf(R, bird.lon, bird.lat), km = kmBetween(bird.lon, bird.lat, goal[0], goal[1]), cheap = cheapFor(km);
+    // A Day Trip: a full ring every round (the player's pick, 2026-11-12). In it: the cheapest flight for this round, and
+    // ENERGY_WASTE to spare. What is left of the spare at the landing is the round's energy use points (the player,
+    // 2026-11-11: "then the excess is converted to points"). No round can strand the next: until 2026-11-12 there was
+    // one tank for the day, three times the day's cheapest flights, and a trip that ran dry ended before round 5.
+    if (!T.endless) S.cap = S.energy = cheap + ENERGY_WASTE;
+    Object.assign(T, { i, t0: S.t, e0: S.energy, from: [bird.lon, bird.lat], goal, km, cheap, wait: false, count: 0, fair: fairSecs(km) });
     const node = document.createElement('div'), addr = document.createElement('div');
     node.className = 'ticket ask'; addr.className = 'addr';
     const what = R.kind === 'flag' || R.kind === 'capflag' ? flagImg(R.c, 'A flag') :
@@ -2307,8 +2310,8 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       btn.classList.add('ready');
     }
   }
-  // another round? Not without energy to take off with (a Day Trip that runs dry ends there, the rounds left "Not reached")
-  const tripMore = (T) => S.energy > 0.5 && (T.endless || T.i < 4);
+  // another round? A Day Trip has five, each with its own full ring. A Ranked flight goes on while there is energy to take off with.
+  const tripMore = (T) => (T.endless ? S.energy > 0.5 : T.i < 4);
   function tripNext() {
     const T = S.trip;
     if (!T || !T.ready) return;
@@ -2322,15 +2325,16 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     const right = countryRound ? reaches(R.c.where, lon, lat) : R.kind === 'city' ? kmBetween(lon, lat, R.lon, R.lat) <= CITY_KM : reaches({ kind: 'k', c: R.c }, lon, lat);
     const d = countryRound ? (right ? 0 : kmToCountry(R.c, lon, lat)) : kmBetween(lon, lat, R.lon, R.lat);
     const tier = !right ? (d < NEAR_KM ? 'near' : 'miss') : !countryRound && d <= SPOT_KM ? 'spot' : 'right';
-    const closeness = Math.round(worth(T, R) * Math.exp(-Math.max(0, d - 1) / fallKm(R)));
+    // Accuracy: all of it on the spot (a country: inside it; a city or capital: SPOT_KM, where the bird still stands on
+    // the city's dot), then falling with every km from there
+    const closeness = Math.round(worth(T, R) * Math.exp(-Math.max(0, d - (countryRound ? 1 : SPOT_KM)) / fallKm(R)));
     const took = S.t - T.t0;
     const speed = right ? Math.round(20 * clamp(1 - Math.max(0, took - T.fair) / T.fair, 0, 1)) : 0;
     // energy use, when right: every point for spending no more than the cheapest flight for the leg (one climb just
-    // high enough to see the location, then a glide straight to it, for a country to its nearest point: par). Past that, needless flapping costs the same
-    // on every leg, 10 points a second of it (flapping burns 7 a second), so ENERGY_WASTE of it leaves none; a short
-    // hop is judged no harder than a long flight. A hop still needs a take-off, so the cheapest never counts as less
-    // than ENERGY_FLOOR (the scripted pilot spends 1.6 to 2.1 on legs of 750 to 1,200 km, whose par is 0.5 to 1.9).
-    const leg = tripPar(T.km), used = T.e0 - S.energy, cheap = Math.max(leg, ENERGY_FLOOR);
+    // high enough to see the location, then a glide straight to it, for a country to its nearest point: cheapFor). Past
+    // that, needless flapping costs the same on every leg, 10 points a second of it (flapping burns 7 a second), so
+    // ENERGY_WASTE of it leaves none; a short hop is judged no harder than a long flight.
+    const used = T.e0 - S.energy, cheap = T.cheap;
     const energy = right ? Math.round(20 * clamp(1 - Math.max(0, used - cheap) / ENERGY_WASTE, 0, 1)) : 0;
     const pts = closeness + speed + energy;
     T.score += pts;
@@ -2339,7 +2343,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     T.results[T.results.length - 1].at = here.name || 'Open ocean';
     Object.assign(T.results[T.results.length - 1], { path: (T.trk || []).concat([[lon, lat, 0]]), from: T.from.slice(), goal: T.goal.slice(), land: [lon, lat] }); T.trk = null;
     // the endless run: a right landing gives back less than the leg cost, a spot-on one nearly all of it (the ring shows it)
-    if (T.endless && right) S.energy = Math.min(S.cap, S.energy + cheap * (tier === 'spot' ? REFILL_SPOT : REFILL));
+    if (T.endless && right) S.energy = Math.min(S.cap, S.energy + cheap * (tier === 'spot' && d <= 1 ? REFILL_SPOT : REFILL));
     if (!T.endless) tripSave();
     $('count').textContent = T.score;
     $('trip-clock').hidden = true;
@@ -2354,7 +2358,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     (right ? (tier === 'spot' ? sfx.spot : sfx.drop) : sfx.miss)();
     const node = document.createElement('div');
     node.className = 'ticket result';
-    const where = countryRound && right ? 'In ' + R.name : exactKm(d) + ' from ' + R.name;
+    const where = countryRound && right ? 'In ' + R.name : tier === 'spot' ? 'On ' + R.name : exactKm(d) + ' from ' + R.name;
     if (tier === 'spot') spotOn();
     const most = roundMax(T, T.i, R.kind);
     node.innerHTML = '<div class="where"><span class="tick ' + tier + '">' + TICK[tier] + '</span> ' + esc(where) + '</div><div class="plus ' + (right ? 'right' : tier === 'near' ? '' : 'wrong') + '">' + pts + '<small>/' + most + '</small></div>' +
@@ -2451,12 +2455,11 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   function tripSave() {
     const T = S.trip;
     save.trips[T.day] = { score: T.score, rounds: T.results.map((r) => ({ kind: r.kind, name: r.name, country: r.country, a2: r.a2, pop: r.pop, right: r.right, tier: r.tier, d: r.d, closeness: r.closeness, speed: r.speed, secs: r.secs, energy: r.energy, pts: r.pts, at: r.at, path: r.path, from: r.from, goal: r.goal, land: r.land })),
-      at: [Math.round(bird.lon * 1000) / 1000, Math.round(bird.lat * 1000) / 1000], energy: Math.round(S.energy * 100) / 100, open: inRound() ? T.i : undefined, over: T.done || undefined };
+      at: [Math.round(bird.lon * 1000) / 1000, Math.round(bird.lat * 1000) / 1000], open: inRound() ? T.i : undefined };
     for (const d in save.trips) if (d !== T.day) for (const r of save.trips[d].rounds) { delete r.path; delete r.from; delete r.goal; delete r.land; }      // only today's card can be opened again
     persist();
   }
-  // today's trip is flown: all five rounds, or it ended early with the energy gone (until 2026-11-12 that one said "Carry on" for ever)
-  const tripDone = () => { const t = save.trips[today()]; return !!t && (t.rounds.length >= 5 || !!t.over); };
+  const tripDone = () => { const t = save.trips[today()]; return !!t && t.rounds.length >= 5; };
   // A round left with its clue showing scores 0: the stopwatch cannot be stopped by leaving, any more than by pausing.
   function tripSettle() {
     const t = save.trips[today()];
@@ -2946,7 +2949,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     bird.spread += (spread - bird.spread) * Math.min(1, dt * (flap ? 30 : 9));
 
     // The flight is over when you are on the ground with nothing left to climb with.
-    if (bird.down && S.energy <= 0 && !(S.trip && S.trip.wait && !S.trip.count)) {
+    if (bird.down && S.energy <= 0 && !(S.trip && (!S.trip.endless || (S.trip.wait && !S.trip.count)))) {
       if (!S.endAt) S.endAt = S.t + 0.7;
       else if (S.t >= S.endAt) { if (S.game === 'trip') tripEnd(); else land(); return; }
     } else S.endAt = 0;
@@ -3290,8 +3293,12 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   }
   // Stamina is a ring beside the bird: it empties while you flap and fills when a letter is delivered.
   function drawStamina(x, y) {
-    const full = S.cap || TANK, k = clamp(S.energy / full, 0, 1), low = S.energy < 0.14 * full, K = Math.max(1, 0.95 * view.ui), r = 6.5 * K;
-    const blink = low && Math.floor(S.t * 4) % 2 === 0;
+    const full = S.cap || TANK, K = Math.max(1, 0.95 * view.ui), r = 6.5 * K;
+    // In a Day Trip the ring is this round's: its upper half is the cheapest flight, however far that is, and its lower
+    // half the spare whose rest is the energy use points. So the mark at its foot is where the losing starts, as the
+    // mark in the middle of the stopwatch's line is the fair time, and the colors mean what they mean there.
+    const day = !!S.trip && !S.trip.endless, round = day && S.trip.cheap > 0, spent = full - S.energy;
+    const k = !round ? clamp(S.energy / full, 0, 1) : spent <= S.trip.cheap ? 1 - 0.5 * spent / S.trip.cheap : clamp(0.5 * (1 - (spent - S.trip.cheap) / ENERGY_WASTE), 0, 1);
     if (S.gain) {
       ctx.globalAlpha = Math.abs(S.gain) * seen;
       ctx.strokeStyle = S.gain > 0 ? GOOD : BAD; ctx.lineWidth = 3 * K;
@@ -3303,8 +3310,9 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.strokeStyle = SHADE; ctx.lineWidth = 4 * K; ctx.stroke();
     if (k > 0) {
       ctx.beginPath(); ctx.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + k * 2 * Math.PI);
-      ctx.strokeStyle = k > 1 / 2 ? GOOD : k > 1 / 3 ? token('--c0') : k > 1 / 6 ? token('--c1') : BAD; ctx.lineWidth = 4 * K; ctx.lineCap = 'butt'; ctx.stroke();          // the stopwatch's stages: green, then yellow, orange, red
+      ctx.strokeStyle = k >= 1 / 2 - 1e-6 ? GOOD : k > 1 / 3 ? token('--c0') : k > 1 / 6 ? token('--c1') : BAD; ctx.lineWidth = 4 * K; ctx.lineCap = 'butt'; ctx.stroke();          // the stopwatch's stages: green, then yellow, orange, red
     }
+    if (day) { ctx.beginPath(); ctx.moveTo(x, y + r - 3.2 * K); ctx.lineTo(x, y + r + 3.2 * K); ctx.strokeStyle = INK; ctx.lineWidth = 1.6 * K; ctx.lineCap = 'butt'; ctx.stroke(); }          // the mark
   }
 
   // Names on the title globe (what you know cold) and the results globe (where you delivered),
@@ -3689,7 +3697,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   // Ground speed in km a second at a height, flying flat out.
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   const setBird = (lon, lat, a, down) => Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down });
-  window.birdsEye = { names: () => atlasNames, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), parFor, capKm, dayNeed, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds,
+  window.birdsEye = { names: () => atlasNames, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), parFor, capKm, cheapFor, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds,
     project: projectLL, unproject, speedAt, placed, seen: () => seen, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
