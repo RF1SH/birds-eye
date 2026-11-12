@@ -666,6 +666,15 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     return [cam.cx + dot(p, cam.e) * k, cam.cy - dot(p, cam.u) * k];
   }
   const projectLL = (lon, lat) => project(unit(lon, lat));
+  // A flat mark (the bird, a name and its flag, a ring) belongs to a point on the globe. Drawn at the globe's rim it
+  // would hang out over space, on ground that is seen edge on. So it is drawn whole only while all of it is RIM clear
+  // of the rim, fades as it comes nearer, and is gone before it touches: 0 to 1 for a box on the screen.
+  const RIM = 30;
+  function rimIn(b) {
+    const dx = Math.abs(b.x - cam.cx) + b.half, dy = Math.max(cam.cy - (b.y - b.up), b.y + b.down - cam.cy);
+    return clamp((cam.rho - Math.hypot(dx, dy)) / (RIM * view.mk), 0, 1);
+  }
+  const rimDot = (s, r) => rimIn({ x: s[0], y: s[1], half: r, up: r, down: r });       // the same for a round mark
   // Which point of the globe is under a point of the screen; null if it is space.
   function unproject(x, y) {
     const u = (x - cam.cx) / view.F, v = -(y - cam.cy) / view.F;
@@ -1586,6 +1595,10 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       const want = dy === UNDER ? s[1] + UNDER_GAP * view.mk + box.up
         : dy === OVER ? (below ? s[1] + NEAR * view.mk + box.up : s[1] - NEAR * view.mk - box.down)
         : s[1] + (typeof dy === 'function' ? dy() : dy || 0);
+      // never out over space, and never without what it names: under the bird it goes when the bird does
+      const dot = 10 * view.mk;
+      alpha *= Math.min(rimIn({ x, y: want, half: box.half, up: box.rise, down: box.drop }), rimIn(dy === UNDER ? birdBox(s) : { x: s[0], y: s[1], half: dot, up: dot, down: dot }));
+      if (alpha <= 0) return;
       const y = settle(x, want, box, s[0], s[1], alpha);
       Object.assign(placed[placed.length - 1], { name: str, flag: !!(c && c.flag), ax: s[0], ay: s[1], rise: box.rise, drop: box.drop, px: box.px });      // for the tests
       nameplate(c, str, x, y, cls, sub, alpha);
@@ -1596,9 +1609,10 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     animate(secs, (k) => {
       const s = project(p);
       if (!s) return;
-      ctx.globalAlpha = 1 - k * k;
+      const r = (from + (to - from) * easeOut(k)) * view.mk;
+      ctx.globalAlpha = (1 - k * k) * rimIn({ x: s[0], y: s[1], half: r, up: r, down: r });
       ctx.strokeStyle = col; ctx.lineWidth = width * view.mk;
-      ctx.beginPath(); ctx.arc(s[0], s[1], (from + (to - from) * easeOut(k)) * view.mk, 0, 7); ctx.stroke();
+      ctx.beginPath(); ctx.arc(s[0], s[1], r, 0, 7); ctx.stroke();
       ctx.globalAlpha = 1;
     });
   }
@@ -2258,7 +2272,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     if (v.km) reach(v.to, v.km, 1, col);
     arc(v.from, v.to, PAPER, 4 * view.mk); arc(v.from, v.to, INK, 2 * view.mk, [6 * view.mk, 6 * view.mk]);
     const s = project(v.to);
-    if (s) { ctx.beginPath(); ctx.arc(s[0], s[1], 7 * view.mk, 0, 7); ctx.fillStyle = PAPER; ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 3 * view.mk; ctx.stroke(); }
+    if (s) { ctx.globalAlpha = rimDot(s, 7 * view.mk); ctx.beginPath(); ctx.arc(s[0], s[1], 7 * view.mk, 0, 7); ctx.fillStyle = PAPER; ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 3 * view.mk; ctx.stroke(); ctx.globalAlpha = 1; }
   }
   // The endless run: never the same place twice, countries first, then flags, capitals, capitals of
   // flags and cities, each from a growing slice of its easiest-first list.
@@ -2856,7 +2870,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       const s = project(c.u);
       if (!s || s[0] < -10 || s[0] > view.w + 10 || s[1] < -10 || s[1] > view.h + 10) continue;
       const pulse = flashes.find((fl) => fl.c === c), on = under === c;
-      ctx.globalAlpha = show;
+      ctx.globalAlpha = show * rimDot(s, 6 * view.mk);
       ctx.beginPath(); ctx.arc(s[0], s[1], 6 * view.mk, 0, 7);
       ctx.fillStyle = pulse && Math.cos((pulse.t / pulse.secs) * pulse.pulses * 2 * Math.PI) > 0 ? PAPER : FILL[c.col];
       ctx.fill();
@@ -2937,7 +2951,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
         if (reveal && S.mode === 'fly') reach(d.p, d.km, shown);
         const s = project(slerp(d.from, d.p, k));
         if (s && pin > 0) {
-          ctx.globalAlpha = pin;
+          ctx.globalAlpha = pin * rimDot(s, 10 * view.mk);
           if (k >= 1) starAt(s[0], s[1], 6 * big, view.mk); else postcard(s[0], s[1], 1.3);
           ctx.globalAlpha = 1;
         }
@@ -2964,8 +2978,10 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     if (capital) { reach(p, capKm(t.it.c), 1); arc(me, p, PAPER, 4.5 * view.mk); arc(me, p, INK, 2 * view.mk, [6 * view.mk, 6 * view.mk]); }
     const s = project(p), pulse = 1 + 0.15 * Math.sin(S.t * 6);
     if (onScreen(s, 34 * view.mk)) {
+      ctx.globalAlpha = rimDot(s, 11 * view.mk);
       if (capital) starAt(s[0], s[1], 7 * pulse, view.mk);
       else if (t.it.c.tiny) { ctx.beginPath(); ctx.arc(s[0], s[1], 9 * pulse * view.mk, 0, 7); ctx.strokeStyle = PAPER; ctx.lineWidth = 3 * view.mk; ctx.stroke(); }
+      ctx.globalAlpha = 1;
       return;
     }
     if (!capital) edgeArrow(me, p);            // a capital has its route: no arrow
@@ -3023,11 +3039,17 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     const top = y - r - pad, bottom = y + Math.max(r, ring && 13 * size + ring) + pad;
     return { x: (left + right) / 2, y: (top + bottom) / 2, half: (right - left) / 2, up: (bottom - top) / 2, down: (bottom - top) / 2, bird: true };
   }
+  let seen = 1;         // how much of the bird is drawn: less as its place nears the globe's rim
   function drawBird() {
     const flying = S.mode === 'fly', size = birdSize();
     const a = flying ? bird.a : 1;
     const g = flying ? project(unit(bird.lon, bird.lat)) : [cam.cx, cam.cy - cam.rho - 40];
     if (!g) return;                       // round the back of the globe while the view is away
+    // When the view turns away to show a place, the bird goes with the ground it stands on: it fades as that nears
+    // the globe's rim and is gone before it, with its shadow, its energy ring and the name under it.
+    seen = flying ? rimIn(birdBox(g)) : 1;
+    if (seen <= 0) return;
+    if (flying) ctx.globalAlpha = seen;
     const lift = flying ? birdLift() : 0;
     const x = g[0], y = g[1] - lift;
     if (flying) {
@@ -3069,18 +3091,18 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     }
     for (const pf of puffs) {
       const [tx, ty] = tips[pf.side > 0 ? 0 : 1], back = (6 + 40 * pf.t * (0.4 + k)) * size;
-      ctx.globalAlpha = 0.6 * (1 - pf.t / 0.55);
+      ctx.globalAlpha = seen * 0.6 * (1 - pf.t / 0.55);
       ctx.strokeStyle = PAPER; ctx.lineWidth = 1.4 * size;
       ctx.beginPath(); ctx.arc(tx - dx * back, ty - dy * back + 8 * pf.t * size, (2 + 9 * pf.t) * size, 0, 7); ctx.stroke();
     }
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = seen;
   }
   // Asleep: three z's drift up and away from the bird, one after another.
   function drawZzz(x, y, t) {
     for (let i = 0; i < 3; i++) {
       const k = ((t * 0.55 + i / 3) % 1), a = Math.min(1, t / 1.5) * Math.sin(Math.PI * k);
       if (a <= 0.01) continue;
-      ctx.globalAlpha = a;
+      ctx.globalAlpha = a * seen;
       text(i === 2 ? 'Z' : 'z', x + 6 + k * 22 + Math.sin(k * 6 + i) * 3, y - k * 34, { size: 13 + k * 9, edge: 3 });
     }
     ctx.globalAlpha = 1;
@@ -3090,10 +3112,10 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     const full = S.cap || TANK, k = clamp(S.energy / full, 0, 1), low = S.energy < 0.14 * full, K = Math.max(1, 0.95 * view.ui), r = 6.5 * K;
     const blink = low && Math.floor(S.t * 4) % 2 === 0;
     if (S.gain) {
-      ctx.globalAlpha = Math.abs(S.gain);
+      ctx.globalAlpha = Math.abs(S.gain) * seen;
       ctx.strokeStyle = S.gain > 0 ? GOOD : BAD; ctx.lineWidth = 3 * K;
       ctx.beginPath(); ctx.arc(x, y, r + 6 * K + 10 * K * (1 - Math.abs(S.gain)), 0, 7); ctx.stroke();
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = seen;
     }
     ctx.beginPath(); ctx.arc(x, y, r + 3.5 * K, 0, 7); ctx.fillStyle = PAPER; ctx.fill();
     ctx.strokeStyle = INK; ctx.lineWidth = 1.4 * K; ctx.stroke();
@@ -3394,7 +3416,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   const setBird = (lon, lat, a, down) => Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down });
   window.birdsEye = { names: () => atlasNames, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), parFor, capKm, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target,
-    project: projectLL, unproject, speedAt, placed, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
+    project: projectLL, unproject, speedAt, placed, seen: () => seen, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
   if (gl) {
