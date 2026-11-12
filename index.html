@@ -1539,6 +1539,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     [str, sub] = disputed(c, str, sub);
     const o = Object.assign({ size: namePx() }, STYLE[cls] || STYLE.name);
     ctx.font = (o.italic ? 'italic ' : '') + (o.weight || 700) + ' ' + o.size + 'px ' + DISPLAY;
+    if ('letterSpacing' in ctx) ctx.letterSpacing = o.track || '0.05em';        // as it will be drawn: else the width is whatever was drawn last
     let w = ctx.measureText(str).width;
     const ss = subPx(o);
     if (sub) { ctx.font = '700 ' + ss + 'px ' + DISPLAY; w = Math.max(w, ctx.measureText(sub).width); }
