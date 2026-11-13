@@ -1479,8 +1479,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const atlas = { lon: -20, lat: 18, spin: 6, idle: 0, rest: REST, from: null, to: null, k: 1 };
   // Height on the camera: 0 on the ground, 1 at the top, evenly spaced in the logarithm.
   const heightFor = (a) => Math.exp(lerp(Math.log(view.H0), Math.log(view.H1), clamp(a, 0, 1)));
+  // The flight is the same over the ground in every window (the player's pick, 2026-11-13: "Yes, the same"). The
+  // camera's top is fitted to the window: in one narrower than 1.6 times its height the globe fills the width, so the
+  // camera's top (view.H1) is lower there. Until then the speed over the ground was counted at the camera's own
+  // height, and the same full climb carried 15,200 km on a wide screen and 9,400 km in a window half as wide. Now it
+  // is counted at the height a wide window has for the same climb (FLY_TOP is view.H1 of a wide window: there
+  // view.ref is 1.6 times the space above the bar, view.F 1.1 times view.ref, and the globe's radius at the top 0.47
+  // of that space). On a wide screen nothing changed. In a narrow window the map passes under the bird faster than
+  // GLIDE_TOP screen-widths a second near the top: about as fast, in pixels, as on a full screen.
+  const FLY_TOP = Math.sqrt(1 + (1.1 * 1.6 / 0.47) ** 2) - 1;
+  const flyHeight = (a) => Math.exp(lerp(Math.log(view.H0), Math.log(FLY_TOP), clamp(a, 0, 1)));
   // Speed on screen, flying flat out, in pixels a second.
-  const paceAt = (a) => view.ref * lerp(GLIDE, GLIDE_TOP, a) * (0.6 + 0.4 * clamp(a / 0.1, 0, 1));
+  const paceAt = (a) => view.ref * lerp(GLIDE, GLIDE_TOP, a) * (0.6 + 0.4 * clamp(a / 0.1, 0, 1)) * flyHeight(a) / heightFor(a);
   // Par: what an efficient flight costs. You climb just high enough for the place to come into
   // view (about 0.42 of the reference size from the bird), then glide down to it. Climbing costs,
   // gliding is free, so par is the price of that climb, found by flapping by the game's own rules.
@@ -2746,7 +2756,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     for (const d in save.trips) if (d !== T.day) for (const r of save.trips[d].rounds) { delete r.path; delete r.from; delete r.goal; delete r.land; }      // only today's card can be opened again
     persist();
   }
-  const tripDone = () => { const t = save.trips[today()]; return !!t && t.rounds.length >= 5; };
+  const dayFlown = (day) => { const t = save.trips[day]; return !!t && t.rounds.length >= 5; };
+  const tripDone = () => dayFlown(today());
   // A round left with its clue showing scores 0: the stopwatch cannot be stopped by leaving, any more than by pausing.
   function tripSettle() {
     const t = save.trips[today()];
@@ -2758,12 +2769,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
     delete t.open;
     persist();
   }
-  // days in a row with a Day Trip, today's counted once it is started; not played yet today, it still stands from yesterday
+  // Days in a row with a Day Trip flown to its fifth landing (the player's pick, 2026-11-13: "All five flown"; Wordle
+  // and Connections count a puzzle once it is finished). Until today's is flown the streak still stands from
+  // yesterday; a trip left unfinished at midnight breaks it. (Until then a day counted once its trip was started.)
   function tripStreak() {
     const d = new Date(today() + 'T12:00:00Z');
-    if (!save.trips[today()]) d.setUTCDate(d.getUTCDate() - 1);
+    if (!dayFlown(today())) d.setUTCDate(d.getUTCDate() - 1);
     let n = 0;
-    while (save.trips[d.toISOString().slice(0, 10)]) { n++; d.setUTCDate(d.getUTCDate() - 1); }
+    while (dayFlown(d.toISOString().slice(0, 10))) { n++; d.setUTCDate(d.getUTCDate() - 1); }
     return n;
   }
   const streakText = (n) => 'Streak: ' + n + (n === 1 ? ' day' : ' days');
@@ -4070,7 +4083,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   const setBird = (lon, lat, a, down) => Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down });
   window.birdsEye = { names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), flightSecs, parFor, capKm, cheapFor, judge, ringKm, hardOf, endlessRound, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
-    project: projectLL, unproject, speedAt, placed, seen: () => seen, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
+    project: projectLL, unproject, speedAt, FLY_TOP, tripStreak, placed, seen: () => seen, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
   if (gl) {
