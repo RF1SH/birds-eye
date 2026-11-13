@@ -2079,7 +2079,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const people = (n) => (n >= 1e7 ? Math.round(n / 1e6) + ' M' : n >= 1e6 ? (Math.round(n / 1e5) / 10) + ' M' : n >= 1e4 ? Math.round(n / 1e3) + ' K' : n >= 1e3 ? (Math.round(n / 100) / 10) + ' K' : String(n));
   function showPlace(here) {
     const box = $('place'), water = here.sea ? (here.w >= 0 ? WATERS[here.w] : null) : null, c = here.c;
-    if (water) flash(water, 1, FLASH); else if (c) flash(c, 1, FLASH);
     if (!here.name) { box.hidden = true; return; }
     let html = '';
     if (c) {
@@ -2096,7 +2095,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // on the map round you: the capital and the country's biggest other cities, with their populations
     S.around = here.name ? { c: c || { name: '' }, water, t: S.t, list: c ? CITIES.filter((x) => x.c === c).slice(0, 6) : [] } : null;
     measure();
+    // One arrival, REVEAL long, everything on one clock and one curve: the map slides aside, the card comes in, all that is
+    // not the place you came down in goes pale (which is what says where you are: no flash), and the names on the map
+    // fade in riding with it. (The player, 2026-11-13: "first the country flashes and the card pops up, then all the
+    // details and cities/surrounding labels pop up. it looks ugly, like things are always buffering ... an animation of
+    // everything popping up might be nice. So it looks purposeful". Until then the names waited about a second for the
+    // map to stop sliding, then stood there all at once.)
+    box.style.opacity = S.around ? 0 : '';          // the card fades in with the rest (drawAround, each frame)
+    if (S.around) aroundLayout(S.around);
   }
+  const REVEAL = 0.4;          // seconds: as long as an interface's own larger transitions (Material: 300 to 400 ms)
+  const arrive = (p) => 1 - Math.pow(1 - clamp(p, 0, 1), 3);          // quick at first, gentle at the end
   // Free flight, on the ground: the map round you, labelled. The places of all the labels are worked out
   // once the map has stopped sliding (and again if the window changes size), from a grid of the screen
   // that knows which country is under each cell: a label goes where it covers no other label, stays clear
@@ -2222,9 +2231,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     }
     if (hole) {
       const d = view.dpr, layer = document.createElement('canvas'), g = layer.getContext('2d');
-      layer.width = Math.round(view.w * d); layer.height = Math.round(view.h * d);
+      L.wide = view.w + Math.ceil(view.slide);          // past the right edge by the slide: the layer rides with the map as it comes over
+      layer.width = Math.round(L.wide * d); layer.height = Math.round(view.h * d);
       g.setTransform(d, 0, 0, d, 0, 0);
-      g.fillStyle = PAPER; g.fillRect(0, 0, view.w, view.h);
+      g.fillStyle = PAPER; g.fillRect(0, 0, L.wide, view.h);
       g.globalCompositeOperation = 'destination-out'; g.fill(hole);
       g.lineWidth = 3; g.lineJoin = 'round'; g.stroke(hole);          // a hair wider, closing the seams between pieces
       g.globalCompositeOperation = 'source-over';
@@ -2233,17 +2243,25 @@ button { font: inherit; color: inherit; cursor: pointer; }
     }
     return L;
   }
-  function drawAround() {
-    const A = S.around;
+  // The labels are laid out for where the map will rest, at once: the camera is put there for the working out.
+  function aroundLayout(A) {
     const cr = $('place').getBoundingClientRect(), st = stage.getBoundingClientRect();
     const card = cr.width ? { x0: cr.left - st.left - 12, x1: cr.right - st.left + 12, y0: cr.top - st.top - 12, y1: cr.bottom - st.top + 12 } : null;
-    const key = view.w + 'x' + view.h + ':' + Math.round(view.slide);
-    if (Math.abs(slid - view.slide) < 0.5 && (!A.L || A.L.key !== key)) A.L = layoutAround(A, card);
-    const L = A.L;
-    if (!L || L.key !== key) return;
-    const k = L.k, size = freePx();
-    ctx.globalAlpha = clamp((S.t - A.t) / 0.4, 0, 1);
-    if (L.wash) { const a = ctx.globalAlpha; ctx.globalAlpha = a * 0.42; ctx.drawImage(L.wash, 0, 0, view.w, view.h); ctx.globalAlpha = a; }
+    const cx = cam.cx;
+    cam.cx += view.slide - slid;
+    A.L = layoutAround(A, card);
+    cam.cx = cx;
+  }
+  function drawAround() {
+    const A = S.around;
+    if (!A.L || A.L.key !== view.w + 'x' + view.h + ':' + Math.round(view.slide)) aroundLayout(A);          // the window changed size
+    const L = A.L, k = L.k, size = freePx(), d = view.slide - slid;          // d: how far the map still has to slide
+    ctx.save();
+    ctx.translate(-d, 0);          // what was laid out for the map at rest rides with the map
+    const shown = arrive((S.t - A.t) / REVEAL);
+    if (A.shown !== shown) { A.shown = shown; $('place').style.opacity = shown < 1 ? shown.toFixed(3) : ''; }          // the card, on the same clock
+    ctx.globalAlpha = shown;
+    if (L.wash) { const a = ctx.globalAlpha; ctx.globalAlpha = a * 0.42; ctx.drawImage(L.wash, 0, 0, L.wide, view.h); ctx.globalAlpha = a; }
     if (L.border) { ctx.lineJoin = 'round'; ctx.strokeStyle = INK; ctx.lineWidth = 3.5 * k; ctx.stroke(L.border); }
     // the seas round about in blue italics, the countries in grey capitals, so neither reads as a city
     const pale = !!L.wash;          // on washed-out sea, dark blue names; on full-strength sea, white ones
@@ -2251,12 +2269,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
     for (const { it, sz, at } of L.cities) {
       const s = project(it.p);
       if (!s) continue;
+      s[0] += d;
       if (it.cap) starAt(s[0], s[1], 9 * k);
       else { ctx.beginPath(); ctx.arc(s[0], s[1], 6 * k, 0, 7); ctx.fillStyle = PAPER; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.stroke(); }
       if (!at) continue;
       text(it.name, at.x, at.y, { size: sz, align: 'left', edge: 4.5 });
       if (it.pop) text('~' + people(it.pop), at.x, at.py, { size: Math.round(size * 0.62), align: 'left', weight: 600, edge: 4, fill: INK_SOFT });
     }
+    ctx.restore();
     ctx.globalAlpha = 1;
   }
 
@@ -3165,14 +3185,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // ---------- drawing ----------
   let under = null, frameNo = 0, hover = null;
 
-  let slid = 0;
+  // Free flight's map slides aside for the card in REVEAL seconds on the arrival's curve, by the game's clock (until
+  // 2026-11-13 a tenth of the rest each frame: about a second on a 60 Hz screen, half that on a 120 Hz one).
+  let slid = 0, slide = { from: 0, to: null, t: 0 };
   function placeCamera() {
     const k = smooth(S.blend);
     const me = unit(bird.lon, bird.lat), there = unit(atlas.lon, atlas.lat);
     let n = slerp(there, me, k);
     const whole = S.mode === 'title' || !S.log.size ? view.Htitle : view.H1;
     let logH = lerp(Math.log(Math.max(view.H0, whole / (atlas.zoom || 1))), Math.log(heightFor(S.mode === 'fly' ? bird.a : 1)), k);
-    slid += ((S.mode === 'fly' ? view.slide : 0) - slid) * 0.1;
+    if (S.mode === 'fly') {
+      if (view.slide !== slide.to || S.t < slide.t) slide = { from: slid, to: view.slide, t: S.t };
+      slid = slide.from + (slide.to - slide.from) * arrive((S.t - slide.t) / REVEAL);
+    } else { slid += (0 - slid) * 0.1; slide.to = null; }          // leaving a flight: back under the title's own turn
     let cx = lerp(S.mode === 'title' ? view.tx : view.ox, view.w / 2, k) + slid;
     let cy = lerp(S.mode === 'title' ? view.ty : (view.h - view.deck - view.keyRoom) / 2, view.gy, k);
     if (S.look) {
