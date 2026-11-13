@@ -1210,6 +1210,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   };
   const TINY = PLAY.filter((c) => c.tiny);
   const LAND = PLAY.concat(CONTEXT).sort((a, b) => a.km - b.km);    // smallest first, so Lesotho wins over South Africa
+  const COAST_KM = 22;          // a landing in the water this close to a country's coast is in the country (reaches)
   const DOT_KM = 22;            // a landing this close to a tiny country's dot is in it...
   const TINY_KM = 35;           // ...and this close counts when the letter is for that tiny country
   // The Southern Ocean is all the water south of 60°S (the boundary the IHO proposed in 2000 and the
@@ -1288,7 +1289,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
     }
     if (c.tiny && kmBetween(lon, lat, c.lx, c.ly) < TINY_KM) return true;
     const slack = c.r < 12 ? 22 : c.r < 30 ? 12 : 4;
-    return around(lon, lat, slack, (x, y) => within(c, x, y));
+    if (around(lon, lat, slack, (x, y) => within(c, x, y))) return true;
+    // In the water within COAST_KM of its coast is in the country: its own waters (12 nautical miles), and on the
+    // screen the bird still touches the coast. (The player, 2026-11-13, of an X 15 km off Vanuatu, in the Coral Sea:
+    // "should it say X if we're that close? Like, technically we are in the sea, but it's also very hard to land on";
+    // their pick. Until then the allowance went by the country's size alone: 12 km for Vanuatu, 4 km for Fiji.) Over a
+    // land border nothing changed.
+    return regionAt(lon, lat).sea === true && kmToCountry(c, lon, lat) <= COAST_KM;
   }
 
   // ---------- what the player has learned ----------
@@ -1434,10 +1441,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const ready = (it) => it.kind === 'c' || !withPlaces || (it.kind === 's' ? metPlaces >= 6 : memOf(it.c.where).box >= 2);
     const all = ITEMS.filter((it) => chosen(it) && ready(it));
     const recent = S.history.slice(-COOLDOWN);
-    // not what was asked lately, and not where the bird stands: its name is on the screen (at a flight's start; after a
-    // delivery it is what was asked last)
-    const st = S.mode === 'fly' && bird.down ? regionAt(bird.lon, bird.lat) : null, stood = st && (st.c ? st.c.id : st.w >= 0 && WATERS[st.w] ? WATERS[st.w].id : null);
-    const rested = (it) => !recent.includes(it.c.id) && it.c.id !== stood && !S.tickets.some((t) => t.it.c.id === it.c.id);
+    const rested = (it) => !recent.includes(it.c.id) && !S.tickets.some((t) => t.it.c.id === it.c.id);
     let pool = all.filter(rested);
     if (!pool.length) pool = all.filter((it) => it.c.id !== S.history[S.history.length - 1]);
     const due = pool.filter((it) => memOf(it).box > 0 && memOf(it).due <= now);
@@ -2086,16 +2090,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (dot(from, to) < -0.98) from = unit(atlas.lon, atlas.lat + 20);       // no one way round from the far side
     S.intro = { from, at: [bird.lon, bird.lat], t: there ? INTRO_TURN : 0 };
   }
-  // The view is down. Study names where the bird stands, as a landing does, and the first postcard comes as one comes
-  // after a delivery (until 2026-11-13 a flight began in the air, and its first landing, which cost nothing, named
-  // where it came down). Free flight shows the card of where the bird stands, as a landing there does.
-  function arrived() {
-    S.intro = null;
-    const here = regionAt(bird.lon, bird.lat);
-    if (S.game === 'free') { showPlace(here); return; }
-    if (here.name) label(here.sea ? null : here.c, here.name, unit(bird.lon, bird.lat), here.sea ? 'sea' : 'name', GROUND, here.sea ? null : capLine(here.c), UNDER);
-    S.spawnAt = Math.max(S.spawnAt, S.t + 0.6);
-  }
+  // Nothing is named and no card shows when the view is down: the start is a Day Trip's (the player, 2026-11-13, of a
+  // start that named where the bird stood: "no name, because if it starts out zoomed out, you should generally know
+  // where you are. and it would get confusing with the name. it should start out like day trip imo"). Study's first
+  // postcard comes the moment the view is down.
   // A Study flight is kept: left for Home, or with the window closed, it is carried on from the Study tab as it stood
   // (the player, 2026-11-12: "Should be able to save and return home in case you want to do different modes during a
   // study session. But can't have multiple sturdy sessions at once"). One flight: it is kept from its first delivery
@@ -3435,7 +3433,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       [atlas.lon, atlas.lat] = lonLat(slerp(intro.from, unit(...(S.trip ? S.trip.at : intro.at)), smooth(clamp(intro.t / INTRO_TURN, 0, 1))));
     }
     S.blend = intro && intro.t < 0 ? Math.max(0, S.blend - dt / TUTOR_LEAD) : intro && intro.t < INTRO_TURN ? 0 : clamp(S.blend + (flying ? dt / INTRO_ZOOM : -dt / 1.3), 0, 1);
-    if (flying && S.intro && S.blend >= 1) arrived();
+    if (flying && S.intro && S.blend >= 1) S.intro = null;          // the view is down
     for (let i = fx.length - 1; i >= 0; i--) { fx[i].t += dt; if (fx[i].t >= fx[i].secs) fx.splice(i, 1); }
     for (let i = flashes.length - 1; i >= 0; i--) { flashes[i].t += dt; if (flashes[i].t >= flashes[i].secs) flashes.splice(i, 1); }
     bird.squash = Math.max(0, bird.squash - dt / 0.18);
@@ -4366,7 +4364,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   const setBird = (lon, lat, a, down) => Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down });
   window.birdsEye = { firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), flightSecs, parFor, capKm, cheapFor, judge, ringKm, hardOf, endlessRound, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
-    project: projectLL, unproject, speedAt, FLY_TOP, tripStreak, placed, seen: () => seen, onMap: () => onMap(), drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
+    project: projectLL, unproject, speedAt, FLY_TOP, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
   if (gl) {
