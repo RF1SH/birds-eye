@@ -2152,7 +2152,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   const flagged = (R) => R.kind === 'flag' || R.kind === 'capflag';
   const fallKm = (R) => TRIP_K * (1 + 2 * hardOf(R)) * (flagged(R) ? FLAG_X : 1);
   const worth = (T, R) => T.endless ? 100 * (1 + hardOf(R)) * (flagged(R) ? FLAG_X : 1) : DAY_ACC;
-  const TRIP_K = 150, CITY_KM = 50, SPOT_KM = 15, COUNT = 3, ENERGY_FLOOR = 2, ENERGY_WASTE = 14;
+  const TRIP_K = 150, CITY_KM = 50, SPOT_KM = 15, COUNT = 3, ENERGY_FLOOR = 2, ENERGY_ROOM = 1, ENERGY_WASTE = 21;
   const ADDRESS = 'https://rf1sh.github.io/birds-eye/';       // where the game lives: the last line of a shared result
   const TRIP_START = [0, 0];                  // every trip and run starts here: the middle of the map, off West Africa
   const INTRO_TURN = 0.9, INTRO_ZOOM = 1.7;   // the 3-2-1: seconds to turn the globe there, then to come down
@@ -2162,9 +2162,6 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   // and fall to none at twice it.
   const flightSecs = (km) => Math.min(3.4, 1 + km / 3500) + (km > 14000 ? 1.6 : 0);
   const fairSecs = (km) => 5 + 1.5 * flightSecs(km);
-  // Par, measured the same way, is right up to about 13,000 km; past that, reaching the far side of
-  // the world costs up to 3 more.
-  const tripPar = (km) => parFor(km) + 3 * clamp((km - 13000) / 3000, 0, 1);
   const exactKm = (km) => Math.max(1, Math.round(km)).toLocaleString('en') + ' km';     // competitive: every km shows. Whole km: a pixel on the ground is 1 to 1.6 km
   // The day is the player's own calendar day, as Wordle's is: everyone gets the same five for the same date, each from
   // their own midnight. (Until 2026-11-12 it was London's: the trip changed at 7 pm in New York, and a trip at 6 pm one
@@ -2220,9 +2217,52 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     for (const r of R.c.fine) for (let i = 0; i < r.length; i += 2) { const d = kmBetween(lon, lat, r[i] / 100, r[i + 1] / 100); if (d < best) { best = d; at = [r[i] / 100, r[i + 1] / 100]; } }
     return at;
   }
-  // What a round's flight is judged against: the cheapest flight to where the round is measured to (its par, and a hop
-  // still needs a take-off, so never under ENERGY_FLOOR: the scripted pilot spends 1.6 to 2.1 on legs of 750 to 1,200 km).
-  const cheapFor = (km) => Math.max(tripPar(km), ENERGY_FLOOR);
+  // What a round's flight is judged against: the cheapest flight to where the round is measured to. That is the least
+  // energy that carries the bird that far over the ground, found by flying by the game's own rules: one climb just
+  // high enough for the glide that follows to come down there. The bird does not have to see the place first, which
+  // is why this is about a fifth less than Study's par (par climbs until the place is in view). Past what one climb
+  // carries, about 15,000 km, the cheapest way is to stay near the top, where the bird sinks slowly and covers the
+  // most ground, with a tap of Space each time it starts to sink: the far side of the world costs 6.8, less than one
+  // whole climb. (Until 2026-11-12 this was par, and 10 for the far side.) The keys steer in eight directions, so the
+  // way flown is a little longer than the straight one (STEER), and a hop still needs a take-off (ENERGY_FLOOR).
+  const STEER = 1.06, STEER_KM = 30;
+  let carryRows = null, carryKey = '';
+  function carryTable() {
+    const key = view.ref + ':' + view.H1;
+    if (carryRows && carryKey === key) return carryRows;
+    carryRows = []; carryKey = key;
+    const dt = 1 / 120;
+    // [km carried, energy spent] by a climb let go at a height, then up to `taps` taps (two steps each) once it sinks near the top
+    const fly = (letGo, taps) => {
+      let a = 0, va = CLIMB * 0.45, vx = 0, cost = 0, far = 0, up = true, tap = 0;
+      for (let n = 0; n < 4000 && (a > 0 || n === 0); n++) {
+        if (up && a >= letGo - 1e-9) up = false;
+        if (!up && !tap && taps > 0 && va < 0 && a < 0.98) { tap = 2; taps--; }
+        const flap = up || tap > 0;
+        if (tap) tap--;
+        va += ((flap ? CLIMB : -(SINK + SINK_MID * Math.sin(Math.PI * clamp(a, 0, 1)))) - va) * Math.min(1, dt * (flap ? 12 : 7));
+        a = Math.min(1, a + va * dt); if (a >= 1 && va > 0) va = 0;
+        if (flap) cost += BURN * dt;
+        vx += (paceAt(a) - vx) * Math.min(1, dt * 10); far += vx * (heightFor(a) / view.F) * dt * R_KM;
+      }
+      return [far, cost];
+    };
+    for (let i = 1; i <= 90; i++) carryRows.push(fly(i / 100, 0));          // let go at 0.9, the bird coasts to the top: more climb carries no farther
+    for (let n = 1; n <= 12; n++) carryRows.push(fly(0.9, n));
+    for (let i = carryRows.length - 2; i >= 0; i--) carryRows[i][0] = Math.min(carryRows[i][0], carryRows[i + 1][0]);       // dearer never carries less
+    return carryRows;
+  }
+  function cheapFor(km) {
+    const rows = carryTable(), need = km * STEER + STEER_KM;
+    return Math.max(ENERGY_FLOOR, (rows.find((r) => r[0] >= need) || rows[rows.length - 1])[1]);
+  }
+  // Energy use: the share of its 20 points left after spending `spent` on a round whose cheapest flight costs `cheap`.
+  // All of them up to ENERGY_ROOM over the cheapest flight (a seventh of a second of flapping: a hand lets go of Space
+  // about that late; the player: "there should be a little room for error"). Past that they fall on a curve, fast at
+  // first and slowly at the end, and none is left after ENERGY_WASTE more, three seconds of flapping nobody needed
+  // (the player: the drops near perfect are bigger than the drops far out, and 0 is for plain wrong). The same on
+  // every leg. A Day Trip's ring draws this in its lower half, and Ranked gives back energy by the same measure.
+  const spareLeft = (spent, cheap) => { const x = clamp(1 - Math.max(0, spent - cheap - ENERGY_ROOM) / ENERGY_WASTE, 0, 1); return x * x; };
   function tripStart(kind) {
     const T = S.trip = kind === 'endless' ? { endless: true, start: TRIP_START, rounds: [], used: new Set() } : makeTrip(today());
     T.results = []; T.i = -1; T.score = 0; T.at = T.start;
@@ -2267,11 +2307,12 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     const T = S.trip, R = T.rounds[i];
     T.intro = null;
     const goal = goalOf(R, bird.lon, bird.lat), km = kmBetween(bird.lon, bird.lat, goal[0], goal[1]), cheap = cheapFor(km);
-    // A Day Trip: a full ring every round (the player's pick, 2026-11-12). In it: the cheapest flight for this round, and
-    // ENERGY_WASTE to spare. What is left of the spare at the landing is the round's energy use points (the player,
-    // 2026-11-11: "then the excess is converted to points"). No round can strand the next: until 2026-11-12 there was
-    // one tank for the day, three times the day's cheapest flights, and a trip that ran dry ended before round 5.
-    if (!T.endless) S.cap = S.energy = cheap + ENERGY_WASTE;
+    // A Day Trip: a full ring every round (the player's pick, 2026-11-12). In it: the cheapest flight for this round with
+    // its room for error, and ENERGY_WASTE to spare. What is left of the spare at the landing gives the round's energy
+    // use points (the player, 2026-11-11: "then the excess is converted to points"). No round can strand the next: until
+    // 2026-11-12 there was one tank for the day, three times the day's cheapest flights, and a trip that ran dry ended
+    // before round 5.
+    if (!T.endless) S.cap = S.energy = cheap + ENERGY_ROOM + ENERGY_WASTE;
     Object.assign(T, { i, t0: S.t, e0: S.energy, from: [bird.lon, bird.lat], goal, km, cheap, wait: false, count: 0, fair: fairSecs(km) });
     const node = document.createElement('div'), addr = document.createElement('div');
     node.className = 'ticket ask'; addr.className = 'addr';
@@ -2330,20 +2371,22 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     const closeness = Math.round(worth(T, R) * Math.exp(-Math.max(0, d - (countryRound ? 1 : SPOT_KM)) / fallKm(R)));
     const took = S.t - T.t0;
     const speed = right ? Math.round(20 * clamp(1 - Math.max(0, took - T.fair) / T.fair, 0, 1)) : 0;
-    // energy use, when right: every point for spending no more than the cheapest flight for the leg (one climb just
-    // high enough to see the location, then a glide straight to it, for a country to its nearest point: cheapFor). Past
-    // that, needless flapping costs the same on every leg, 10 points a second of it (flapping burns 7 a second), so
-    // ENERGY_WASTE of it leaves none; a short hop is judged no harder than a long flight.
+    // energy use, when right: every point for the cheapest flight for the leg (cheapFor; for a country to its nearest
+    // point) or a tap of Space more, then fewer by the curve of spareLeft
     const used = T.e0 - S.energy, cheap = T.cheap;
-    const energy = right ? Math.round(20 * clamp(1 - Math.max(0, used - cheap) / ENERGY_WASTE, 0, 1)) : 0;
+    const energy = right ? Math.round(20 * spareLeft(used, cheap)) : 0;
     const pts = closeness + speed + energy;
     T.score += pts;
     T.results.push({ kind: R.kind, name: R.name, country: R.c.name, a2: R.c.a2, pop: R.city ? R.city.pop : 0, right, tier, d: Math.round(d * 10) / 10, closeness, speed, energy, used: Math.round(used * 100) / 100, secs: Math.round(took * 10) / 10, pts, p: R.p });
     Object.assign(T, { wait: true, ready: false, reveal: { from: p, to: R.p, km: R.km, right, area: countryRound } });
     T.results[T.results.length - 1].at = here.name || 'Open ocean';
     Object.assign(T.results[T.results.length - 1], { path: (T.trk || []).concat([[lon, lat, 0]]), from: T.from.slice(), goal: T.goal.slice(), land: [lon, lat] }); T.trk = null;
-    // the endless run: a right landing gives back less than the leg cost, a spot-on one nearly all of it (the ring shows it)
-    if (T.endless && right) S.energy = Math.min(S.cap, S.energy + cheap * (tier === 'spot' && d <= 1 ? REFILL_SPOT : REFILL));
+    // Ranked: a correct landing gives back what the flight cost, up to the cheapest flight and its room for error, and a
+    // wrong one gives back nothing. So a flight that scores every energy use point costs nothing, a wasteful one costs
+    // its waste, and a wrong answer costs the flight (the player, 2026-11-12: "if someone plays actually perfectly with
+    // no error, then a round of ranked should theoretically be endless.. it's the error that drains the energy").
+    // Until then every correct landing gave back three quarters of par, so a perfect flyer ran down too.
+    if (T.endless && right) S.energy = Math.min(S.cap, S.energy + Math.min(used, cheap + ENERGY_ROOM));
     if (!T.endless) tripSave();
     $('count').textContent = T.score;
     $('trip-clock').hidden = true;
@@ -2385,7 +2428,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   // flags and cities, each from a growing slice of its easiest-first list.
   // the most a round can score: full accuracy, times its weight, and full speed
   const roundMax = (T, i) => Math.round(worth(T, T.rounds[i])) + 40;        // accuracy, and 20 each for speed and energy use
-  const ENDLESS_TANK = 40, REFILL = 0.75, REFILL_SPOT = 0.95;
+  const ENDLESS_TANK = 40;
   function endlessRound(n) {
     const T = S.trip, last = T.rounds[n - 1];
     const kinds = ['country'].concat(n >= 2 ? ['flag'] : [], n >= 4 ? ['capital'] : [], n >= 8 ? ['capflag'] : [], n >= 12 ? ['city'] : []);
@@ -3294,11 +3337,12 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   // Stamina is a ring beside the bird: it empties while you flap and fills when a letter is delivered.
   function drawStamina(x, y) {
     const full = S.cap || TANK, K = Math.max(1, 0.95 * view.ui), r = 6.5 * K;
-    // In a Day Trip the ring is this round's: its upper half is the cheapest flight, however far that is, and its lower
-    // half the spare whose rest is the energy use points. So the mark at its foot is where the losing starts, as the
-    // mark in the middle of the stopwatch's line is the fair time, and the colors mean what they mean there.
-    const day = !!S.trip && !S.trip.endless, round = day && S.trip.cheap > 0, spent = full - S.energy;
-    const k = !round ? clamp(S.energy / full, 0, 1) : spent <= S.trip.cheap ? 1 - 0.5 * spent / S.trip.cheap : clamp(0.5 * (1 - (spent - S.trip.cheap) / ENERGY_WASTE), 0, 1);
+    // In a Day Trip the ring is this round's: its upper half is the cheapest flight and its room for error, however far
+    // that is, and its lower half is the energy use points still to be had (spareLeft: it empties fast at first and
+    // slowly at the end, as the points do). So the mark at its foot is where the losing starts, as the mark in the
+    // middle of the stopwatch's line is the fair time, and the colors mean what they mean there.
+    const day = !!S.trip && !S.trip.endless, round = day && S.trip.cheap > 0, spent = full - S.energy, free = round ? S.trip.cheap + ENERGY_ROOM : 1;
+    const k = !round ? clamp(S.energy / full, 0, 1) : spent <= free ? 1 - 0.5 * spent / free : 0.5 * spareLeft(spent, S.trip.cheap);
     if (S.gain) {
       ctx.globalAlpha = Math.abs(S.gain) * seen;
       ctx.strokeStyle = S.gain > 0 ? GOOD : BAD; ctx.lineWidth = 3 * K;
