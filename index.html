@@ -3465,10 +3465,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (s) { c.beginPath(); c.arc(s[0], s[1], 5.5 * u, 0, 7); c.fillStyle = fill; c.fill(); c.strokeStyle = edge; c.lineWidth = (edge === INK ? 1.5 : 2) * u; c.stroke(); }
   }
   const startDot = (c, L, u) => endDot(c, L.from, u, PAPER, INK), landDot = (c, L, u) => endDot(c, L.land, u, L.right ? GOOD : BAD, PAPER);
-  // What the three lines of a round mean, under the globe they are drawn on, in the words How to play uses ("fly up",
-  // "glide", "Flying up uses energy"). The player asked: "do u think we need an explanation for what the thick and
-  // thin regions of the line mean?" Each line as it is drawn on the globe, in paper-white on the dark, with no box.
-  const KEY_WORDS = [['flying up', THICK], ['gliding', THIN], ['shortest route', 0]];          // "route", not "way" (the player: "don't use ambiguous words")
+  // What the three lines of a round mean, under the globe they are drawn on. The player asked: "do u think we need an
+  // explanation for what the thick and thin regions of the line mean?" Each line as it is drawn on the globe, in
+  // paper-white on the dark, with no box. The words are the player's: "flapping" (2026-11-13: 'change "flying up" to
+  // "flapping" in the key'), and "route", not "way" ("don't use ambiguous words").
+  const KEY_WORDS = [['flapping', THICK], ['gliding', THIN], ['shortest route', 0]];
   function wayKey(u) {
     const size = Math.round(14 * u), len = 30 * u, pad = 8 * u, gap = 30 * u, y = Math.round(cam.cy + cam.rho + KEY_ROOM * u * 0.6);          // zoomed in, it is off the screen with the globe's rim
     ctx.save();
