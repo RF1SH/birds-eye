@@ -1502,7 +1502,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   const STYLE = {
     name: {},
-    wrong: { fill: BAD },
+    wrong: { fill: BAD, sub: INK },          // the name wears the verdict; a line under it (the capital) is a fact about the place, in ink
     helped: { fill: PAPER, stroke: INK },
     sea: { italic: true, weight: 600, fill: PAPER, stroke: SEA_DEEP, track: '0.02em' },
     wrongsea: { italic: true, weight: 600, fill: BAD, track: '0.02em' },
@@ -1530,8 +1530,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function disputed(c, str, sub) {
     if (!c || !c.flag || !c.flagNote) return [str, sub];
     if (sub && sub.includes(c.name)) return [str, sub.replace(c.name, c.name + '*')];
-    return str === c.name && !sub ? [str + '*', '*Flag disputed'] : [str, sub];
+    return str === c.name && (!sub || sub.startsWith(CAP_WORD)) ? [str + '*', (sub ? sub + '\n' : '') + '*Flag disputed'] : [str, sub];
   }
+  // A country that a landing names carries its capital under its name (the player, 2026-11-12: 'It should say its
+  // capital under the name of the country (e.g. "Capital: Canberra" underneath Australia if you were meant to go to
+  // Ulaanbaatar. Should probably also do that just generally? Instead of only displaying the country name, display
+  // both.'). In their words, not as the capital's mark: a star beside a name on the map reads as "the city is here".
+  const CAP_WORD = 'Capital: ';
+  const capLine = (c) => (c && c.cap ? CAP_WORD + c.cap[0] : null);
+  // the lines under a name (one, or a capital and a flag's note), and how far the last one's middle is below the name's
+  const subLines = (sub) => (sub ? sub.split('\n') : []);
+  const subFall = (o, n) => (n ? o.size + 1 + (n - 1) * (subPx(o) + 1) : 0);
   function nameplate(c, str, x, y, cls, sub, alpha, size) {
     [str, sub] = disputed(c, str, sub);
     const o = Object.assign({ size: size || namePx(), edge: size ? 3.5 : 3.5 * nameUp() }, STYLE[cls] || STYLE.name);
@@ -1540,19 +1549,20 @@ button { font: inherit; color: inherit; cursor: pointer; }
     ctx.font = (o.italic ? 'italic ' : '') + (o.weight || 700) + ' ' + o.size + 'px ' + DISPLAY;
     if ('letterSpacing' in ctx) ctx.letterSpacing = o.track || '0.05em';
     const tw = ctx.measureText(str).width, fh = flagH(size || basePx()), fw = flag ? (flag.width / flag.height) * fh : 0;
-    const so = Object.assign({}, o, { size: subPx(o), weight: 700 });
-    let sw = 0;
-    if (sub) { ctx.font = (so.italic ? 'italic ' : '') + '700 ' + so.size + 'px ' + DISPLAY; sw = ctx.measureText(sub).width; }
+    const so = Object.assign({}, o, { size: subPx(o), weight: 700, fill: o.sub || o.fill });
+    const subs = subLines(sub), step = so.size + 1;
+    ctx.font = (so.italic ? 'italic ' : '') + '700 ' + so.size + 'px ' + DISPLAY;
+    const sws = subs.map((line) => ctx.measureText(line).width), sw = Math.max(0, ...sws);
     if (!flag) {
       text(str, x, y, o);
-      if (sub) text(sub, x, y + o.size + 1, so);
+      subs.forEach((line, i) => text(line, x, y + o.size + 1 + i * step, so));
     } else {
-      // the flag to the left; the name, and the line under it, beside it and centred on it
-      const total = fw + 8 + Math.max(tw, sw), left = x - total / 2, mid = y + (sub ? (o.size + 1) / 2 : 0), tx = left + fw + 8;
+      // the flag to the left; the name, and the lines under it, beside it and centred on it
+      const total = fw + 8 + Math.max(tw, sw), left = x - total / 2, mid = y + subFall(o, subs.length) / 2, tx = left + fw + 8;
       ctx.drawImage(flagFor(c, fh), left, mid - fh / 2, fw, fh);
       if (!c.flagCut) { ctx.strokeStyle = 'rgba(19,38,59,.35)'; ctx.lineWidth = 1; ctx.strokeRect(left, mid - fh / 2, fw, fh); }
       text(str, tx + tw / 2, y, o);
-      if (sub) text(sub, tx + sw / 2, y + o.size + 1, so);
+      subs.forEach((line, i) => text(line, tx + sws[i] / 2, y + o.size + 1 + i * step, so));
     }
     ctx.globalAlpha = 1;
   }
@@ -1613,13 +1623,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
     ctx.font = (o.italic ? 'italic ' : '') + (o.weight || 700) + ' ' + o.size + 'px ' + DISPLAY;
     if ('letterSpacing' in ctx) ctx.letterSpacing = o.track || '0.05em';        // as it will be drawn: else the width is whatever was drawn last
     let w = ctx.measureText(str).width;
-    const ss = subPx(o);
-    if (sub) { ctx.font = '700 ' + ss + 'px ' + DISPLAY; w = Math.max(w, ctx.measureText(sub).width); }
-    const fh = flagH(basePx()), mid = sub ? (o.size + 1) / 2 : 0, half = o.size * 0.8;
+    const ss = subPx(o), subs = subLines(sub), fall = subFall(o, subs.length);
+    if (sub) { ctx.font = '700 ' + ss + 'px ' + DISPLAY; for (const line of subs) w = Math.max(w, ctx.measureText(line).width); }
+    const fh = flagH(basePx()), mid = fall / 2, half = o.size * 0.8;
     if (c && c.flag) w += (c.flag.width / c.flag.height) * fh + 8;
     // rise and drop: how far what is drawn reaches above and below the name's line. up and down: the room kept for it
-    const rise = c && c.flag ? fh / 2 - mid : o.size * 0.4, drop = c && c.flag ? mid + fh / 2 : sub ? o.size + 1 + ss * 0.4 : o.size * 0.4;
-    return { half: w / 2 + 6, up: Math.max(half, rise + 2), down: Math.max(sub ? o.size + 1 + ss * 0.8 : half, drop + 2), rise, drop, px: o.size };
+    const rise = c && c.flag ? Math.max(fh / 2 - mid, o.size * 0.4) : o.size * 0.4, drop = c && c.flag ? Math.max(mid + fh / 2, fall + ss * 0.4) : sub ? fall + ss * 0.4 : o.size * 0.4;
+    return { half: w / 2 + 6, up: Math.max(half, rise + 2), down: Math.max(sub ? fall + ss * 0.8 : half, drop + 2), rise, drop, px: o.size };
   }
   function settle(x, y, box, ax, ay, alpha, quiet) {
     const beside = (b) => Math.abs(b.x - x) < b.half + box.half;
@@ -1705,7 +1715,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
         ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(ex, ey); ctx.stroke();
         ctx.beginPath(); ctx.arc(s[0], s[1], 2.2 * view.mk, 0, 7); ctx.fillStyle = INK; ctx.fill(); ctx.globalAlpha = 1;
       }
-      Object.assign(placed[placed.length - 1], { name: str, sub: sub || '', flag: !!(c && c.flag), ax: s[0], ay: s[1], rise: box.rise, drop: box.drop, px: box.px });      // for the tests
+      Object.assign(placed[placed.length - 1], { name: str, sub: disputed(c, str, sub)[1] || '', ink: (STYLE[cls] || {}).sub === INK, flag: !!(c && c.flag), ax: s[0], ay: s[1], rise: box.rise, drop: box.drop, px: box.px });      // for the tests: the lines under the name as drawn
       nameplate(c, str, x, y, cls, sub, alpha);
     }, true);
     return f;
@@ -1821,13 +1831,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // After a capital letter, and when you are shown the way, if the place is out of sight the view
   // goes to it: the globe turns until the place is in the middle (rising on a long trip, so the turn
   // reads as the globe spinning), holds there, then turns back to the bird. Each leg takes longer the
-  // farther it goes. Flapping cuts the hold short.
+  // farther it goes. While the view is away the bird stays on the ground, and Space brings the view back
+  // much faster (stepLook).
   function fits(n, H, pts, m, side) {
     aim(n, H, view.w / 2, view.gy);
     const lo = view.h - view.deck - 30, mx = side || m;
     return pts.every((p) => { const s = project(p); return s && s[0] > mx && s[0] < view.w - mx && s[1] > m + 20 && s[1] < lo; });
   }
   const LOOK_HOLD = 1.6;       // seconds the view rests on the place
+  const LOOK_HURRY = 3;        // how many times faster the view comes back once Space is pressed (0.2 to 0.4 s, as long as an interface's own transitions)
   function lookAt(p) {
     const me = unit(bird.lon, bird.lat), Hb = heightFor(bird.a), saved = Object.assign({}, cam);
     const away = !fits(me, Hb, [p], 70, Math.max(70, 5 * basePx()));       // room for its name at either side
@@ -1843,6 +1855,29 @@ button { font: inherit; color: inherit; cursor: pointer; }
     return S.look.end;
   }
   const along = (L, k) => (k < 0.5 ? slerp(L.me, L.mid, k * 2) : slerp(L.mid, L.p, k * 2 - 1));
+  // While the view is away the bird cannot take off: it would fly unseen. The first press of Space brings the view back
+  // instead, much faster and from wherever it is (also when it has not arrived yet), and the next press flies. The press
+  // that hurried is used up: held down, it does not take off when the view is back. (The player, 2026-11-12: "Shouldn't be
+  // able to take off until it's done showing you the new location that you missed and has returned to you in the center.
+  // And if you press space it returns to you much faster (animation is much faster so you can press space 2x then you're
+  // flying again)". Until then Space took off at once, under a view that was elsewhere, and only cut the rest short.)
+  let flapWas = false, flapSpent = false;
+  function stepLook(dt) {
+    const press = keys.flap && !flapWas;
+    flapWas = keys.flap;
+    if (!keys.flap) flapSpent = false;
+    const L = S.look;
+    if (!L) return;
+    const back = L.go + L.hold;
+    if (press) {
+      flapSpent = !L.fast;                     // a second press, on the way back, is the one that flies
+      if (!L.fast) { L.fast = true; L.t = L.t < L.go ? back + L.go - L.t : Math.max(L.t, back); }       // still going there: the same spot on the way back
+    }
+    L.t += dt * (L.fast ? LOOK_HURRY : 1);
+    if (L.t <= L.end) return;
+    S.look = null;
+    if (L.fast && S.trip && S.trip.wait) S.trip.after = Math.min(S.trip.after, Math.max(S.trip.least, S.t));       // a round's result: the button is ready when the view is back
+  }
 
   // ---------- flying a round ----------
   let tab = 'challenge';        // the title card's tab: challenge | study | free. The game opens on the first, Challenge (the player's pick)
@@ -1889,7 +1924,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // Coming down where you took off from is not a guess, and neither is the first landing of a flight.
     if (!t || was === '*' || was === here.key) {
       (here.sea ? sfx.splash : sfx.thud)();
-      if (was === '*' && here.name) label(here.sea ? null : here.c, here.name, p, here.sea ? 'sea' : 'name', GROUND, null, UNDER);
+      if (was === '*' && here.name) label(here.sea ? null : here.c, here.name, p, here.sea ? 'sea' : 'name', GROUND, here.sea ? null : capLine(here.c), UNDER);
       return;
     }
     strand(here, p);
@@ -2439,8 +2474,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // is in the answer's own country: the answer's name already carries that country and its flag.
     const col = right ? GOOD : BAD;        // the verdict is worn by the landing: its ring and its name
     if (countryRound) { if (right) flash(R.c, 1, FLASH); else flash(R.c, 0, 4, null, 0.5); }      // the answer: lit as a delivery is, or held paper-white while you find it
-    if (!right && here.name && (here.sea || here.c !== R.c)) label(here.sea ? null : here.c, here.name, p, here.sea ? 'wrongsea' : 'wrong', GROUND, null, UNDER);
-    const sub = R.kind === 'city' ? R.c.name + ', population ~' + people(R.city.pop) : countryRound ? null : R.c.name;
+    if (!right && here.name && (here.sea || here.c !== R.c)) label(here.sea ? null : here.c, here.name, p, here.sea ? 'wrongsea' : 'wrong', GROUND, here.sea ? null : capLine(here.c), UNDER);
+    const sub = R.kind === 'city' ? R.c.name + ', population ~' + people(R.city.pop) : countryRound ? capLine(R.c) : R.c.name;          // a country round's answer: its capital under its name, as under any country a landing names
     label(R.c, R.name, R.p, 'name', GROUND, sub, countryRound ? AREA : OVER);
     ring(p, 6, 30, col, 2.5, 0.5);
     (right ? (tier === 'spot' ? sfx.spot : sfx.drop) : sfx.miss)();
@@ -2456,6 +2491,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     node.querySelector('.next').addEventListener('click', () => { tripNext(); stage.focus({ preventScroll: true }); });
     ticketsEl.replaceChildren(node);
     if (!T.endless) [...document.querySelectorAll('#trip-pips i')][T.i].className = 'done';
+    T.least = S.t + 1.2;          // the result stands at least this long, also when Space hurries the view back
     T.after = S.t + Math.max(1.2, lookAt(R.p) + 0.3);
     measure();
   }
@@ -2765,9 +2801,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
       S.drops.push({ p, t: S.t });
       const there = !c.tiny && project(c.u), on = there && there[0] > 50 && there[0] < view.w - 50 && there[1] > 50 && there[1] < view.h - view.deck - 30;
       // at its middle when that is in sight and the name and flag stand clear of the bird there; else under the bird
-      const box = plateBox(c, c.name, 'name'), me = birdBox(project(p) || [view.w / 2, view.gy]);
+      const box = plateBox(c, c.name, 'name', capLine(c)), me = birdBox(project(p) || [view.w / 2, view.gy]);
       const clear = on && (Math.abs(there[0] - me.x) >= box.half + me.half || there[1] - box.up >= me.y + me.down || there[1] + box.down <= me.y - me.up);
-      label(c, c.name, clear ? c.u : p, 'name', GROUND, null, clear ? AREA : UNDER);
+      label(c, c.name, clear ? c.u : p, 'name', GROUND, capLine(c), clear ? AREA : UNDER);
       ring(p, 4, 22, INK, 2.5, 0.45);
     }
     (spot ? sfx.spot : sfx.drop)();
@@ -2781,7 +2817,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     S.said = 'correct country';
     flash(c, 1, FLASH);
     ring(p, 6, 30, PAPER, 2.5, 0.5);
-    label(t.shown ? null : c, c.name, p, 'name', GROUND, null, UNDER);      // shown the way: the capital's name is still up, with the flag
+    label(t.shown ? null : c, c.name, p, 'name', GROUND, null, UNDER);      // shown the way: the capital's name is still up, with the flag. No capital line here: the postcard itself names it
     if (!t.warm) {
       t.warm = true;
       sfx.thud();
@@ -2804,7 +2840,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     S.gain = -1;
     ring(p, 6, 30, BAD, 2.5, 0.5);
     const lit = here.c || (here.sea && here.w >= 0 ? WATERS[here.w] : null);
-    if (here.name) label(here.sea ? null : here.c, here.name, p, here.sea ? 'wrongsea' : 'wrong', GROUND, null, UNDER);
+    if (here.name) label(here.sea ? null : here.c, here.name, p, here.sea ? 'wrongsea' : 'wrong', GROUND, here.sea ? null : capLine(here.c), UNDER);
     sfx.miss();
     if (t) countAgainst(t);
   }
@@ -2993,12 +3029,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       return;
     }
 
-    if (S.look) {
-      S.look.t += dt;
-      const L = S.look, back = L.go + L.hold;
-      if (keys.flap && L.t > L.go && L.t < back) L.t = back;
-      if (L.t > L.end) S.look = null;
-    }
+    stepLook(dt);
 
     // A bird left alone on the ground dozes off, and after a few minutes the game pauses itself.
     S.idle += dt;
@@ -3008,7 +3039,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (S.idle > IDLE_PAUSE) { setPaused(true, true); return; }
 
     // Flapping is the only thing that costs energy. With none left, you can only glide down.
-    const flap = keys.flap && S.energy > 0 && !(S.trip && S.trip.wait);
+    const flap = keys.flap && !flapSpent && !S.look && S.energy > 0 && !(S.trip && S.trip.wait);
     if (flap) {
       S.energy = Math.max(0, S.energy - BURN * dt);
       if (bird.down) { bird.down = false; bird.va = CLIMB * 0.45; }
