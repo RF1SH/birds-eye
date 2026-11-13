@@ -2342,13 +2342,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
 
   // ---------- Day Trip ----------
-  // Five places a day, the same for everyone (seeded by the UTC date): a country by name, a country by
+  // Five locations a day, the same for everyone (seeded by the date): a country by name, a country by
   // its flag, a capital by name, the capital of a country shown by its flag, and a city that is not a
-  // capital. One landing each. Before each place a 3-2-1, then a stopwatch runs until you land.
-  // Each round scores closeness (always, falling with every kilometre, the later rounds worth more)
-  // and, when the landing is right, speed (against a fair time for the leg's length). One tank for
-  // the day, three times the cheapest climbs along the route; what is left of the spare at the end is
-  // energy points, as many fifths of them as rounds were right. A day is out of 1,000.
+  // capital. One landing each. Before each location a 3-2-1, then a stopwatch runs until you land.
+  // Each round is worth 200: accuracy 160 (always, falling with the distance) and, when the landing is
+  // correct, speed 20 (against a fair time for the leg's length) and energy use 20 (against the cheapest
+  // flight for the leg). Every round begins with a full ring. A day is out of 1,000.
   const CITIES = (D.cities || []).map(([name, cid, lon, lat, pop]) => ({ name, c: byId.get(cid), lon, lat, pop })).filter((x) => x.c);
   // How hard a location is, 0 (everyone knows it) to 1: how far down its kind it ranks by readers of its
   // English Wikipedia page (worked out in tools/assemble.py from data/fame.json). A flag is FLAG_X harder than
@@ -2375,12 +2374,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const ADDRESS = 'https://rf1sh.github.io/birds-eye/';       // where the game lives: the last line of a shared result
   const TRIP_START = [0, 0];                  // every trip and run starts here: the middle of the map, off West Africa
   const INTRO_TURN = 0.9, INTRO_ZOOM = 1.7;   // the 3-2-1: seconds to turn the globe there, then to come down
-  // Measured with a scripted pilot (tests/trip_pilot.py): an efficient flight takes 1 + km / 3500 s, at
-  // most 3.4, plus about 1.6 s more for the far side of the world. The fair time allows 5 s to read the
-  // clue and think, and half as long again as that flight. Speed points are full up to the fair time
-  // and fall to none at twice it.
-  const flightSecs = (km) => Math.min(3.4, 1 + km / 3500) + (km > 14000 ? 1.6 : 0);
-  const fairSecs = (km) => 5 + 1.5 * flightSecs(km);
   const exactKm = (km) => Math.max(1, Math.round(km)).toLocaleString('en') + ' km';     // competitive: every km shows. Whole km: a pixel on the ground is 1 to 1.6 km
   // The day is the player's own calendar day, as Wordle's is: everyone gets the same five for the same date, each from
   // their own midnight. (Until 2026-11-12 it was London's: the trip changed at 7 pm in New York, and a trip at 6 pm one
@@ -2394,8 +2387,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     let a = h >>> 0;
     return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   }
-  // The day's five, the same for everyone: drawn from the day's seed again and again until their average
-  // difficulty is near DAY_H, so no day is much harder or easier than another.
+  // The day's five, the same for everyone, in five different countries: drawn from the day's seed again and again
+  // until their average difficulty is near DAY_H, so no day is much harder or easier than another.
   const DAY_H = 0.45, DAY_BAND = 0.06;
   function makeTrip(day) {
     const r = seeded('daytrip:' + day), pick = (list) => list[Math.floor(r() * list.length)];
@@ -2405,7 +2398,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
     for (let tries = 0; tries < 200 && gap > DAY_BAND; tries++) {
       const used = new Set(), fresh = (list) => { const c = pick(list.filter((x) => !used.has(x.id))); used.add(c.id); return c; };
       const c1 = fresh(PLAY), c2 = fresh(flagOk), c3 = fresh(capped), c4 = fresh(capped.filter((c) => c.a2 && !c.flagNote));
-      const city = r() < 0.65 ? pick(CITIES.slice(0, 200)) : pick(CITIES.slice(200));
+      // the city too is in a country not asked that day: drawn again when it is not (on 18 days in 730 it was, until 2026-11-13)
+      let city = null;
+      for (let n = 0; n < 50 && (!city || used.has(city.c.id)); n++) city = r() < 0.65 ? pick(CITIES.slice(0, 200)) : pick(CITIES.slice(200));
       const rounds = [
         { kind: 'country', c: c1, p: c1.u, lon: c1.lx, lat: c1.ly, name: c1.name },
         { kind: 'flag', c: c2, p: c2.u, lon: c2.lx, lat: c2.ly, name: c2.name },
@@ -2450,10 +2445,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (carryRows && carryKey === key) return carryRows;
     carryRows = []; carryKey = key;
     const dt = 1 / 120;
-    // [km carried, energy spent] by a climb let go at a height, then up to `taps` taps (two steps each) once it sinks near the top
+    // [km carried, energy spent, seconds in the air] by a climb let go at a height, then up to `taps` taps (two steps each) once it sinks near the top
     const fly = (letGo, taps) => {
-      let a = 0, va = CLIMB * 0.45, vx = 0, cost = 0, far = 0, up = true, tap = 0;
-      for (let n = 0; n < 4000 && (a > 0 || n === 0); n++) {
+      let a = 0, va = CLIMB * 0.45, vx = 0, cost = 0, far = 0, up = true, tap = 0, n = 0;
+      for (; n < 4000 && (a > 0 || n === 0); n++) {
         if (up && a >= letGo - 1e-9) up = false;
         if (!up && !tap && taps > 0 && va < 0 && a < 0.98) { tap = 2; taps--; }
         const flap = up || tap > 0;
@@ -2463,17 +2458,27 @@ button { font: inherit; color: inherit; cursor: pointer; }
         if (flap) cost += BURN * dt;
         vx += (paceAt(a) - vx) * Math.min(1, dt * 10); far += vx * (heightFor(a) / view.F) * dt * R_KM;
       }
-      return [far, cost];
+      return [far, cost, n * dt];
     };
     for (let i = 1; i <= 90; i++) carryRows.push(fly(i / 100, 0));          // let go at 0.9, the bird coasts to the top: more climb carries no farther
     for (let n = 1; n <= 12; n++) carryRows.push(fly(0.9, n));
     for (let i = carryRows.length - 2; i >= 0; i--) carryRows[i][0] = Math.min(carryRows[i][0], carryRows[i + 1][0]);       // dearer never carries less
     return carryRows;
   }
-  function cheapFor(km) {
-    const rows = carryTable(), need = km * STEER + STEER_KM;
-    return Math.max(ENERGY_FLOOR, (rows.find((r) => r[0] >= need) || rows[rows.length - 1])[1]);
-  }
+  const cheapRow = (km) => { const rows = carryTable(), need = km * STEER + STEER_KM; return rows.find((r) => r[0] >= need) || rows[rows.length - 1]; };
+  const cheapFor = (km) => Math.max(ENERGY_FLOOR, cheapRow(km)[1]);
+  // The fair time of a round: THINK seconds to read the clue and think, and FLIGHT_X times as long as the cheapest
+  // flight for the leg is in the air. That flight is timed in the table its energy comes from, so the fair time and
+  // energy use are judged against one flight, in every window: 0.9 s in the air for 600 km, 2.1 for 4,000, 2.7 for
+  // 8,500, 3.3 for 14,000, 3.7 for the far side of the world. The half more is room for a flight that is not the
+  // cheapest (a bird that climbs until it sees the location is in the air about half a second longer). Speed points
+  // are full up to the fair time and fall to none at twice it. Neither number has been checked against a person yet.
+  // (Until 2026-11-13 the flight was a rule of thumb, min(3.4, 1 + km / 3500) s and 1.6 s more past 14,000 km, from
+  // a pilot that climbed until it saw the location: up to 1.6 s too long on a far leg, so the time left to think
+  // ran from 5.6 s on a hop to 9 s on the far side of the world.)
+  const THINK = 5, FLIGHT_X = 1.5;
+  const flightSecs = (km) => cheapRow(km)[2];
+  const fairSecs = (km) => THINK + FLIGHT_X * flightSecs(km);
   // Energy use: the share of its 20 points left after spending `spent` on a round whose cheapest flight costs `cheap`.
   // All of them up to ENERGY_ROOM over the cheapest flight (a seventh of a second of flapping: a hand lets go of Space
   // about that late; the player: "there should be a little room for error"). Past that they fall on a curve, fast at
@@ -4064,7 +4069,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // Ground speed in km a second at a height, flying flat out.
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   const setBird = (lon, lat, a, down) => Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down });
-  window.birdsEye = { names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), parFor, capKm, cheapFor, judge, ringKm, hardOf, endlessRound, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
+  window.birdsEye = { names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), flightSecs, parFor, capKm, cheapFor, judge, ringKm, hardOf, endlessRound, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     project: projectLL, unproject, speedAt, placed, seen: () => seen, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
