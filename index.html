@@ -910,7 +910,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
       const np = PLAY.length, nc = CONTEXT.length;
       const segVAO = lineVAO(g.segs);
       LOD.push({ vao, all, segVAO, segBuf: lastLineBuffer, ranges: g.ranges, segRanges: g.segRanges, caps: g.caps, np, nc, lakes: g.ranges[np + nc],
-        waters: WATERS.map((w, i) => owner.flatMap((o, k) => (o === i ? [g.ranges[np + nc + 1 + k]] : []))) });
+        waters: WATERS.map((w, i) => owner.flatMap((o, k) => (o === i ? [g.ranges[np + nc + 1 + k]] : []))),
+        waterSegs: WATERS.map((w, i) => owner.flatMap((o, k) => (o === i ? [g.segRanges[np + nc + 1 + k]] : []))) });
       gl.bindVertexArray(null);
     }
 
@@ -996,9 +997,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
     gl.uniform4fv(u.uColor, col);
     gl.drawElements(gl.TRIANGLES, range[1], gl.UNSIGNED_INT, range[0] * 4);
   }
-  // Fill several ranges as one shape, where any of them covers (their patches overlap): each is
-  // drawn into stencil bit 1 and gathered into bit 2, then bit 2 is painted once.
-  function fillAll(list, col) {
+  // A water lit as one shape with no seams: each patch is drawn into stencil bit 1 and gathered into bit 2 (the patches
+  // overlap, and together they are the water). Its patches do not quite meet: where two of them touch there is a hairline
+  // gap, seen as dark threads across a lit sea once the whole sea is in view. So the patches' outlines are gathered
+  // into the shape too, SEAM pixels wide, and painted first; then the patches are painted where the outlines did not
+  // reach. Every pixel once, so nothing is lit twice. The land is drawn afterwards and covers what spills over a coast.
+  // (The fill program, its vertex array and the stencil test are on when this is called, and are on again after it.)
+  const SEAM = 3;
+  function fillWater(L, i, col) {
+    const list = L.waters[i], segs = L.waterSegs[i];
     if (!list || !list.length) return;
     gl.colorMask(false, false, false, false);
     for (const r of list) {
@@ -1009,10 +1016,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
       gl.stencilMask(1); gl.stencilFunc(gl.ALWAYS, 0, 1); gl.stencilOp(gl.KEEP, gl.KEEP, gl.ZERO);
       gl.drawElements(gl.TRIANGLES, r[1], gl.UNSIGNED_INT, r[0] * 4);
     }
+    uniforms(progLine);
+    gl.uniform1f(progLine.u.uPush, 1);
+    gl.stencilMask(2); gl.stencilFunc(gl.ALWAYS, 2, 2); gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE);
+    segments(L, segs, SEAM, col);                                   // into the shape (nothing is painted: the color mask is off)
     gl.colorMask(true, true, true, true);
-    gl.stencilMask(2); gl.stencilFunc(gl.EQUAL, 2, 2); gl.stencilOp(gl.KEEP, gl.KEEP, gl.ZERO);
+    gl.stencilFunc(gl.EQUAL, 2, 2); gl.stencilOp(gl.KEEP, gl.KEEP, gl.ZERO);
+    segments(L, segs, SEAM, col);                                   // painted, and taken out of the shape
+    uniforms(progFill);
+    gl.uniform1f(progFill.u.uPush, 3);
+    gl.bindVertexArray(L.vao);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, L.all);
     gl.uniform4fv(progFill.u.uColor, col);
-    for (const r of list) gl.drawElements(gl.TRIANGLES, r[1], gl.UNSIGNED_INT, r[0] * 4);
+    for (const r of list) gl.drawElements(gl.TRIANGLES, r[1], gl.UNSIGNED_INT, r[0] * 4);       // the rest of the shape
     gl.stencilMask(0xff);
   }
   function lines(vao, count, width, col) {
@@ -1090,9 +1106,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, L.all);
     gl.enable(gl.STENCIL_TEST);
     // a water you have just landed on lights up under the land, so only the water shows it
-    for (const fl of flashes) if (fl.c.water) fillAll(L.waters[fl.c.index], colour(PAPER, clamp(1 - fl.t / fl.secs, 0, 1) * 0.55));
+    // pulses 0: it holds, then fades in its last fifth (the view is away showing the whole sea); else it fades from the start
+    for (const fl of flashes) if (fl.c.water) { const k = fl.t / fl.secs; fillWater(L, fl.c.index, colour(PAPER, clamp(fl.pulses === 0 ? Math.min(1, (1 - k) / 0.2) : 1 - k, 0, 1) * 0.55)); }
     const glow = beacon(), glowing = 0.16 + 0.2 * (0.5 + 0.5 * Math.sin(S.t * 4));       // the place you were shown: its whole shape, a country or a sea
-    if (glow && glow.water) fillAll(L.waters[glow.index], colour(PAPER, glowing * 1.5));
+    if (glow && glow.water) fillWater(L, glow.index, colour(PAPER, glowing * 1.5));
     gl.disable(gl.BLEND);
     for (const i of shown) fill(L.ranges[i], i >= L.np ? colour(SAND) : sanded[i] > 0.004 ? toSand(FILL[PLAY[i].col], sanded[i]) : colour(FILL[PLAY[i].col]));
     gl.enable(gl.BLEND);
@@ -1808,7 +1825,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const r = c.water || c.tiny || t.it.kind === 'k' ? 14 : clamp(c.r * cam.pxRad / R_KM, 14, 90);
     ring(p, r / view.mk + 96, r / view.mk, PAPER, 3, 0.9);
     sfx.show();
-    lookAt(p);
+    if (c.water) lookAt(p, c); else lookAt(p);          // a sea: the whole of it
     // its name stays on it until the postcard is delivered (a sea's below the ring, whatever the name's size then;
     // a tiny country's by its dot as a capital's is by its pin). Shown again after another wrong landing: one name, not two
     if (t.label) t.label.secs = 0;
@@ -1848,9 +1865,52 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   const LOOK_HOLD = 1.6;       // seconds the view rests on the place
   const LOOK_HURRY = 3;        // how many times faster the view comes back once Space is pressed (0.2 to 0.4 s, as long as an interface's own transitions)
-  function lookAt(p) {
+  // A sea is shown whole (the player, 2026-11-12: "Should zoom out to show the entire sea territory (not ocean), in
+  // general, but especially if you land on the edge or in the 'acceptable' range"): when a sea is delivered, or you
+  // are shown where one is, and not all of it is in view, the view goes to its middle and back, as high as it takes
+  // for every piece of it and the bird to be on the screen. An ocean cannot be: it is wider than one side of the globe.
+  // seaShape: a sea's outline, thinned to sixty points a ring.
+  const isOcean = (w) => / Ocean$/.test(w.name);
+  function seaShape(w) {
+    if (w.shape) return w.shape;
+    const pts = [];
+    for (const s of D.seas) {
+      if (s.w !== w.index) continue;
+      for (const r of s.rings) { const n = r.length / 2, every = Math.max(1, Math.ceil(n / 60)); for (let i = 0; i < n; i += every) pts.push(unit(r[2 * i] / 100, r[2 * i + 1] / 100)); }
+    }
+    return (w.shape = pts);
+  }
+  // Where the view rests to show all of pts: the point in its middle and its height, found as a map fits its view to
+  // bounds (Leaflet's fitBounds, Mapbox's cameraForBounds): the box round the points as drawn is put in the middle of
+  // the room there is, and the view is as low as still holds the box. Three rounds, because moving the middle changes
+  // the box a little. null when even the top of the flight cannot hold them. (It moves the camera: the caller puts it back.)
+  function viewFor(pts, lowest, room) {
+    const top = room + 20, lo = view.h - view.deck - 30;
+    let c = norm(pts.reduce((a, q) => [a[0] + q[0], a[1] + q[1], a[2] + q[2]], [0, 0, 0])), H = lowest;
+    for (let round = 0; ; round++) {
+      H = lowest;
+      while (H < view.H1 && !fits(c, H, pts, room)) H *= 1.03;
+      const ok = fits(c, H, pts, room);
+      if (round === 3) return ok ? [c, H] : null;
+      if (!ok) aim(c, view.H1, view.w / 2, view.gy);
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+      for (const q of pts) { const at = project(q); if (at) { x0 = Math.min(x0, at[0]); x1 = Math.max(x1, at[0]); y0 = Math.min(y0, at[1]); y1 = Math.max(y1, at[1]); } }
+      const ll = x1 >= x0 ? unproject((x0 + x1) / 2, view.gy + (y0 + y1) / 2 - (top + lo) / 2) : null;
+      if (ll) c = unit(ll[0], ll[1]);
+    }
+  }
+  // lookAt(p): to a place that is out of sight. lookAt(p, sea): to a sea that is not all in sight; least is the lowest
+  // the view may rest (when you are shown where a sea is, as high as for any place, so the lands round it say where that is).
+  function lookAt(p, sea, least) {
     const me = unit(bird.lon, bird.lat), Hb = heightFor(bird.a), saved = Object.assign({}, cam);
-    const away = !fits(me, Hb, [p], 70, Math.max(70, 5 * basePx()));       // room for its name at either side
+    const whole = sea && !isOcean(sea) ? seaShape(sea).concat([me]) : null, room = 44 * view.ui;
+    let away = whole ? !fits(me, Hb, whole, room) : !fits(me, Hb, [p], 70, Math.max(70, 5 * basePx()));       // a place: room for its name at either side
+    let H = Math.max(Hb, least === undefined ? heightFor(0.5) : least);
+    if (whole && away) {
+      const v = viewFor(whole, H, room);
+      if (v) [p, H] = v;
+      else { H = Math.max(Hb, heightFor(0.5)); p = sea.u; away = !fits(me, Hb, [p], 70, Math.max(70, 5 * basePx())); }       // too wide for the screen: to its point, as before
+    }
     Object.assign(cam, saved);
     if (!away) return 0;
     const ang = Math.acos(clamp(dot(me, p), -1, 1));
@@ -1858,7 +1918,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     let mid = slerp(me, p, 0.5);
     if (ang > Math.PI - 0.05) { const up = Math.abs(me[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0]; mid = norm([me[1] * up[2] - me[2] * up[1], me[2] * up[0] - me[0] * up[2], me[0] * up[1] - me[1] * up[0]]); }
     const go = 0.55 + 0.6 * (ang / Math.PI);
-    const H = Math.max(Hb, heightFor(0.5)), rise = Math.log(view.H1 * 1.1 / H) * clamp((ang - 0.3) / 1.2, 0, 1);
+    const rise = Math.log(view.H1 * 1.1 / H) * clamp((ang - 0.3) / 1.2, 0, 1);
     S.look = { me, mid, p, go, hold: LOOK_HOLD, end: 2 * go + LOOK_HOLD, H, rise: Math.max(0, rise), t: 0 };
     return S.look.end;
   }
@@ -2801,7 +2861,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
       S.drops[S.drops.length - 1].hold = Math.max(LOOK, lookAt(city));
     } else if (c.water) {
       S.drops.push({ p, t: S.t });
-      flash(c, 1, FLASH);
+      const away = lookAt(p, c, 0);                // the whole sea, when not all of it is in view from here: it stays lit until the view is on its way back
+      flash(c, away ? 0 : 1, away || FLASH);
       label(null, c.name, p, 'sea', GROUND, edge ? 'Acceptable' : null, UNDER);   // in the border zone: counts, said quietly
       ring(p, 4, 22, PAPER, 2.5, 0.45);
       sfx.splash();
