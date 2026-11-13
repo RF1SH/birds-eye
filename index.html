@@ -272,6 +272,24 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #trip-clock .track { height: 100%; border-radius: 3px; overflow: hidden; background: var(--paper-shade); }
 #trip-bar { height: 100%; background: linear-gradient(90deg, var(--good) 0 50%, var(--yellow) 0 66.7%, var(--orange) 0 83.3%, var(--bad) 0) 0 0 / 108px 100% no-repeat; }
 #trip-clock .bar::after { content: ""; position: absolute; left: calc(50% - 1px); top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
+/* The tutorial. Its bar is the box beside the postcard: its label, one line at a time, and its buttons, each a cell
+   of that box like the rounds and the stopwatch. Every part is one the game already has: the key caps, .go and .alt. */
+#tutor-label { display: grid; align-content: center; padding: 6px 18px; font: 700 20px/1 var(--display); white-space: nowrap; }
+#tutor-say { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 20px; font-size: 17px; line-height: 1.35; }
+#tutor-say > span { text-wrap: pretty; }          /* in a narrow window a sentence takes a second line, set as the How to play card sets its own: no word left alone */
+#tutor-say kbd { flex: none; margin: 0 1px; }
+#tutor-say .arrows { flex: none; gap: 2px; }          /* the four arrows as they stand on a keyboard, smaller than on the How to play card */
+#tutor-say .arrows kbd { min-width: 21px; margin: 0; padding: 0 4px 1px; font-size: 12px; line-height: 1.3; border-bottom-width: 2.5px; }
+.tutor-btn { display: grid; align-content: center; padding: 6px 14px; }
+.tutor-btn button { pointer-events: auto; white-space: nowrap; }
+.tutor-btn .go { font-size: 20px; padding: 7px 14px 9px; }
+.tutor-btn .alt { font-size: 16px; padding: 5px 10px 6px; }
+#console.tutor #status { min-width: 0; }          /* in a narrow window the bar gives way (its sentence wraps), never the postcard that asks */
+#console.tutor #tickets:has(.ticket.ask) { flex: none; }
+#console.lesson #tickets { display: none; }          /* no postcard yet: the bar stands in the middle */
+#console.lesson #status { min-height: calc(66.5px + 2 * var(--b2z)); }        /* as tall as the countdown's postcard that comes next (its two lines, its padding, its border), so nothing moves when it does */
+/* a first visit: the title and two buttons, nothing else */
+#card.first .seg, #card.first #howto-open, #card.first #pane-study, #card.first #pane-free, #card.first #pane-soon { display: none; }
 .ticket.ask .addr { min-width: 170px; }
 .ticket .kind { display: block; margin-bottom: 4px; font: 700 11.5px/1 var(--text); color: var(--ink-soft); text-transform: uppercase; letter-spacing: .06em; }
 .ticket .what { display: flex; align-items: center; justify-content: center; gap: 8px; }
@@ -288,6 +306,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #daycard td.pts small { font-size: 13px; }
 .ticket.result .next { grid-column: 3; grid-row: 1 / span 2; align-self: center; pointer-events: auto; visibility: hidden; font-size: 20px; padding: 7px 14px 9px; }
 .ticket.result .next.ready { visibility: visible; }
+.ticket.result .two { grid-column: 3; grid-row: 1 / span 2; display: flex; align-items: center; gap: 10px; }          /* the tutorial's card: two buttons */
+.ticket.result .two .next { white-space: nowrap; }
 .ticket.result .plus.right { color: var(--good); }
 .ticket.result .plus.wrong { color: var(--bad); }
 .ticket.result .parts b { color: var(--ink); }
@@ -417,6 +437,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       <div id="card-title">
         <h1>Bird's <span class="eye">Eye<svg class="logo" viewBox="-27 -27 54 54" aria-hidden="true"><use href="#i-bird" transform="rotate(-18)"/></svg></span></h1>
         <button id="howto-open" type="button" aria-label="How to play" title="How to play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></button>
+        <div class="row" id="first-row" hidden><button class="go" id="go-tutor" type="button">Start tutorial</button><button class="alt" id="first-skip" type="button">Skip</button></div>
         <div class="seg" role="tablist" aria-label="Mode">
           <button type="button" role="tab" data-mode="challenge" aria-selected="true">Challenge</button><button type="button" role="tab" data-mode="study" aria-selected="false">Study</button><button type="button" role="tab" data-mode="free" aria-selected="false">Free flight</button>
         </div>
@@ -467,7 +488,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
           <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><circle cx="24" cy="22" r="19.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/><circle cx="24" cy="22" r="12.5" fill="none" stroke="var(--ink)" stroke-width="1.5"/><circle cx="24" cy="22" r="5.5" fill="var(--good)" stroke="var(--ink)" stroke-width="1.5"/><use href="#i-bird" transform="translate(39.5 27.5) scale(.42)"/></svg></div>
           <p>The closer you land, the more points.</p>
           <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><text x="28" y="19" text-anchor="middle" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" font-size="16" fill="var(--ink)">3.9 s</text><rect x="1" y="26" width="54" height="4.4" rx="1.6" fill="var(--paper-shade)"/><path d="M2.6 26 H17 V30.4 H2.6 A1.6 1.6 0 0 1 1 28.8 V27.6 A1.6 1.6 0 0 1 2.6 26 Z" fill="var(--good)"/><rect x="27.4" y="24.2" width="1.2" height="8" fill="var(--ink)"/></svg></div>
-          <p>Land before the mark for full speed points.</p>
+          <p>Land before the timer's halfway mark for full speed points.</p>
           <div class="ill"><svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="15" fill="var(--paper)" stroke="var(--ink)" stroke-width="2"/><circle cx="22" cy="22" r="10.5" fill="none" stroke="var(--paper-shade)" stroke-width="6"/><path d="M22 11.5 A10.5 10.5 0 1 1 11.6 23.4" fill="none" stroke="var(--good)" stroke-width="6"/></svg></div>
           <p>Flying up uses energy. The less you use, the more points.</p>
         </div>
@@ -493,8 +514,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
       <div id="console" hidden>
         <div id="tickets"></div>
         <div id="status">
+          <div id="tutor-label" hidden>Tutorial</div>
           <div id="trip-pips" class="tripbox" hidden><div class="row5"><i></i><i></i><i></i><i></i><i></i></div><span id="trip-round">Round 1 of 5</span></div>
           <div id="trip-clock" class="tripbox" hidden><b id="trip-secs">0.0 s</b><div class="bar"><div class="track"><div id="trip-bar"></div></div></div></div>
+          <div id="tutor-say" hidden></div>
+          <div id="tutor-go" class="tutor-btn" hidden><button class="go" id="tutor-continue" type="button">Continue</button></div>
+          <div id="tutor-skip" class="tutor-btn" hidden><button class="alt" id="tutor-skip-btn" type="button">Skip</button></div>
           <div id="tally"><b id="count">0</b><span id="count-what">delivered</span></div>
         </div>
       </div>
@@ -1306,7 +1331,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   const KEY = 'birds-eye-world-1';
   const KINDS = ['c', 'k', 'f', 's'], REGIONS = ['World', 'Africa', 'Americas', 'Asia', 'Europe', 'Oceania'];
-  const save = { mem: {}, best: 0, sound: true, study: { kinds: KINDS.slice(), where: ['World'] }, trips: {}, endless: 0, skill: null };
+  const save = { mem: {}, best: 0, sound: true, study: { kinds: KINDS.slice(), where: ['World'] }, trips: {}, endless: 0, skill: null, visited: false };
   const wholeWorld = (w) => !w.length || w.includes('World') || REGIONS.every((r) => r === 'World' || w.includes(r));      // no region, World itself, or all five
   try {
     const got = JSON.parse(localStorage.getItem(KEY)) || {};
@@ -1333,7 +1358,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (st && Array.isArray(st.kinds)) { const k = KINDS.filter((x) => st.kinds.includes(x)); if (k.length) save.study.kinds = k; }
     const w = st && (Array.isArray(st.where) ? st.where : [st.where]).filter((x) => REGIONS.includes(x));
     if (w && w.length) save.study.where = wholeWorld(w) ? ['World'] : w;
+    if (got.visited === true) save.visited = true;
   } catch (e) { /* private window, or nothing saved yet */ }
+  // A first visit: the first card's choice (Start tutorial or Skip) has not been made in this browser, and nothing has
+  // been played in it either (a player from before the tutorial existed is not a first-time visitor).
+  let firstVisit = !save.visited && !Object.keys(save.mem).length && !Object.keys(save.trips).length && !save.endless && !save.best && !save.flight;
   const persist = () => {
     try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) { /* carry on without saving */ }
   };
@@ -2031,6 +2060,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (S.game === 'free') S.energy = Infinity;          // Free flight: no energy, no end
     if (S.game === 'trip') tripStart(runKind);
     if (S.game === 'study' && save.flight) carryOn();
+    tutorBar();
     stage.classList.add('flying');
     stage.classList.remove('atlas');
     stage.focus({ preventScroll: true });
@@ -2543,11 +2573,140 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // (the player: the drops near perfect are bigger than the drops far out, and 0 is for plain wrong). The same on
   // every leg. A Day Trip's ring draws this in its lower half, and Ranked gives back energy by the same measure.
   const spareLeft = (spent, cheap) => { const x = clamp(1 - Math.max(0, spent - cheap - ENERGY_ROOM) / ENERGY_WASTE, 0, 1); return x * x; };
+  // ---------- the tutorial ----------
+  // A first visit opens on the title and two buttons, Start tutorial and Skip (the player's pick, 2026-11-13: "Two
+  // buttons"); the tutorial can be flown later from the Challenge tab's How to play card. It is a Day Trip round that
+  // keeps nothing. First the keys, one line at a time in the bar, each gone once its thing has been done: hold Space,
+  // use the arrows, let go. (The arrows come before letting go because they do nothing on the ground.) Down again, the
+  // rule of a round and a button to go on; then one location, Australia, the country real players find most often,
+  // counted in from the tutorial's start and scored as any round is. Its card has two buttons: the real game, and Keep practicing, which asks
+  // more locations one after another under the label Practice. A wrong landing there has one sentence beside its card.
+  // The words are the player's or the How to play card's own ("I don't want to over explain things").
+  const TUTOR_START = [88, -22];          // open water west of Australia: flying up brings it into view
+  const LESSON_TANK = 28;                 // four seconds of flying up, about a Day Trip round's ring
+  const TUTOR_LEAD = 0.6;                 // seconds the view takes to rise from where the bird stands before the globe turns to a start (the tutorial's round, and the real game after it)
+  const SAY = {
+    space: 'Hold <kbd class="space">Space</kbd> to fly up.',
+    arrows: 'Use <span class="arrows"><kbd class="up">&uarr;</kbd><kbd>&larr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd></span> to navigate.',
+    letgo: '<span>Flying up uses energy. Let go to glide down.</span>',
+    rule: '<span>A postcard will name a location.<br>You have one attempt to land there.</span>',
+    clock: '<span>Land before the timer\'s halfway mark for full speed points.</span>',
+    wrong: '<span>Speed and energy points only&nbsp;count<br>on a correct landing.</span>' };
+  // a step of the lesson: space | arrows | letgo (the bird flies, nothing is asked) | rule (down again: the bar waits for Continue)
+  function lesson(step) {
+    const T = S.trip;
+    Object.assign(T, { wait: true, ready: false, count: 0, reveal: null, lesson: step, nav: 0, least: S.t + 1.2 });
+    if (step === 'space' || step === 'rule') { S.cap = S.energy = LESSON_TANK; T.cheap = 0; }          // a full ring to learn with, and again once down
+    $('trip-clock').hidden = true;
+    ticketsEl.replaceChildren();
+    tutorBar();
+    measure();
+  }
+  const lessonFlies = (T) => !!T.lesson && T.lesson !== 'rule' && !T.intro;
+  function lessonTick(dt) {
+    const T = S.trip;
+    if (T.intro) { if (T.intro.t >= INTRO_TURN + INTRO_ZOOM) T.intro = null; return; }          // the view comes down to the bird first
+    if (bird.down) return;
+    if (T.lesson === 'space' && bird.a >= 0.3) lesson('arrows');          // held, not tapped: the map has begun to widen
+    else if (T.lesson === 'arrows') {
+      if (keys.left || keys.right || keys.up || keys.down) T.nav += dt;
+      if (T.nav >= 0.4) lesson('letgo');                                 // long enough to have seen the bird go that way
+    }
+  }
+  // down in the lesson: after the third line, the rule of a round. Before it (a tap, or no arrow used yet): Space again.
+  function lessonLand() { const T = S.trip; if (T.lesson === 'letgo') lesson('rule'); else if (T.lesson !== 'rule') lesson('space'); }
+  // Continue. The round starts from the tutorial's own start, as every real game starts from one spot: the view rises
+  // from where the bird came down, the globe turns back, and the count waits for it. (Flown by the keys, the lesson
+  // leaves the bird anywhere: 0.6 s of an arrow at the top carries it 4,900 km, from the start onto Australia itself,
+  // where "Find Australia" would ask for the country it stands on; a second longer, and it is on the far side of the
+  // world. From the start Australia is 2,600 km off and in view once the bird is up, for everyone.)
+  function tutorGo() {
+    const T = S.trip;
+    if (!T || T.lesson !== 'rule') return;
+    const at = [bird.lon, bird.lat];
+    [atlas.lon, atlas.lat] = at; atlas.to = null; atlas.zoom = 1;
+    let from = unit(at[0], at[1]);
+    if (dot(from, unit(...T.start)) < -0.98) from = unit(at[0], at[1] + 20);       // no one way round from the far side
+    T.at = T.start; T.intro = { from, t: -TUTOR_LEAD };
+    Object.assign(bird, { lon: T.at[0], lat: T.at[1], a: 0, va: 0, vx: 0, vy: 0, down: true, at: regionAt(T.at[0], T.at[1]).key });
+    tripCount(0);
+    T.count += TUTOR_LEAD;
+  }
+  // Keep practicing: the kinds a Day Trip asks, in a day's order, each from the ten best known of its kind not asked
+  // yet (a country comes once, however it is asked, as in Ranked). The tutorial's own location is Australia.
+  const DAY_KINDS = ['country', 'flag', 'capital', 'capflag', 'city'];
+  let easyRounds = null;
+  function easiest(kind) {
+    if (!easyRounds) {
+      const flagOk = (c) => c.a2 && !c.flagNote;
+      const area = (k) => (c) => ({ kind: k, c, p: c.u, lon: c.lx, lat: c.ly, name: c.name });
+      const point = (k) => (c) => ({ kind: k, c, p: unit(c.cap[1], c.cap[2]), lon: c.cap[1], lat: c.cap[2], name: c.cap[0] });
+      easyRounds = { country: PLAY.map(area('country')), flag: PLAY.filter(flagOk).map(area('flag')), capital: PLAY.filter((c) => c.cap).map(point('capital')),
+        capflag: PLAY.filter((c) => c.cap && flagOk(c)).map(point('capflag')),
+        city: CITIES.map((x) => ({ kind: 'city', c: x.c, city: x, p: unit(x.lon, x.lat), lon: x.lon, lat: x.lat, name: x.name })) };
+      for (const k in easyRounds) easyRounds[k].sort((a, b) => hardOf(a) - hardOf(b));
+    }
+    return easyRounds[kind];
+  }
+  function tutorRound(n) {
+    const T = S.trip, list = easiest(DAY_KINDS[n % 5]);
+    let fresh = n ? list.filter((R) => !T.used.has(R.c.id)) : list.filter((R) => R.name === 'Australia');
+    if (!fresh.length) { T.used.clear(); fresh = list; }          // every country has been asked: again from the best known
+    const R = fresh[Math.floor(Math.random() * Math.min(10, fresh.length))];
+    T.used.add(R.c.id);
+    return R;
+  }
+  // The card's first button is the Challenge tab's own: today's trip as its button reads there, and Ranked's once
+  // today's trip is flown (the tutorial can be flown again from How to play on any day).
+  const tutorNext = () => (tripDone() ? 'Play ranked' : save.trips[today()] ? "Carry on today's trip" : "Start today's trip");
+  function tutorOut() {
+    const at = [bird.lon, bird.lat];
+    abandon();
+    [atlas.lon, atlas.lat] = at; atlas.to = null; atlas.zoom = 1;
+    runKind = tripDone() ? 'endless' : 'day';
+    takeOff();
+    S.trip.intro.t = -TUTOR_LEAD; S.trip.count += TUTOR_LEAD;          // the view rises from where the bird stood, then the globe turns to the start as it always does
+  }
+  function tutorMore() {
+    const T = S.trip;
+    if (!T || !T.tutor || !T.ready) return;
+    T.ready = false; T.practice = true;
+    tripCount(T.i + 1);
+  }
+  // What the bar holds at each moment of the tutorial (and that it holds none of it in any other flight).
+  function tutorBar() {
+    const T = S.trip, on = S.mode === 'fly' && S.game === 'trip' && !!T && !!T.tutor;
+    const result = on && T.wait && !T.count && !T.lesson, last = on ? T.results[T.results.length - 1] : null;
+    const say = !on ? '' : T.lesson ? SAY[T.lesson] : result ? (last && !last.right ? SAY.wrong : '') : !T.wait && !T.practice ? SAY.clock : '';
+    $('tutor-label').hidden = !on || result;
+    $('tutor-label').textContent = on && T.practice ? 'Practice' : 'Tutorial';
+    $('tutor-say').hidden = !say;
+    if ($('tutor-say').innerHTML !== say) $('tutor-say').innerHTML = say;
+    $('tutor-go').hidden = !(on && T.lesson === 'rule');
+    $('tutor-skip').hidden = !on || result || !!T.practice;
+    $('tally').hidden = on;
+    $('status').hidden = on && result && !say;          // a correct landing: the card alone
+    $('console').classList.toggle('tutor', on);
+    $('console').classList.toggle('lesson', on && !!T.lesson);
+  }
+  // The first card's choice is made once: after it the title card is the usual one.
+  function showFirst() { $('card').classList.toggle('first', firstVisit); $('first-row').hidden = !firstVisit; }
+  function endFirst() {
+    if (!firstVisit) return;
+    firstVisit = false; save.visited = true; persist();
+    showFirst(); measure();
+  }
+  function startTutor() {
+    endFirst();
+    if (tab !== 'challenge') showMode('challenge');
+    runKind = 'tutor';
+    takeOff();
+  }
   function tripStart(kind) {
-    const T = S.trip = kind === 'endless' ? { endless: true, start: TRIP_START, rounds: [], used: new Set() } : makeTrip(today());
+    const T = S.trip = kind === 'endless' ? { endless: true, start: TRIP_START, rounds: [], used: new Set() } : kind === 'tutor' ? { tutor: true, start: TUTOR_START, rounds: [], used: new Set() } : makeTrip(today());
     T.results = []; T.i = -1; T.score = 0; T.at = T.start;
     if (T.endless) S.cap = S.energy = ENDLESS_TANK;
-    else {
+    else if (!T.tutor) {
       // a trip begun earlier today is carried on: its rounds and points, and the bird where it stood
       tripSettle();
       const was = save.trips[today()];
@@ -2557,7 +2716,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
         if (was.at) T.at = was.at;
       }
     }
-    $('trip-pips').hidden = !!T.endless;
+    $('trip-pips').hidden = !!T.endless || !!T.tutor;
     Object.assign(bird, { lon: T.at[0], lat: T.at[1], a: 0, va: 0, vx: 0, vy: 0, down: true, at: regionAt(T.at[0], T.at[1]).key });
     // the 3-2-1: the globe turns to the start, then the view comes down to the bird on it
     let from = unit(atlas.lon, atlas.lat);
@@ -2565,22 +2724,24 @@ button { font: inherit; color: inherit; cursor: pointer; }
     T.intro = { from, t: 0 };
     atlasNames = [];
     $('count').textContent = T.score;
-    if (!T.endless && !save.trips[today()]) { save.trips[today()] = { score: 0, rounds: [] }; persist(); }      // started: today's trip is used
-    tripCount(T.results.length);
+    if (!T.endless && !T.tutor && !save.trips[today()]) { save.trips[today()] = { score: 0, rounds: [] }; persist(); }      // started: today's trip is used
+    if (T.tutor) lesson('space'); else tripCount(T.results.length);
   }
   // 3, 2, 1 on the postcard, then the place
   function tripCount(i) {
     const T = S.trip;
     if (T.endless && !T.rounds[i]) T.rounds[i] = endlessRound(i);
-    Object.assign(T, { wait: true, ready: false, count: S.t + COUNT, next: i, reveal: null });
+    if (T.tutor && !T.rounds[i]) T.rounds[i] = tutorRound(i);
+    Object.assign(T, { wait: true, ready: false, count: S.t + COUNT, next: i, reveal: null, lesson: null });
     if (!T.endless) { S.cap = S.energy = 1; T.cheap = 0; }          // a Day Trip's ring is full again for the round to come
     $('trip-clock').hidden = false; $('trip-secs').textContent = '0.0 s'; $('trip-bar').style.width = '0%';
     const node = document.createElement('div');
     node.className = 'ticket ask';
-    node.innerHTML = '<div class="addr"><span class="kind">' + (i ? 'Next location in' : 'First location in') + '</span><span class="what" id="trip-count">' + COUNT + '</span></div>';
+    node.innerHTML = '<div class="addr"><span class="kind">' + (i ? 'Next location in' : T.tutor ? 'Location in' : 'First location in') + '</span><span class="what" id="trip-count">' + COUNT + '</span></div>';
     ticketsEl.replaceChildren(node);
     [...document.querySelectorAll('#trip-pips i')].forEach((el, k) => { el.className = k < i ? 'done' : k === i ? 'now' : ''; });
     $('trip-round').textContent = T.endless ? 'Location ' + (i + 1) : 'Round ' + (i + 1) + ' of 5';
+    tutorBar();
     measure();
   }
   function tripShow(i) {
@@ -2604,6 +2765,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     $('trip-clock').hidden = false;
     if (!T.endless) tripSave();          // the clue has been seen: this round is open
     sfx.call();
+    tutorBar();
     measure();
   }
   // the stopwatch: the seconds, and the time line under them (the mark in its middle is the fair time)
@@ -2611,9 +2773,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     $('trip-secs').textContent = took.toFixed(1) + ' s';
     $('trip-bar').style.width = (100 * clamp(took / (2 * S.trip.fair), 0, 1)).toFixed(1) + '%';
   }
-  function tripTick() {
+  function tripTick(dt) {
     const T = S.trip;
     if (!T) return;
+    if (T.lesson) { lessonTick(dt); return; }
     if (T.count) {
       const left = Math.ceil(T.count - S.t), el = $('trip-count');
       if (el && el.textContent !== String(left)) el.textContent = Math.max(1, left);
@@ -2625,10 +2788,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
       if (S.t - T.trkAt >= 0.05) { T.trk.push([+bird.lon.toFixed(2), +bird.lat.toFixed(2), keys.flap && S.energy > 0 && !bird.down ? 1 : 0]); T.trkAt = S.t; }
     } else if (!T.ready && T.done !== true && S.t >= T.after && !S.look) {
       T.ready = true;
-      const btn = ticketsEl.querySelector('.next');
-      if (!btn) return;
-      btn.textContent = tripMore(T) ? 'Next location' : T.endless ? 'See your score' : 'See your day';
-      btn.classList.add('ready');
+      const btns = [...ticketsEl.querySelectorAll('.next')];
+      if (!btns.length) return;
+      if (!T.tutor) btns[0].textContent = tripMore(T) ? 'Next location' : T.endless ? 'See your score' : 'See your day';      // the tutorial's card has its two buttons already
+      for (const b of btns) b.classList.add('ready');
     }
   }
   // another round? A Day Trip has five, each with its own full ring. A Ranked flight goes on while there is energy to take off with.
@@ -2637,6 +2800,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const T = S.trip;
     if (!T || !T.ready) return;
     T.ready = false;
+    if (T.tutor) { tutorOut(); return; }          // Space and Enter press the card's first button, as on every card
     if (tripMore(T)) tripCount(T.i + 1); else tripEnd();
   }
   // What a landing gets. Correct or not, two states (the player, 2026-11-12: "the X versus the check, that's just if
@@ -2655,7 +2819,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   function tripLand(here, lon, lat) {
     const T = S.trip;
-    if (!T || T.wait) { (here.sea ? sfx.splash : sfx.thud)(); return; }      // between rounds: nothing counts
+    if (!T || T.wait) { (here.sea ? sfx.splash : sfx.thud)(); if (T && T.lesson) lessonLand(); return; }      // between rounds: nothing counts
     const R = T.rounds[T.i], p = unit(lon, lat), countryRound = R.kind === 'country' || R.kind === 'flag';
     const { right, d, share } = judge(R, lon, lat);
     const tier = !right ? 'miss' : !countryRound && d <= SPOT_KM ? 'spot' : 'right';
@@ -2698,12 +2862,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
     node.innerHTML = '<div class="where"><span class="tick ' + tier + '">' + TICK[tier] + '</span> ' + esc(where) + '</div><div class="plus ' + (right ? 'right' : 'wrong') + '">' + pts + '<small>/' + most + '</small></div>' +
       '<div class="parts"><span>Accuracy <b>' + closeness + '</b>/' + (most - 40) + '</span>' +
       '<span>Speed ' + (right ? '<b>' + speed + '</b>' : NOT_EARNED) + '/20</span><span>Energy use ' + (right ? '<b>' + energy + '</b>' : NOT_EARNED) + '/20</span></div>' +      // always listed, so the card adds up to its total; a wrong landing shows its X where a number was not earned (the player's idea, 2026-11-13: "X out of 20"; 0/20 had read as slow and wasteful, and leaving them off as 74/160 beside 74/200)
-      '<button class="go next" type="button">Next location</button>';
+      (T.tutor ? '<div class="two"><button class="go next" type="button">' + tutorNext() + '</button><button class="alt next" type="button">Keep practicing</button></div>' : '<button class="go next" type="button">Next location</button>');
     node.querySelector('.next').addEventListener('click', () => { tripNext(); stage.focus({ preventScroll: true }); });
+    if (T.tutor) node.querySelector('.alt').addEventListener('click', () => { tutorMore(); stage.focus({ preventScroll: true }); });
     ticketsEl.replaceChildren(node);
-    if (!T.endless) [...document.querySelectorAll('#trip-pips i')][T.i].className = 'done';
+    if (!T.endless && !T.tutor) [...document.querySelectorAll('#trip-pips i')][T.i].className = 'done';
     T.least = S.t + 1.2;          // the result stands at least this long, also when Space hurries the view back
     T.after = S.t + Math.max(1.2, lookAt(R.p) + 0.3);
+    tutorBar();
     measure();
   }
   // The line from where you came down to the answer, and the circle that counted. A country has neither: anywhere in it
@@ -2798,6 +2964,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // next round: the rounds flown, where the bird stands, the energy left, and the round whose clue is showing, if one is.
   function tripSave() {
     const T = S.trip;
+    if (T.endless || T.tutor) return;          // only a Day Trip is kept as it goes
     save.trips[T.day] = { score: T.score, rounds: T.results.map((r) => ({ kind: r.kind, name: r.name, country: r.country, a2: r.a2, pop: r.pop, right: r.right, tier: r.tier, d: r.d, closeness: r.closeness, speed: r.speed, secs: r.secs, energy: r.energy, pts: r.pts, at: r.at, path: r.path, from: r.from, goal: r.goal, land: r.land })),
       at: [Math.round(bird.lon * 1000) / 1000, Math.round(bird.lat * 1000) / 1000], open: inRound() ? T.i : undefined };
     for (const d in save.trips) if (d !== T.day) for (const r of save.trips[d].rounds) { delete r.path; delete r.from; delete r.goal; delete r.land; }      // only today's card can be opened again
@@ -3135,7 +3302,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // Leave a flight part-way. Every delivery is saved as it happens; only the best count needs a look.
   function abandon(home) {
     if (S.mode !== 'fly') return;
-    if (S.game === 'trip' && S.trip && !S.trip.endless) tripSave();          // a Day Trip left part-way is kept as it stands, to carry on
+    if (S.game === 'trip' && S.trip && !S.trip.endless && !S.trip.tutor) tripSave();          // a Day Trip left part-way is kept as it stands, to carry on (the tutorial keeps nothing)
     if (S.game === 'trip' && S.trip && S.trip.endless && S.trip.score > save.endless) save.endless = S.trip.score;      // a Ranked flight left part-way ends there, and its points count
     const kept = home && S.game === 'study' && S.n > 0;          // a Study flight left for Home is carried on later: it is not over, so it is no best yet
     if (!kept && S.n > save.best) save.best = S.n;
@@ -3206,7 +3373,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     $('restart').hidden = !(S.game === 'trip' && !!S.trip && !!S.trip.endless);
     $('end').hidden = S.game !== 'study';          // a Study flight can be ended here, for its end screen
     // what leaving does: Study keeps what you have learned and a Day Trip waits for you; a Ranked flight ends; Free flight has nothing to keep
-    $('pause-note').hidden = S.game === 'free';
+    $('pause-note').hidden = S.game === 'free' || (S.game === 'trip' && !!S.trip && !!S.trip.tutor);          // the tutorial keeps nothing either
     $('pause-note').textContent = S.game === 'trip' && !!S.trip && !!S.trip.endless ? 'Home ends this flight.' : 'Progress is saved.';
     keys.left = keys.right = keys.up = keys.down = keys.flap = false;
     $('card-title').hidden = on;
@@ -3235,7 +3402,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       intro.t += dt;
       [atlas.lon, atlas.lat] = lonLat(slerp(intro.from, unit(...S.trip.at), smooth(clamp(intro.t / INTRO_TURN, 0, 1))));
     }
-    S.blend = intro && intro.t < INTRO_TURN ? 0 : clamp(S.blend + (flying ? dt / (intro ? INTRO_ZOOM : 0.9) : -dt / 1.3), 0, 1);
+    S.blend = intro && intro.t < 0 ? Math.max(0, S.blend - dt / TUTOR_LEAD) : intro && intro.t < INTRO_TURN ? 0 : clamp(S.blend + (flying ? dt / (intro ? INTRO_ZOOM : 0.9) : -dt / 1.3), 0, 1);
     for (let i = fx.length - 1; i >= 0; i--) { fx[i].t += dt; if (fx[i].t >= fx[i].secs) fx.splice(i, 1); }
     for (let i = flashes.length - 1; i >= 0; i--) { flashes[i].t += dt; if (flashes[i].t >= flashes[i].secs) flashes.splice(i, 1); }
     bird.squash = Math.max(0, bird.squash - dt / 0.18);
@@ -3267,7 +3434,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (S.idle > IDLE_PAUSE) { setPaused(true, true); return; }
 
     // Flapping is the only thing that costs energy. With none left, you can only glide down.
-    const flap = keys.flap && !flapSpent && !S.look && S.energy > 0 && !(S.trip && S.trip.wait);
+    const flap = keys.flap && !flapSpent && !S.look && S.energy > 0 && !(S.trip && S.trip.wait && !lessonFlies(S.trip));
     if (flap) {
       S.energy = Math.max(0, S.energy - BURN * dt);
       if (bird.down) { bird.down = false; bird.va = CLIMB * 0.45; }
@@ -3311,7 +3478,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     } else S.endAt = 0;
 
     if (S.game === 'study' && !S.tickets.length && S.t >= S.spawnAt) addTicket();
-    if (S.game === 'trip') tripTick();
+    if (S.game === 'trip') tripTick(dt);
     if (!bird.down && !$('place').hidden) { $('place').hidden = true; S.around = null; measure(); }
     for (const t of S.tickets) t.age += dt;
   }
@@ -3324,7 +3491,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   let slid = 0, slide = { from: 0, to: null, t: 0 };
   function placeCamera() {
     const k = smooth(S.blend);
-    const me = unit(bird.lon, bird.lat), there = unit(atlas.lon, atlas.lat);
+    const lead = S.mode === 'fly' && !!S.trip && !!S.trip.intro && S.trip.intro.t < 0;          // out of the tutorial into a real game: straight up from where the bird stood
+    const there = unit(atlas.lon, atlas.lat), me = lead ? there : unit(bird.lon, bird.lat);
     let n = slerp(there, me, k);
     const whole = S.mode === 'title' || !S.log.size ? view.Htitle : view.H1;
     let logH = lerp(Math.log(Math.max(view.H0, whole / (atlas.zoom || 1))), Math.log(heightFor(S.mode === 'fly' ? bird.a : 1)), k);
@@ -3929,7 +4097,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // ---------- controls ----------
   function start() {
     if (S.mode === 'over' && performance.now() - S.landedAt < 1200) return false;
-    if (S.mode !== 'fly') { takeOff(); return true; }
+    if (S.mode !== 'fly') { if (firstVisit) startTutor(); else takeOff(); return true; }          // on a first visit the card's first button is Start tutorial
     if (S.paused) { setPaused(false); return true; }
     return false;
   }
@@ -3949,6 +4117,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     else if (k === 'ArrowUp' || k === 'w') keys.up = true;
     else if (k === 'ArrowDown' || k === 's') keys.down = true;
     else if ((k === ' ' || k === 'Enter') && S.mode === 'fly' && !S.paused && S.trip && S.trip.ready) { if (!e.repeat) tripNext(); }
+    else if ((k === ' ' || k === 'Enter') && S.mode === 'fly' && !S.paused && S.trip && S.trip.lesson === 'rule') { if (!e.repeat && S.t >= S.trip.least) tutorGo(); }      // the tutorial's Continue, once the two sentences have stood a moment
     else if (k === ' ') {
       if (e.target instanceof HTMLButtonElement && S.mode !== 'fly') return;
       if (S.mode === 'fly' && !S.paused) keys.flap = true; else if (!e.repeat) start();
@@ -4034,7 +4203,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   showStudy();
   showWhere(null, true);
-  $('go2').addEventListener('click', takeOff);
+  $('go2').addEventListener('click', () => { if (tab === 'challenge') startTutor(); else takeOff(); });
+  $('go-tutor').addEventListener('click', startTutor);
+  $('first-skip').addEventListener('click', () => { endFirst(); $('go-trip').focus({ preventScroll: true }); });
+  $('tutor-continue').addEventListener('click', () => { tutorGo(); stage.focus({ preventScroll: true }); });
+  $('tutor-skip-btn').addEventListener('click', goHome);
+  showFirst();
   $('go-free').addEventListener('click', takeOff);
   $('go-trip').addEventListener('click', () => { runKind = 'day'; takeOff(); });
   $('go-endless').addEventListener('click', () => { runKind = 'endless'; takeOff(); });
@@ -4042,14 +4216,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
   showTripNote();
   // How to play is the card of the tab you are on (the player, 2026-11-13: "the how to play button should change for
   // each tab"). Study's card is the player's own, line for line. A card's first button is its tab's own: Take off, or
-  // Carry on for a kept Study flight. The Challenge card has Back alone: that tab holds two games, so a button there
+  // Carry on for a kept Study flight. The Challenge card has no Take off: that tab holds two games, so a button there
   // could not say which one it starts (the player, the same day: "there's two different modes that you could have
-  // chosen from, so how would it know which one to take off?").
+  // chosen from, so how would it know which one to take off?"). Its first button is Tutorial, which says what it
+  // starts: the way back to the tutorial for someone who skipped it.
   function howTo(on) {
     if (on) {
       for (const el of document.querySelectorAll('#card-howto .how')) el.hidden = el.dataset.for !== tab;
-      $('go2').hidden = tab === 'challenge';
-      if (tab !== 'challenge') $('go2').textContent = $(tab === 'study' ? 'go' : 'go-free').textContent;
+      $('go2').textContent = tab === 'challenge' ? 'Tutorial' : $(tab === 'study' ? 'go' : 'go-free').textContent;
     }
     $('card-title').hidden = on; $('card-howto').hidden = !on;
     measure();
@@ -4144,7 +4318,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // Ground speed in km a second at a height, flying flat out.
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   const setBird = (lon, lat, a, down) => Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down });
-  window.birdsEye = { names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), flightSecs, parFor, capKm, cheapFor, judge, ringKm, hardOf, endlessRound, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
+  window.birdsEye = { firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), flightSecs, parFor, capKm, cheapFor, judge, ringKm, hardOf, endlessRound, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     project: projectLL, unproject, speedAt, FLY_TOP, tripStreak, placed, seen: () => seen, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
