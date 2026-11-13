@@ -419,7 +419,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
         <div id="pane-study" hidden>
           <div class="checks" id="kinds" role="group" aria-label="Locations"><button type="button" data-k="c">Countries</button><button type="button" data-k="k">Capitals</button><button type="button" data-k="f">Flags</button><button type="button" data-k="s">Seas</button></div>
           <div class="regions" id="where" role="group" aria-label="Where"><button type="button" data-r="World">World</button><button type="button" data-r="Africa">Africa</button><button type="button" data-r="Americas">Americas</button><button type="button" data-r="Asia">Asia</button><button type="button" data-r="Europe">Europe</button><button type="button" data-r="Oceania">Oceania</button></div>
-          <div class="row"><button class="go" id="go" type="button">Take off</button></div>
+          <div class="row"><button class="go" id="go" type="button">Take off</button><span class="mode-stat" id="kept" hidden></span></div>
           <p class="aside" id="known" style="margin: 14px 0 0" hidden></p>
         </div>
         <div id="pane-free" hidden>
@@ -459,7 +459,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       </div>
       <div id="card-pause" hidden>
         <h2 id="pause-head">Paused</h2>
-        <div class="row"><button class="go" id="resume" type="button">Carry on</button></div>
+        <div class="row"><button class="go" id="resume" type="button">Carry on</button><button class="alt" id="end" type="button" hidden>End flight <kbd>E</kbd></button></div>
         <div class="row" style="margin-top: 12px"><button class="alt" id="restart" type="button">Restart <kbd>R</kbd></button><button class="alt" id="home" type="button">Home <kbd>H</kbd></button></div>
         <p class="aside" id="pause-note" style="margin: 10px 0 0">Progress is saved.</p>
       </div>
@@ -1304,6 +1304,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (Number.isFinite(got.endless)) save.endless = got.endless;
     if (got.skill && got.skill.k && got.skill.r) save.skill = got.skill;
     if (got.trips && typeof got.trips === 'object') for (const k in got.trips) { const v = got.trips[k]; if (/^\d{4}-\d\d-\d\d$/.test(k) && v && Number.isFinite(v.score) && Array.isArray(v.rounds)) save.trips[k] = v; }
+    const fl = got.flight;
+    if (fl && fl.n >= 1 && Number.isFinite(fl.energy) && Array.isArray(fl.bird) && Array.isArray(fl.log) && Array.isArray(fl.was)) save.flight = fl;
     const st = got.study;
     if (st && Array.isArray(st.kinds)) { const k = KINDS.filter((x) => st.kinds.includes(x)); if (k.length) save.study.kinds = k; }
     const w = st && (Array.isArray(st.where) ? st.where : [st.where]).filter((x) => REGIONS.includes(x));
@@ -1828,6 +1830,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (c.water) lookAt(p, c); else lookAt(p);          // a sea: the whole of it
     // its name stays on it until the postcard is delivered (a sea's below the ring, whatever the name's size then;
     // a tiny country's by its dot as a capital's is by its pin). Shown again after another wrong landing: one name, not two
+    shownName(t);
+  }
+  function shownName(t) {
+    const c = t.it.c, p = pointOf(t.it), here = () => S.mode === 'fly' && S.tickets.includes(t);
     if (t.label) t.label.secs = 0;
     if (t.it.kind === 'k') t.label = label(c, c.cap[0], p, 'name', 0, c.name, OVER, here);
     else t.label = label(c.water ? null : c, c.name, p, c.water ? 'sea' : 'name', 0, null, c.water ? () => 22 + namePx() / 2 : c.tiny ? OVER : AREA, here);
@@ -1972,6 +1978,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     S.cap = 0; S.trip = null;
     if (S.game === 'free') S.energy = Infinity;          // Free flight: no energy, no end
     if (S.game === 'trip') tripStart(runKind);
+    if (S.game === 'study' && save.flight) carryOn();
     stage.classList.add('flying');
     stage.classList.remove('atlas');
     stage.focus({ preventScroll: true });
@@ -1979,6 +1986,56 @@ button { font: inherit; color: inherit; cursor: pointer; }
     drawHud();
   }
 
+  // A Study flight is kept: left for Home, or with the window closed, it is carried on from the Study tab as it stood
+  // (the player, 2026-11-12: "Should be able to save and return home in case you want to do different modes during a
+  // study session. But can't have multiple sturdy sessions at once"). One flight: it is kept from its first delivery
+  // until it ends, on the end screen or by Restart. Written after every landing, on leaving and when the page goes.
+  function keepFlight() {
+    if (S.mode !== 'fly' || S.game !== 'study') return;
+    if (!S.n) { delete save.flight; persist(); return; }          // nothing delivered yet: nothing to carry on
+    const ll = (p) => lonLat(p).map((v) => +v.toFixed(3)), t = S.tickets[0];
+    save.flight = { n: S.n, energy: +S.energy.toFixed(3), streak: S.streak, best: S.bestStreak, first: S.firstTry, fresh: S.fresh,
+      bird: [+bird.lon.toFixed(3), +bird.lat.toFixed(3), +bird.a.toFixed(3), bird.down ? 1 : 0, bird.at],
+      was: [...S.was], fails: [...S.fails], recent: S.recent.slice(), history: S.history.slice(-12), sinceNew: S.sinceNew, last: S.last,
+      log: [...S.log.values()].map((r) => [r.it.key, r.shown ? 1 : 0, r.isNew ? 1 : 0].concat(r.p ? ll(r.p) : [])),
+      drops: S.drops.filter((d) => d.from).map((d) => ll(d.p).concat(ll(d.from), [d.km, d.city])),
+      card: t ? [t.it.key, t.misses, t.shown ? 1 : 0, t.warm ? 1 : 0, t.isNew ? 1 : 0, t.from[0], t.from[1], t.fromTop ? 1 : 0] : null,
+      cols: PLAY.map((c) => c.col).join('') };
+    persist();
+  }
+  function carryOn() {
+    const f = save.flight, item = (key) => ITEMS.find((it) => it.key === key);
+    try {
+      Object.assign(S, { n: f.n, energy: clamp(f.energy, 0, TANK), streak: f.streak | 0, bestStreak: f.best | 0, firstTry: f.first | 0, fresh: f.fresh | 0, last: f.last || null });
+      S.was = new Map(f.was); S.fails = new Map(f.fails || []);
+      for (const [key, shown, isNew, lon, lat] of f.log) { const it = item(key); if (it) S.log.set(key, { it, shown: !!shown, isNew: !!isNew, p: lon === undefined ? null : unit(lon, lat) }); }
+      // delivered capitals: their pins come back on the end globe (in the flight they left long ago)
+      for (const [lon, lat, flon, flat, km, city] of f.drops || []) S.drops.push({ p: unit(lon, lat), from: unit(flon, flat), t: -1e6, left: 0, km, city });
+      if (typeof f.cols === 'string' && f.cols.length === PLAY.length) PLAY.forEach((c, i) => { const col = +f.cols[i]; if (col >= 0 && col < FILL.length) c.col = col; });      // the flight's own colors
+      const [lon, lat, a, down, at] = f.bird;
+      Object.assign(bird, { lon, lat, a: clamp(a, 0, 1), va: 0, vx: 0, vy: 0, down: !!down, at: at || 'elsewhere' });
+      const card = f.card && item(f.card[0]);
+      if (card) {
+        addTicket(card);
+        const t = S.tickets[0], [, misses, shown, warm, isNew, flon, flat, fromTop] = f.card;
+        Object.assign(t, { misses: misses | 0, shown: !!shown, warm: !!warm, isNew: !!isNew, from: [flon, flat], fromTop: !!fromTop });
+        if (t.misses) setStrikes(t);
+        if (t.shown) shownName(t);
+      }
+      Object.assign(S, { recent: (f.recent || []).slice(), history: (f.history || []).slice(), sinceNew: f.sinceNew | 0 });      // after the postcard is back aboard: putting it there counts as asking
+      $('count').textContent = S.n;
+    } catch (e) { delete save.flight; persist(); }          // a kept flight that cannot be read: a new one
+  }
+  // Ending a Study flight by choice, from the pause card: the end screen, and the postcard aboard is not a missed one
+  // (the player: "should be able to end study session from pause screen, which would then take you to the end screen
+  // and WOULDN'T have a red missed on at the end").
+  function endFlight() {
+    if (S.mode !== 'fly' || S.game !== 'study') return;
+    S.paused = false;
+    $('card').hidden = true; $('card-pause').hidden = true; $('card-title').hidden = false;
+    clearTimeout(pauseFactTimer); hideSleepFact();
+    land(true);
+  }
   function touchDown() {
     const lon = bird.lon, lat = bird.lat, was = bird.at, p = unit(lon, lat);
     Object.assign(bird, { a: 0, va: 0, vx: 0, vy: 0, down: true, squash: 1 });
@@ -1986,6 +2043,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     bird.at = here.key;
     if (S.game === 'free') { (here.sea ? sfx.splash : sfx.thud)(); showPlace(here); return; }
     if (S.game === 'trip') { tripLand(here, lon, lat); return; }
+    studyLand(here, lon, lat, was, p);
+    keepFlight();
+  }
+  function studyLand(here, lon, lat, was, p) {
     const t = S.tickets[0];
     if (t && reaches(t.it, lon, lat)) { deliver(t, lon, lat); return; }
     if (t && t.it.kind === 'k' && here.c === t.it.c) { warm(t, p, lon, lat); return; }
@@ -2935,7 +2996,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (t) countAgainst(t);
   }
 
-  function land() {
+  function land(ended) {
+    delete save.flight;          // the flight is over: nothing to carry on
     S.mode = 'over'; atlas.zoom = 1;
     S.landedAt = performance.now();
     S.energy = 0;
@@ -2949,7 +3011,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     sfx.over();
 
     // the postcard you were carrying when the energy ran out: named in red on the results globe
-    const lost = S.tickets[0] && S.tickets[0].it;
+    const lost = ended ? null : S.tickets[0] && S.tickets[0].it;          // ended by choice: the postcard aboard was not missed
     for (const t of S.tickets) t.node.remove();
     S.tickets = [];
     fx.length = 0;
@@ -3007,11 +3069,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
 
   // Leave a flight part-way. Every delivery is saved as it happens; only the best count needs a look.
-  function abandon() {
+  function abandon(home) {
     if (S.mode !== 'fly') return;
     if (S.game === 'trip' && S.trip && !S.trip.endless) tripSave();          // a Day Trip left part-way is kept as it stands, to carry on
     if (S.game === 'trip' && S.trip && S.trip.endless && S.trip.score > save.endless) save.endless = S.trip.score;      // a Ranked flight left part-way ends there, and its points count
-    if (S.n > save.best) save.best = S.n;
+    const kept = home && S.game === 'study' && S.n > 0;          // a Study flight left for Home is carried on later: it is not over, so it is no best yet
+    if (!kept && S.n > save.best) save.best = S.n;
+    if (kept) keepFlight();
     persist();
     for (const t of S.tickets) t.node.remove();
     S.tickets = [];
@@ -3019,6 +3083,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function restart() {
     if (S.game === 'trip' && S.trip && !S.trip.endless) return;      // one Day Trip a day (R used to bring up the title card over the flight)
     abandon();
+    delete save.flight;          // Restart is a new flight: the one left is not kept
     S.paused = false;
     $('card-pause').hidden = true; $('card-title').hidden = false;
     takeOff();
@@ -3026,7 +3091,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // Back to the title: the globe stays where you were and starts turning again.
   function goHome() {
     if (S.mode === 'title') return;
-    abandon();
+    abandon(true);
     const from = S.mode === 'fly' ? [bird.lon, bird.lat] : [atlas.lon, atlas.lat];
     S.mode = 'title'; S.paused = false; S.look = null; atlas.zoom = 1;
     S.route = null; S.legs = null;           // the flight path ends with its results screen
@@ -3071,6 +3136,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     S.paused = on;
     $('pause-head').textContent = asleep ? 'Fast asleep' : 'Paused';
     $('restart').hidden = S.game === 'trip' && !!S.trip && !S.trip.endless;      // one Day Trip a day: it cannot be started again
+    $('end').hidden = S.game !== 'study';          // a Study flight can be ended here, for its end screen
     // what leaving does: Study keeps what you have learned and a Day Trip waits for you; a Ranked flight ends; Free flight has nothing to keep
     $('pause-note').hidden = S.game === 'free';
     $('pause-note').textContent = S.game === 'trip' && !!S.trip && !!S.trip.endless ? 'Home ends this flight.' : 'Progress is saved.';
@@ -3809,6 +3875,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       e.preventDefault();
       return;
     }
+    if (k === 'e' && !e.repeat && S.paused && S.game === 'study') { endFlight(); e.preventDefault(); return; }
     if (k === 'ArrowLeft' || k === 'a') keys.left = true;
     else if (k === 'ArrowRight' || k === 'd') keys.right = true;
     else if (k === 'ArrowUp' || k === 'w') keys.up = true;
@@ -3913,6 +3980,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   $('again').addEventListener('click', () => start());
   $('resume').addEventListener('click', () => setPaused(false));
   $('restart').addEventListener('click', restart);
+  $('end').addEventListener('click', endFlight);
+  window.addEventListener('pagehide', keepFlight);          // the window closed in a Study flight: it is carried on next time
   $('home').addEventListener('click', goHome);
   $('home2').addEventListener('click', goHome);
 
@@ -3985,6 +4054,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const known = $('known');
     known.hidden = met === 0;
     known.innerHTML = 'Countries seen: ' + met + '<br>Countries mastered: ' + cold.length;
+    // a kept flight: the button carries it on, and its count stands beside it as a trip's streak does
+    const f = save.flight;
+    $('go').textContent = f ? 'Carry on' : 'Take off';
+    $('kept').hidden = !f;
+    if (f) $('kept').textContent = f.n + ' delivered';
   }
 
   // Ground speed in km a second at a height, flying flat out.
