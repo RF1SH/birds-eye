@@ -87,7 +87,7 @@ body {
 }
 #card h1 {
   margin: 0 0 12px;
-  padding-right: 40px;
+  padding-right: 76px;          /* clear of the two marks at the card's top right: How to play and sound */
   font: italic 800 clamp(50px, 6.5vh, 64px)/.86 var(--display);
   text-transform: uppercase;
   letter-spacing: -.005em;
@@ -160,9 +160,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .aside { color: var(--ink-soft); font-size: 13px; }
 .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 #card { position: relative; }
-#sound { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; padding: 4px; border: 0; border-radius: 3px; background: none; color: var(--ink-soft); }
-#sound:hover { color: var(--ink); background: var(--paper-shade); }
-#sound svg { display: block; width: 24px; height: 24px; }
+#sound, #howto-open { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; padding: 4px; border: 0; border-radius: 3px; background: none; color: var(--ink-soft); }
+#howto-open { right: 46px; }          /* How to play, beside the sound mark: the one spot that holds still on every tab */
+#sound:hover, #howto-open:hover { color: var(--ink); background: var(--paper-shade); }
+#sound svg, #howto-open svg { display: block; width: 24px; height: 24px; }
 #sound .wave { display: var(--waves, inline); }
 #sound .cross { display: var(--cross, none); }
 #sound.off { --waves: none; --cross: inline; }
@@ -404,20 +405,21 @@ button { font: inherit; color: inherit; cursor: pointer; }
     <div id="card">
       <div id="card-title">
         <h1>Bird's <span class="eye">Eye<svg class="logo" viewBox="-27 -27 54 54" aria-hidden="true"><use href="#i-bird" transform="rotate(-18)"/></svg></span></h1>
+        <button id="howto-open" type="button" aria-label="How to play" title="How to play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></button>
         <div class="seg" role="tablist" aria-label="Mode">
-          <button type="button" role="tab" data-mode="challenge" aria-selected="false">Challenge</button><button type="button" role="tab" data-mode="study" aria-selected="true">Study</button><button type="button" role="tab" data-mode="free" aria-selected="false">Free flight</button>
+          <button type="button" role="tab" data-mode="challenge" aria-selected="true">Challenge</button><button type="button" role="tab" data-mode="study" aria-selected="false">Study</button><button type="button" role="tab" data-mode="free" aria-selected="false">Free flight</button>
         </div>
-        <div id="pane-study">
+        <div id="pane-study" hidden>
           <div class="checks" id="kinds" role="group" aria-label="Locations"><button type="button" data-k="c">Countries</button><button type="button" data-k="k">Capitals</button><button type="button" data-k="f">Flags</button><button type="button" data-k="s">Seas</button></div>
           <div class="regions" id="where" role="group" aria-label="Where"><button type="button" data-r="World">World</button><button type="button" data-r="Africa">Africa</button><button type="button" data-r="Americas">Americas</button><button type="button" data-r="Asia">Asia</button><button type="button" data-r="Europe">Europe</button><button type="button" data-r="Oceania">Oceania</button></div>
-          <div class="row"><button class="go" id="go" type="button">Take off</button><button class="alt" id="howto-open" type="button">How to play</button></div>
+          <div class="row"><button class="go" id="go" type="button">Take off</button></div>
           <p class="aside" id="known" style="margin: 14px 0 0" hidden></p>
         </div>
         <div id="pane-free" hidden>
           <p class="hook">Fly anywhere. Land to read about the location.</p>
           <div class="row"><button class="go" id="go-free" type="button">Take off</button></div>
         </div>
-        <div id="pane-soon" hidden>
+        <div id="pane-soon">
           <section class="mode">
             <h3 class="mode-head">Day Trip</h3>
             <p class="hook">A five-location daily challenge.</p>
@@ -525,7 +527,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     SEA_DEEP = token('--sea-deep'), SAND = token('--sand'), SAND_LINE = token('--sand-line'), BAD = token('--bad'),
     GOOD = token('--good'), SPACE = token('--space'), SHADE = token('--paper-shade');
   const FILL = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => token('--c' + i)), YELLOW = token('--yellow'), ORANGE = token('--orange');
-  const DISPLAY = token('--display');
+  const DISPLAY = token('--display'), TEXT = token('--text');
   const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
 
   // ---------- the data ----------
@@ -587,6 +589,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const view = { ui: 1, mk: 1, ox: 0, slide: 0, w: 1, h: 1, dpr: 1, scale: 1, deck: 0, ref: 1, F: 1, H0: 0.3, H1: 3, Htitle: 3, gy: 0, tx: 0, ty: 0 };
   const cam = { n: [1, 0, 0], e: [0, 1, 0], u: [0, 0, 1], H: 1, D: 2, cos0: 0.5, sin0: 0.87, cx: 0, cy: 0, rho: 1, pxRad: 1 };
   const GROUND_KM = 1600;
+  const KEY_ROOM = 40;                // the room under a results globe for the line that explains its lines, times the scale of the cards
   const hFor = (rho) => Math.sqrt(1 + (view.F / rho) ** 2) - 1;      // height at which the globe shows as a disc of radius rho
   function measure() {
     const w = stage.clientWidth, h = stage.clientHeight;
@@ -635,7 +638,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // Free flight: while the card for where you came down is up, the map slides over to the middle of the space beside it
     const place = $('place');
     view.slide = !place.hidden && w > 900 ? (place.getBoundingClientRect().right - box.left) / 2 : 0;
-    view.Htitle = hFor(0.46 * Math.min(w - Math.max(left, dayRight), avail));
+    // Under a results globe that shows flights stands a line saying what its three lines mean (wayKey): the globe keeps
+    // room for it and is centered in the space above it.
+    view.keyRoom = !day.hidden && S.legs ? KEY_ROOM * view.ui : 0;
+    view.Htitle = hFor(0.46 * Math.min(w - Math.max(left, dayRight), avail - view.keyRoom));
     if (gl) gl.viewport(0, 0, glCanvas.width, glCanvas.height);
     if (typeof placeSleepFact === 'function') placeSleepFact();
     steadyCard();
@@ -1839,7 +1845,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const along = (L, k) => (k < 0.5 ? slerp(L.me, L.mid, k * 2) : slerp(L.mid, L.p, k * 2 - 1));
 
   // ---------- flying a round ----------
-  let tab = 'study';            // the title card's tab: study | free | challenge
+  let tab = 'challenge';        // the title card's tab: challenge | study | free. The game opens on the first, Challenge (the player's pick)
   let runKind = 'day';          // on the challenge tab: today's trip, or an endless run
   function takeOff() {
     if (tab === 'challenge' && runKind === 'day' && tripDone()) return;          // one trip a day (one begun is carried on)
@@ -2237,7 +2243,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // A country is an area, never its middle (the player: "Why do they go to the center of the country? The shortest
   // route would be just to go to the edge of the country that's closest"): the nearest point of it, and for a round
   // that begins inside it, the spot the bird stands on. The fair time, the cheapest flight that energy use is judged
-  // against and the day's tank are all measured to this point, and the results globe draws the shortest way to it.
+  // against and the day's tank are all measured to this point, and the results globe draws the shortest route to it.
   function goalOf(R, lon, lat) {
     if (R.kind !== 'country' && R.kind !== 'flag') return [R.lon, R.lat];
     if (reaches(R.c.where, lon, lat)) return [lon, lat];
@@ -2609,7 +2615,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   // the end of a trip or a run: the results globe with the answers named, and the card
   function showResults(T, from) {
-    S.mode = 'over'; S.landedAt = performance.now(); S.look = null;
+    S.mode = 'over'; S.landedAt = performance.now(); S.look = null; atlas.zoom = 1;
     $('spoton').hidden = true;               // the stamp of the last landing does not stay up over the card
     S.route = null;           // Study's path of deliveries; a trip's flights are in S.legs
     stage.classList.remove('flying'); stage.classList.add('atlas');
@@ -2804,7 +2810,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
 
   function land() {
-    S.mode = 'over';
+    S.mode = 'over'; atlas.zoom = 1;
     S.landedAt = performance.now();
     S.energy = 0;
     S.look = null;
@@ -2892,7 +2898,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (S.mode === 'title') return;
     abandon();
     const from = S.mode === 'fly' ? [bird.lon, bird.lat] : [atlas.lon, atlas.lat];
-    S.mode = 'title'; S.paused = false; S.look = null;
+    S.mode = 'title'; S.paused = false; S.look = null; atlas.zoom = 1;
     S.route = null; S.legs = null;           // the flight path ends with its results screen
     runKind = 'day';
     S.log = new Map(); S.drops = [];
@@ -2908,7 +2914,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     [atlas.lon, atlas.lat] = from;
     showWhere();
     measure();
-    $('go').focus({ preventScroll: true });
+    $(tab === 'study' ? 'go' : tab === 'free' ? 'go-free' : $('go-trip').hidden ? 'see-trip' : 'go-trip').focus({ preventScroll: true });          // the open tab's own button
   }
 
   // Day Trip and Ranked: no pausing while a round's stopwatch runs. A pause there stopped the clock with the clue
@@ -2980,7 +2986,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
         if (atlas.k >= 1) atlas.to = null;
       } else if (!drag.on) {
         atlas.idle += dt;
-        if (atlas.idle > atlas.rest) atlas.lon = wrapLon(atlas.lon + atlas.spin * dt * clamp((atlas.idle - atlas.rest) / 2, 0, 1));
+        if (atlas.idle > atlas.rest && !(atlas.zoom > 1)) atlas.lon = wrapLon(atlas.lon + atlas.spin * dt * clamp((atlas.idle - atlas.rest) / 2, 0, 1));          // zoomed in, it holds still
       }
       bird.beat += dt * 2.2;
       bird.spread += (0.86 + 0.14 * Math.sin(bird.beat * 2.4) - bird.spread) * Math.min(1, dt * 8);
@@ -3059,10 +3065,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const k = smooth(S.blend);
     const me = unit(bird.lon, bird.lat), there = unit(atlas.lon, atlas.lat);
     let n = slerp(there, me, k);
-    let logH = lerp(Math.log(S.mode === 'title' || !S.log.size ? view.Htitle : view.H1), Math.log(heightFor(S.mode === 'fly' ? bird.a : 1)), k);
+    const whole = S.mode === 'title' || !S.log.size ? view.Htitle : view.H1;
+    let logH = lerp(Math.log(Math.max(view.H0, whole / (atlas.zoom || 1))), Math.log(heightFor(S.mode === 'fly' ? bird.a : 1)), k);
     slid += ((S.mode === 'fly' ? view.slide : 0) - slid) * 0.1;
     let cx = lerp(S.mode === 'title' ? view.tx : view.ox, view.w / 2, k) + slid;
-    let cy = lerp(S.mode === 'title' ? view.ty : (view.h - view.deck) / 2, view.gy, k);
+    let cy = lerp(S.mode === 'title' ? view.ty : (view.h - view.deck - view.keyRoom) / 2, view.gy, k);
     if (S.look) {
       const L = S.look, t = L.t;
       const k = smooth(t < L.go ? t / L.go : t < L.go + L.hold ? 1 : clamp(1 - (t - L.go - L.hold) / L.go, 0, 1));
@@ -3412,7 +3419,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // back to its place with a short line, or waits for the globe to turn.
   // The day's flight on the results globe (the player asked for it: "so you can see where the energy went").
   // The way the bird went is a line that is thin where it glided and thick where it flapped (two widths, rounded where
-  // they meet). The shortest way is a row of ink dots, drawn only for the round picked, to the point the round was scored
+  // they meet). The shortest route is a row of ink dots, drawn only for the round picked, to the point the round was scored
   // against (goalOf: a city or capital, and for a country its nearest point, never its middle). Where a round started
   // is a paper-white dot, where the bird came down a green or a red one. The other rounds are the same lines and dots, faint.
   const THIN = 1.8, THICK = 5.5, FAINT = 0.28;
@@ -3430,7 +3437,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const L = S.legs[i], mid = slerp(L.from, L.land, 0.5), all = [L.from[0] + L.land[0] + L.ans[0], L.from[1] + L.land[1] + L.ans[1], L.from[2] + L.land[2] + L.ans[2]];
     const wide = Math.hypot(...all) > 0.3 ? norm(all) : mid, near = Math.cos(65 * RAD);          // only when all three can be seen from there
     const [lo, la] = lonLat(dot(mid, L.ans) < Math.cos(55 * RAD) && dot(wide, L.ans) > near && dot(wide, L.from) > near && dot(wide, L.land) > near ? wide : mid);
-    S.focus = i; atlas.from = [atlas.lon, atlas.lat]; atlas.to = [lo, clamp(la, -45, 60)]; atlas.k = 0; atlas.idle = 0;
+    S.focus = i; atlas.from = [atlas.lon, atlas.lat]; atlas.to = [lo, clamp(la, -45, 60)]; atlas.k = 0; atlas.idle = 0; atlas.zoom = 1;
     settleNames();
   }
   // The way the bird went, in plain ink with no edge round it. TWO widths and no more (the player: "a certain thickness
@@ -3458,6 +3465,26 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (s) { c.beginPath(); c.arc(s[0], s[1], 5.5 * u, 0, 7); c.fillStyle = fill; c.fill(); c.strokeStyle = edge; c.lineWidth = (edge === INK ? 1.5 : 2) * u; c.stroke(); }
   }
   const startDot = (c, L, u) => endDot(c, L.from, u, PAPER, INK), landDot = (c, L, u) => endDot(c, L.land, u, L.right ? GOOD : BAD, PAPER);
+  // What the three lines of a round mean, under the globe they are drawn on, in the words How to play uses ("fly up",
+  // "glide", "Flying up uses energy"). The player asked: "do u think we need an explanation for what the thick and
+  // thin regions of the line mean?" Each line as it is drawn on the globe, in paper-white on the dark, with no box.
+  const KEY_WORDS = [['flying up', THICK], ['gliding', THIN], ['shortest route', 0]];          // "route", not "way" (the player: "don't use ambiguous words")
+  function wayKey(u) {
+    const size = Math.round(14 * u), len = 30 * u, pad = 8 * u, gap = 30 * u, y = Math.round(cam.cy + cam.rho + KEY_ROOM * u * 0.6);          // zoomed in, it is off the screen with the globe's rim
+    ctx.save();
+    ctx.font = '400 ' + size + 'px ' + TEXT; if ('letterSpacing' in ctx) ctx.letterSpacing = '0.02em';
+    const wide = KEY_WORDS.map(([word]) => len + pad + ctx.measureText(word).width);
+    let x = cam.cx - (wide.reduce((a, b) => a + b, 0) + gap * (KEY_WORDS.length - 1)) / 2;
+    ctx.globalAlpha *= 0.9; ctx.strokeStyle = ctx.fillStyle = PAPER; ctx.lineCap = 'round'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    KEY_WORDS.forEach(([word, width], i) => {
+      const w = (width || 2.2) * u;
+      ctx.beginPath(); ctx.moveTo(x + w / 2, y); ctx.lineTo(x + len - w / 2, y);
+      ctx.lineWidth = w; ctx.setLineDash(width ? [] : [0.1, 6 * u]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillText(word, x + len + pad, y + size * 0.04);
+      x += wide[i] + gap;
+    });
+    ctx.restore();
+  }
   let sheet = null;          // the faint rounds are drawn whole on a sheet of their own and laid on faintly, so that pieces which overlap do not darken
   function drawLegs() {
     const u = view.ui, ga = ctx.globalAlpha, focus = S.focus, [lo, hi] = heldRounds();
@@ -3479,9 +3506,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     });
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = ga * FAINT; ctx.drawImage(sheet, 0, 0); ctx.restore();
     if (P) { arc(P.from, P.to, INK, 2.2 * u, [0.1, 6 * u]); flown(ctx, P, u); startDot(ctx, P, u); landDot(ctx, P, u); }          // both lines leave the white dot; the verdict's dot is on top
+    if (P) wayKey(u);
   }
   // What the names on a title or results globe keep off: the capital pins of a Study flight, and on a trip's globe the
-  // two ends and the dotted shortest way of the round picked, so a name never hides the verdict the landing's dot
+  // two ends and the dotted shortest route of the round picked, so a name never hides the verdict the landing's dot
   // wears, nor where that round started. (A city's name stands
   // round its dot anyway: when you came down right on the city, that dot is the city's, see placeNames.)
   function nameBoxes() {
@@ -3494,7 +3522,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (S.mode === 'over' && S.trip && S.legs) {
       const L = S.legs[S.focus], s = L && project(L.land), t = L && L.point && project(L.ans);
       if (s && !(t && Math.hypot(s[0] - t[0], s[1] - t[1]) < 14 * view.ui)) boxes.push({ x: s[0], y: s[1], half: 8 * view.ui });
-      // ... and off the dot where it started and off its dotted shortest way: a name over the first dots made that line
+      // ... and off the dot where it started and off its dotted shortest route: a name over the first dots made that line
       // seem to start at the name (the player, of "Jordan" there: "two paths coming from different origins")
       const f = L && project(L.from);
       if (f) boxes.push({ x: f[0], y: f[1], half: 8 * view.ui });
@@ -3784,6 +3812,24 @@ button { font: inherit; color: inherit; cursor: pointer; }
     hover = r.name ? { x, y, name: r.name, c: r.c, sea: r.sea } : null;
   });
   const endDrag = () => { drag.on = false; stage.classList.remove('dragging'); };
+  // The wheel, or a pinch on a trackpad, zooms the title globe and a results globe toward the pointer, as on any map:
+  // the place under the pointer stays under it. As near as the lowest view of a flight, as far as the whole globe.
+  // (The player: "Should be able to zoom in on the Home Screen?")
+  inkCanvas.addEventListener('wheel', (e) => {
+    if (S.mode === 'fly') return;
+    e.preventDefault();
+    const box = stage.getBoundingClientRect(), x = e.clientX - box.left, y = e.clientY - box.top, at = unproject(x, y);
+    const whole = S.mode === 'title' || !S.log.size ? view.Htitle : view.H1;
+    atlas.zoom = clamp((atlas.zoom || 1) * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), 1, whole / view.H0);
+    atlas.to = null; atlas.idle = 0; hover = null;
+    for (let i = 0; i < 3 && at; i++) {          // turn the globe so that place is under the pointer again
+      placeCamera();
+      const s = projectLL(at[0], at[1]), k = cam.H / view.F / RAD;
+      if (!s) break;
+      atlas.lat = clamp(atlas.lat + (y - s[1]) * k, -60, 75);
+      atlas.lon = wrapLon(atlas.lon - ((x - s[0]) * k) / Math.max(0.2, Math.cos(atlas.lat * RAD)));
+    }
+  }, { passive: false });
   inkCanvas.addEventListener('pointerup', endDrag);
   inkCanvas.addEventListener('pointercancel', endDrag);
   inkCanvas.addEventListener('pointerleave', () => { hover = null; });
