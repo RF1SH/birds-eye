@@ -1434,7 +1434,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const ready = (it) => it.kind === 'c' || !withPlaces || (it.kind === 's' ? metPlaces >= 6 : memOf(it.c.where).box >= 2);
     const all = ITEMS.filter((it) => chosen(it) && ready(it));
     const recent = S.history.slice(-COOLDOWN);
-    const rested = (it) => !recent.includes(it.c.id) && !S.tickets.some((t) => t.it.c.id === it.c.id);
+    // not what was asked lately, and not where the bird stands: its name is on the screen (at a flight's start; after a
+    // delivery it is what was asked last)
+    const st = S.mode === 'fly' && bird.down ? regionAt(bird.lon, bird.lat) : null, stood = st && (st.c ? st.c.id : st.w >= 0 && WATERS[st.w] ? WATERS[st.w].id : null);
+    const rested = (it) => !recent.includes(it.c.id) && it.c.id !== stood && !S.tickets.some((t) => t.it.c.id === it.c.id);
     let pool = all.filter(rested);
     if (!pool.length) pool = all.filter((it) => it.c.id !== S.history[S.history.length - 1]);
     const due = pool.filter((it) => memOf(it).box > 0 && memOf(it).due <= now);
@@ -1892,7 +1895,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     S.history.push(it.c.id);
     const isNew = memOf(it).box === 0;
     S.sinceNew = isNew ? 0 : S.sinceNew + 1;
-    S.tickets.push({ it, node, age: 0, isNew, misses: 0, shown: false, warm: false, from: [bird.lon, bird.lat], fromTop: bird.at === '*' });      // the first of a flight: picked up at the top, before any landing
+    S.tickets.push({ it, node, age: 0, isNew, misses: 0, shown: false, warm: false, from: [bird.lon, bird.lat] });
     sfx.call();
     measure();
   }
@@ -2041,12 +2044,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (tab === 'challenge' && runKind === 'day' && tripDone()) return;          // one trip a day (one begun is carried on)
     S.game = tab === 'challenge' ? 'trip' : tab;
     Object.assign(S, { mode: 'fly', paused: false, t: 0, energy: TANK, n: 0, streak: 0, bestStreak: 0, firstTry: 0, fresh: 0, route: null, legs: null, tickets: [], last: null,
-      spawnAt: 0.4, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, gain: 0, idle: 0, fails: new Map() });
+      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, gain: 0, idle: 0, fails: new Map(), intro: null });
     S.log = new Map();
     S.drops = [];
     fx.length = 0; flashes.length = 0;
     ticketsEl.replaceChildren();
-    Object.assign(bird, { lon: atlas.lon, lat: clamp(atlas.lat, -60, 75), a: 1, va: 0, vx: 0, vy: 0, down: false, at: '*' });
+    // Every flight starts on the ground with the whole globe in view, and the view comes down on the bird (the player,
+    // 2026-11-13: "in all game modes, like study mode too, I think that the bird should never start in the air. It
+    // should start grounded. And it should start zoomed out and then zoom in on where you are"). A new Study flight
+    // and Free flight start where the title globe was looking. Until then they began at the top, as the original did.
+    Object.assign(bird, { lon: atlas.lon, lat: clamp(atlas.lat, -60, 75), a: 0, va: 0, vx: 0, vy: 0, down: true });
+    bird.at = regionAt(bird.lon, bird.lat).key;
     keys.flap = false;
     hover = null;
     $('card').hidden = true;
@@ -2060,6 +2068,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (S.game === 'free') S.energy = Infinity;          // Free flight: no energy, no end
     if (S.game === 'trip') tripStart(runKind);
     if (S.game === 'study' && save.flight) carryOn();
+    if (S.game !== 'trip') startView();
     tutorBar();
     stage.classList.add('flying');
     stage.classList.remove('atlas');
@@ -2068,6 +2077,25 @@ button { font: inherit; color: inherit; cursor: pointer; }
     drawHud();
   }
 
+  // Study and Free flight: the view comes down on the bird as a trip's does (INTRO_ZOOM). A new flight's bird stands
+  // where the globe is looking, so nothing turns first; a flight carried on turns to where its bird stood (INTRO_TURN).
+  function startView() {
+    const to = unit(bird.lon, bird.lat);
+    let from = unit(atlas.lon, atlas.lat);
+    const there = dot(from, to) > 0.9999;
+    if (dot(from, to) < -0.98) from = unit(atlas.lon, atlas.lat + 20);       // no one way round from the far side
+    S.intro = { from, at: [bird.lon, bird.lat], t: there ? INTRO_TURN : 0 };
+  }
+  // The view is down. Study names where the bird stands, as a landing does, and the first postcard comes as one comes
+  // after a delivery (until 2026-11-13 a flight began in the air, and its first landing, which cost nothing, named
+  // where it came down). Free flight shows the card of where the bird stands, as a landing there does.
+  function arrived() {
+    S.intro = null;
+    const here = regionAt(bird.lon, bird.lat);
+    if (S.game === 'free') { showPlace(here); return; }
+    if (here.name) label(here.sea ? null : here.c, here.name, unit(bird.lon, bird.lat), here.sea ? 'sea' : 'name', GROUND, here.sea ? null : capLine(here.c), UNDER);
+    S.spawnAt = Math.max(S.spawnAt, S.t + 0.6);
+  }
   // A Study flight is kept: left for Home, or with the window closed, it is carried on from the Study tab as it stood
   // (the player, 2026-11-12: "Should be able to save and return home in case you want to do different modes during a
   // study session. But can't have multiple sturdy sessions at once"). One flight: it is kept from its first delivery
@@ -2081,7 +2109,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       fails: [...S.fails], recent: S.recent.slice(), history: S.history.slice(-12), sinceNew: S.sinceNew, last: S.last,
       log: [...S.log.values()].map((r) => [r.it.key, r.shown ? 1 : 0, r.isNew ? 1 : 0].concat(r.p ? ll(r.p) : [])),
       drops: S.drops.filter((d) => d.from).map((d) => ll(d.p).concat(ll(d.from), [d.km, d.city])),
-      card: t ? [t.it.key, t.misses, t.shown ? 1 : 0, t.warm ? 1 : 0, t.isNew ? 1 : 0, t.from[0], t.from[1], t.fromTop ? 1 : 0] : null,
+      card: t ? [t.it.key, t.misses, t.shown ? 1 : 0, t.warm ? 1 : 0, t.isNew ? 1 : 0, t.from[0], t.from[1]] : null,
       cols: PLAY.map((c) => c.col).join('') };
     persist();
   }
@@ -2094,13 +2122,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
       // delivered capitals: their pins come back on the end globe (in the flight they left long ago)
       for (const [lon, lat, flon, flat, km, city] of f.drops || []) S.drops.push({ p: unit(lon, lat), from: unit(flon, flat), t: -1e6, left: 0, km, city });
       if (typeof f.cols === 'string' && f.cols.length === PLAY.length) PLAY.forEach((c, i) => { const col = +f.cols[i]; if (col >= 0 && col < FILL.length) c.col = col; });      // the flight's own colors
-      const [lon, lat, a, down, at] = f.bird;
-      Object.assign(bird, { lon, lat, a: clamp(a, 0, 1), va: 0, vx: 0, vy: 0, down: !!down, at: at || 'elsewhere' });
+      const [lon, lat] = f.bird;          // on the ground, under where it was if it was left in the air: no flight starts in the air
+      Object.assign(bird, { lon, lat, a: 0, va: 0, vx: 0, vy: 0, down: true, at: regionAt(lon, lat).key });
       const card = f.card && item(f.card[0]);
       if (card) {
         addTicket(card);
-        const t = S.tickets[0], [, misses, shown, warm, isNew, flon, flat, fromTop] = f.card;
-        Object.assign(t, { misses: misses | 0, shown: !!shown, warm: !!warm, isNew: !!isNew, from: [flon, flat], fromTop: !!fromTop });
+        const t = S.tickets[0], [, misses, shown, warm, isNew, flon, flat] = f.card;
+        Object.assign(t, { misses: misses | 0, shown: !!shown, warm: !!warm, isNew: !!isNew, from: [flon, flat] });
         if (t.misses) setStrikes(t);
         if (t.shown) shownName(t);
       }
@@ -2132,16 +2160,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const t = S.tickets[0];
     if (t && reaches(t.it, lon, lat)) { deliver(t, lon, lat); return; }
     if (t && t.it.kind === 'k' && here.c === t.it.c) { warm(t, p, lon, lat); return; }
-    // The first landing of a flight is not a guess, and neither is one with no postcard aboard. Every other landing
-    // that is not the answer is a wrong one, also in the country or sea you took off from (the player, 2026-11-13:
+    // A landing with no postcard aboard is not a guess. Every other landing that is not the answer is a wrong one, the
+    // first of a flight too (until 2026-11-13 a flight began in the air and its first landing cost nothing), also in the country or sea you took off from (the player, 2026-11-13:
     // "It shouldn't have to be in 3 separate locations, I think. Just landing 3 times. So if the person wants to
     // reveal, they can just press spacebar and land again to get X"). Until then a hop that came down where it took
     // off was free, a rule of the original game.
-    if (!t || was === '*') {
-      (here.sea ? sfx.splash : sfx.thud)();
-      if (was === '*' && here.name) label(here.sea ? null : here.c, here.name, p, here.sea ? 'sea' : 'name', GROUND, here.sea ? null : capLine(here.c), UNDER);
-      return;
-    }
+    if (!t) { (here.sea ? sfx.splash : sfx.thud)(); return; }
     strand(here, p);
   }
 
@@ -2589,13 +2613,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
     space: 'Hold <kbd class="space">Space</kbd> to fly up.',
     arrows: 'Use <span class="arrows"><kbd class="up">&uarr;</kbd><kbd>&larr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd></span> to navigate.',
     letgo: '<span>Flying up uses energy. Let go to glide down.</span>',
+    land: '<span>Find somewhere nice to land.</span>',
     rule: '<span>A postcard will name a location.<br>You have one attempt to land there.</span>',
     clock: '<span>Land before the timer\'s halfway mark for full speed points.</span>',
     wrong: '<span>Speed and energy points only&nbsp;count<br>on a correct landing.</span>' };
-  // a step of the lesson: space | arrows | letgo (the bird flies, nothing is asked) | rule (down again: the bar waits for Continue)
+  // a step of the lesson: space | arrows | letgo | land (the bird flies, nothing is asked) | rule (down again: the bar waits for Continue)
+  const LETGO_SECS = 3;                   // seconds the third line stands before the line about landing may follow it
   function lesson(step) {
     const T = S.trip;
-    Object.assign(T, { wait: true, ready: false, count: 0, reveal: null, lesson: step, nav: 0, least: S.t + 1.2 });
+    Object.assign(T, { wait: true, ready: false, count: 0, reveal: null, lesson: step, nav: 0, least: S.t + 1.2, said: S.t });
     if (step === 'space' || step === 'rule') { S.cap = S.energy = LESSON_TANK; T.cheap = 0; }          // a full ring to learn with, and again once down
     $('trip-clock').hidden = true;
     ticketsEl.replaceChildren();
@@ -2612,9 +2638,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
       if (keys.left || keys.right || keys.up || keys.down) T.nav += dt;
       if (T.nav >= 0.4) lesson('letgo');                                 // long enough to have seen the bird go that way
     }
+    // Space let go and the bird still in the air once the third line has stood a while: the next line does not wait
+    // for the landing (the player, 2026-11-13: "you shouldn't have to land for the next instruction to come up ... after
+    // like maybe like 3 seconds of showing it and the user has let go of the spacebar to glide down and they haven't
+    // landed, then you could say, find somewhere nice to land. And then the instructions can continue.")
+    else if (T.lesson === 'letgo' && !keys.flap && S.t >= T.said + LETGO_SECS) lesson('land');
   }
   // down in the lesson: after the third line, the rule of a round. Before it (a tap, or no arrow used yet): Space again.
-  function lessonLand() { const T = S.trip; if (T.lesson === 'letgo') lesson('rule'); else if (T.lesson !== 'rule') lesson('space'); }
+  function lessonLand() { const T = S.trip; if (T.lesson === 'letgo' || T.lesson === 'land') lesson('rule'); else if (T.lesson !== 'rule') lesson('space'); }
   // Continue. The round starts from the tutorial's own start, as every real game starts from one spot: the view rises
   // from where the bird came down, the globe turns back, and the count waits for it. (Flown by the keys, the lesson
   // leaves the bird anywhere: 0.6 s of an arrow at the top carries it 4,900 km, from the start onto Australia itself,
@@ -3042,7 +3073,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     atlasNames = T.results.map((r, i) => ({ c: T.rounds[i].c, p: r.p, name: r.name, city: r.kind !== 'country' && r.kind !== 'flag', i }));
     const mid = norm(T.results.slice(-12).reduce((a, r) => [a[0] + r.p[0], a[1] + r.p[1], a[2] + r.p[2]], [1e-9, 0, 0]));
     const [lon, lat] = T.results.length ? lonLat(mid) : from;
-    atlas.from = from; atlas.to = [lon, clamp(lat, -45, 60)]; atlas.k = 0; atlas.lon = from[0]; atlas.lat = from[1]; atlas.spin = 0; atlas.idle = 0;
+    atlas.from = from; atlas.to = [lon, clamp(lat, -45, 60)]; atlas.k = 0; atlas.secs = 0; S.tour = null; atlas.lon = from[0]; atlas.lat = from[1]; atlas.spin = 0; atlas.idle = 0;
     // The flight of every round that has one (a round left with its clue showing has none, nor has a trip saved before
     // flights were kept). The globe shows the last round flown; the others are picked on the card.
     S.legs = null; S.focus = null; S.rowOn = undefined;
@@ -3125,10 +3156,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (t.label) t.label.secs = 0;                     // the name it wore since it was shown: the delivery writes its own
     const off = it.kind === 'k' ? kmBetween(lon, lat, c.cap[1], c.cap[2]) : 0;
     const spot = it.kind === 'k' && (c.tiny || off <= capKm(c) / 3);
-    // par for the distance from where the postcard was picked up. The first of a flight, picked up at the top, has none:
-    // that height was free. Any later one has it, also when the bird was already off the ground again as it came (it paid
-    // for that climb: until 2026-11-12 taking off within 0.6 s of a delivery lost the next postcard's whole par)
-    const par = t.fromTop ? 0 : parFor(kmBetween(t.from[0], t.from[1], lon, lat));
+    // par for the distance from where the postcard was picked up, the first of a flight too (it is picked up on the
+    // ground like any other; until 2026-11-13 it came at the top, a height that was free, and had none). Also when the
+    // bird was already off the ground again as it came (it paid for that climb: until 2026-11-12 taking off within
+    // 0.6 s of a delivery lost the next postcard's whole par)
+    const par = parFor(kmBetween(t.from[0], t.from[1], lon, lat));
     let gain = clean ? SLACK * par + 1 + BONUS * Math.pow(BONUS_FADE, S.n) + (spot ? BULLSEYE : 0) : par;
     S.lastGain = gain;
     // How well it was known: flown straight to (a new one too: then it was known already) is Good, or
@@ -3274,7 +3306,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // this is where I started. Oh, it's moving. Cool"). With one stop or none there is no path: it rests on what is named.
     const path = S.route.length > 1, centre = path ? S.route[0] : Math.hypot(sx, sy, sz) > 1e-6 ? norm([sx, sy, sz]) : unit(bird.lon, bird.lat);
     const [lon, lat] = lonLat(centre);
-    atlas.from = [bird.lon, bird.lat]; atlas.to = [lon, clamp(lat, -45, 60)]; atlas.k = 0;
+    atlas.from = [bird.lon, bird.lat]; atlas.to = [lon, clamp(lat, -45, 60)]; atlas.k = 0; atlas.secs = 0; S.tour = null;
     atlas.lon = bird.lon; atlas.lat = bird.lat;
     let turn = 1;
     if (path) {         // east or west: toward the middle of the stops that follow the first
@@ -3330,7 +3362,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     S.log = new Map(); S.drops = [];
     fx.length = 0; flashes.length = 0;
     keys.left = keys.right = keys.up = keys.down = keys.flap = false;
-    atlas.from = from; atlas.to = [from[0], clamp(from[1], -45, 60)]; atlas.k = 0; atlas.spin = 6; atlas.idle = 0; atlas.rest = REST;
+    atlas.from = from; atlas.to = [from[0], clamp(from[1], -45, 60)]; atlas.k = 0; atlas.secs = 0; S.tour = null; atlas.spin = 6; atlas.idle = 0; atlas.rest = REST;
     stage.classList.remove('flying'); stage.classList.add('atlas');
     $('console').hidden = true; $('debrief').hidden = true; $('place').hidden = true; $('daycard').hidden = true; hideFunFact();
     $('spoton').hidden = true;
@@ -3397,12 +3429,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
     S.t += dt;
     const sand = S.mode === 'title' ? tab === 'study' : S.game === 'study';       // Study's choice shows on its title tab, through its flight and on its end screen
     for (let i = 0; i < sanded.length; i++) sanded[i] += ((sand ? outside[i] : 0) - sanded[i]) * Math.min(1, dt * 7);
-    const intro = flying && S.trip && S.trip.intro;
+    const intro = flying && (S.trip ? S.trip.intro : S.intro);
     if (intro) {
       intro.t += dt;
-      [atlas.lon, atlas.lat] = lonLat(slerp(intro.from, unit(...S.trip.at), smooth(clamp(intro.t / INTRO_TURN, 0, 1))));
+      [atlas.lon, atlas.lat] = lonLat(slerp(intro.from, unit(...(S.trip ? S.trip.at : intro.at)), smooth(clamp(intro.t / INTRO_TURN, 0, 1))));
     }
-    S.blend = intro && intro.t < 0 ? Math.max(0, S.blend - dt / TUTOR_LEAD) : intro && intro.t < INTRO_TURN ? 0 : clamp(S.blend + (flying ? dt / (intro ? INTRO_ZOOM : 0.9) : -dt / 1.3), 0, 1);
+    S.blend = intro && intro.t < 0 ? Math.max(0, S.blend - dt / TUTOR_LEAD) : intro && intro.t < INTRO_TURN ? 0 : clamp(S.blend + (flying ? dt / INTRO_ZOOM : -dt / 1.3), 0, 1);
+    if (flying && S.intro && S.blend >= 1) arrived();
     for (let i = fx.length - 1; i >= 0; i--) { fx[i].t += dt; if (fx[i].t >= fx[i].secs) fx.splice(i, 1); }
     for (let i = flashes.length - 1; i >= 0; i--) { flashes[i].t += dt; if (flashes[i].t >= flashes[i].secs) flashes.splice(i, 1); }
     bird.squash = Math.max(0, bird.squash - dt / 0.18);
@@ -3411,16 +3444,21 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
     if (!flying) {             // title and results: the globe turns slowly; drag it to turn it yourself
       if (atlas.to) {
-        atlas.k = Math.min(1, atlas.k + dt / 1.3);
+        atlas.k = Math.min(1, atlas.k + dt / (atlas.secs || 1.3));
         const p = slerp(unit(...atlas.from), unit(...atlas.to), smooth(atlas.k));
         [atlas.lon, atlas.lat] = lonLat(p);
-        if (atlas.k >= 1) atlas.to = null;
+        if (atlas.k >= 1) { atlas.to = null; atlas.secs = 0; }
+      } else if (S.tour && S.mode === 'over' && S.legs && !drag.on) {          // a results globe on a round's origin: a rest, then the slow turn to its end (showLeg)
+        S.tour.rest -= dt;
+        if (S.tour.rest <= 0) {
+          const here = [atlas.lon, atlas.lat], deg = Math.acos(clamp(dot(unit(...here), unit(...S.tour.to)), -1, 1)) / RAD;
+          if (deg > 0.5) { atlas.from = here; atlas.to = S.tour.to; atlas.k = 0; atlas.secs = Math.max(TOUR_MIN, deg / TOUR_DEG); }
+          S.tour = null;
+        }
       } else if (!drag.on) {
         atlas.idle += dt;
         if (atlas.idle > atlas.rest && !(atlas.zoom > 1)) atlas.lon = wrapLon(atlas.lon + atlas.spin * dt * clamp((atlas.idle - atlas.rest) / 2, 0, 1));          // zoomed in, it holds still
       }
-      bird.beat += dt * 2.2;
-      bird.spread += (0.86 + 0.14 * Math.sin(bird.beat * 2.4) - bird.spread) * Math.min(1, dt * 8);
       return;
     }
 
@@ -3434,7 +3472,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (S.idle > IDLE_PAUSE) { setPaused(true, true); return; }
 
     // Flapping is the only thing that costs energy. With none left, you can only glide down.
-    const flap = keys.flap && !flapSpent && !S.look && S.energy > 0 && !(S.trip && S.trip.wait && !lessonFlies(S.trip));
+    // No flying until the view has come down on the bird (S.blend), in any mode.
+    const flap = keys.flap && !flapSpent && !S.look && S.energy > 0 && S.blend >= 1 && !(S.trip && S.trip.wait && !lessonFlies(S.trip));
     if (flap) {
       S.energy = Math.max(0, S.energy - BURN * dt);
       if (bird.down) { bird.down = false; bird.va = CLIMB * 0.45; }
@@ -3443,9 +3482,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     } else flapClock = 0;
 
     if (!bird.down) {
-      // A flight opens with a moment at the top to take in the world and read the letter.
-      const poised = bird.at === '*' && S.t < 1.4 && bird.a > 0.98;
-      const want = flap ? CLIMB : poised ? 0 : -(SINK + SINK_MID * Math.sin(Math.PI * clamp(bird.a, 0, 1)));
+      const want = flap ? CLIMB : -(SINK + SINK_MID * Math.sin(Math.PI * clamp(bird.a, 0, 1)));
       bird.va += (want - bird.va) * Math.min(1, dt * (flap ? 12 : 7));
       bird.a = Math.min(1, bird.a + bird.va * dt);
       if (bird.a >= 1 && bird.va > 0) bird.va = 0;
@@ -3477,7 +3514,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       else if (S.t >= S.endAt) { if (S.game === 'trip') tripEnd(); else land(); return; }
     } else S.endAt = 0;
 
-    if (S.game === 'study' && !S.tickets.length && S.t >= S.spawnAt) addTicket();
+    if (S.game === 'study' && !S.tickets.length && !S.intro && S.t >= S.spawnAt) addTicket();
     if (S.game === 'trip') tripTick(dt);
     if (!bird.down && !$('place').hidden) { $('place').hidden = true; S.around = null; measure(); }
     for (const t of S.tickets) t.age += dt;
@@ -3746,44 +3783,47 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // The bird grows with the screen as the cards do, and is one size against the map in every mode. In a flight it is
   // drawn above its shadow, higher the higher it flies.
   const birdSize = () => 0.92 * view.mk, birdLift = () => (4 + 70 * Math.pow(bird.a, 0.8)) * view.mk;
+  // On the ground the bird is part of the map: while the view is higher than the ground's own (a start coming down on
+  // it, the view away at an answer) it is drawn at the map's scale, small on the whole globe, with its shadow and its
+  // ring. In the air it keeps its size and the earth changes. (The player, 2026-11-13: "the bird is like the same size
+  // on the screen the entire time. I think it should be like pretty small, and then it should zoom in ... Because
+  // theoretically, the bird is on the ground the whole time. While you're actually playing the game, it is flying, so
+  // it would stay the same size, and the earth changes size.")
+  const onMap = () => (S.mode === 'fly' && bird.down ? Math.min(1, view.H0 / cam.H) : 1);
   // The room the bird takes on the screen in a flight, with its energy ring: names keep clear of it.
   function birdBox(g) {
-    const size = birdSize(), r = 26 * size, pad = 6 * view.mk, ring = S.game === 'free' ? 0 : 11 * Math.max(1, 0.95 * view.ui);
-    const y = g[1] - birdLift(), left = g[0] - r - pad, right = g[0] + Math.max(r, ring && 30 * size + ring) + pad;
+    const k = onMap(), size = birdSize() * k, r = 26 * size, pad = 6 * view.mk * k, ring = S.game === 'free' ? 0 : 11 * Math.max(1, 0.95 * view.ui) * k;
+    const y = g[1] - birdLift() * k, left = g[0] - r - pad, right = g[0] + Math.max(r, ring && 30 * size + ring) + pad;
     const top = y - r - pad, bottom = y + Math.max(r, ring && 13 * size + ring) + pad;
     return { x: (left + right) / 2, y: (top + bottom) / 2, half: (right - left) / 2, up: (bottom - top) / 2, down: (bottom - top) / 2, bird: true };
   }
   let seen = 1;         // how much of the bird is drawn: less as its place nears the globe's rim
   function drawBird() {
-    const flying = S.mode === 'fly', size = birdSize();
-    const a = flying ? bird.a : 1;
-    const g = flying ? project(unit(bird.lon, bird.lat)) : [cam.cx, cam.cy - cam.rho - 40];
+    const k = onMap(), size = birdSize() * k, a = bird.a;          // on the ground, at the map's scale
+    const g = project(unit(bird.lon, bird.lat));
     if (!g) return;                       // round the back of the globe while the view is away
     // When the view turns away to show a place, the bird goes with the ground it stands on: it fades as that nears
     // the globe's rim and is gone before it, with its shadow, its energy ring and the name under it.
-    seen = flying ? rimIn(birdBox(g)) : 1;
+    seen = rimIn(birdBox(g));
     if (seen <= 0) return;
-    if (flying) ctx.globalAlpha = seen;
-    const lift = flying ? birdLift() : 0;
-    const x = g[0], y = g[1] - lift;
-    if (flying) {
-      const sh = 1 - 0.5 * a;
-      ctx.fillStyle = 'rgba(19,38,59,' + (0.34 - 0.14 * a).toFixed(3) + ')';
-      ctx.beginPath(); ctx.ellipse(g[0], g[1], 15 * size * sh, 6 * size * sh, 0, 0, 7); ctx.fill();
-      if (!bird.down) {
-        const u = view.mk;
-        ctx.strokeStyle = 'rgba(255,253,246,.9)'; ctx.lineWidth = 1.5 * u;
-        ctx.beginPath(); ctx.arc(g[0], g[1], 3 * u, 0, 7); ctx.stroke();
-        if (lift > 14 * u) {
-          ctx.setLineDash([2 * u, 4 * u]); ctx.strokeStyle = 'rgba(255,253,246,.55)'; ctx.lineWidth = 1.5 * u;
-          ctx.beginPath(); ctx.moveTo(g[0], g[1] - 6 * u); ctx.lineTo(x, y + 8 * u); ctx.stroke(); ctx.setLineDash([]);
-        }
+    ctx.globalAlpha = seen;
+    const lift = birdLift() * k, x = g[0], y = g[1] - lift, sh = 1 - 0.5 * a;
+    ctx.fillStyle = 'rgba(19,38,59,' + (0.34 - 0.14 * a).toFixed(3) + ')';
+    ctx.beginPath(); ctx.ellipse(g[0], g[1], 15 * size * sh, 6 * size * sh, 0, 0, 7); ctx.fill();
+    if (!bird.down) {
+      const u = view.mk;
+      ctx.strokeStyle = 'rgba(255,253,246,.9)'; ctx.lineWidth = 1.5 * u;
+      ctx.beginPath(); ctx.arc(g[0], g[1], 3 * u, 0, 7); ctx.stroke();
+      if (lift > 14 * u) {
+        ctx.setLineDash([2 * u, 4 * u]); ctx.strokeStyle = 'rgba(255,253,246,.55)'; ctx.lineWidth = 1.5 * u;
+        ctx.beginPath(); ctx.moveTo(g[0], g[1] - 6 * u); ctx.lineTo(x, y + 8 * u); ctx.stroke(); ctx.setLineDash([]);
       }
+      drawAir(x, y, size);
     }
-    if (flying && !bird.down) drawAir(x, y, size);
     birdShape(x, y, size, bird.spread, bird.squash);
-    if (flying && S.game !== 'free') drawStamina(x + 30 * size, y + 13 * size);
-    if (flying && bird.down && S.idle > IDLE_SLEEP) drawZzz(x + 10 * size, y - 14, S.idle - IDLE_SLEEP);
+    if (S.game !== 'free') drawStamina(x + 30 * size, y + 13 * size, k);
+    if (bird.down && S.idle > IDLE_SLEEP) drawZzz(x + 10 * size, y - 14, S.idle - IDLE_SLEEP);
+    ctx.globalAlpha = 1;
   }
   // The air the bird moves through: a faint streak off each wingtip, longer the faster it goes, and
   // a small puff pushed back with each wingbeat.
@@ -3822,8 +3862,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     ctx.globalAlpha = 1;
   }
   // Stamina is a ring beside the bird: it empties while you flap and fills when a letter is delivered.
-  function drawStamina(x, y) {
-    const full = S.cap || TANK, K = Math.max(1, 0.95 * view.ui), r = 6.5 * K;
+  function drawStamina(x, y, scale) {
+    const full = S.cap || TANK, K = Math.max(1, 0.95 * view.ui) * (scale || 1), r = 6.5 * K;
     // In a Day Trip the ring is this round's: its upper half is the cheapest flight and its room for error, however far
     // that is, and its lower half is the energy use points still to be had (spareLeft: it empties fast at first and
     // slowly at the end, as the points do). So the mark at its foot is where the losing starts, as the mark in the
@@ -3855,22 +3895,29 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // against (goalOf: a city or capital, and for a country its nearest point, never its middle). Where a round started
   // is a paper-white dot, where the bird came down a green or a red one. The other rounds are the same lines and dots, faint.
   const THIN = 1.8, THICK = 5.5, FAINT = 0.28;
-  // The rounds a results globe holds at a time: the one picked and the two before and after it, five in all, with the
-  // names of their answers. A Day Trip is five rounds, so it is all there. A Ranked flight is twenty or more, and drawn
+  // The rounds a results globe holds at a time: the one picked and the two before and after it, five in all. Only the
+  // picked round's answer is named (the player, 2026-11-13, of "Vaduz" standing by round 4's flight to Paris: "Why is
+  // Vaduz showing ... it Shouldn't"; until then all five were, their pick of 2026-11-12). A Day Trip is five rounds, so
+  // its flights are all there. A Ranked flight is twenty or more, and drawn
   // whole it was a web of lines (looked at with a flight of 22: audit/rank1.py).
   const HELD = 5;
   function heldRounds() {
     const lo = clamp(S.focus - (HELD - 1) / 2, 0, Math.max(0, S.legs.length - HELD));
     return [lo, Math.min(S.legs.length - 1, lo + HELD - 1)];
   }
-  // One round on the globe: it turns to the middle of that round's flight. When the answer would be out of sight from
-  // there (a landing far from it), to the middle of the flight and the answer, so what was asked can be seen and named.
+  // One round on the globe (the player, 2026-11-13: "globe should start on origin of whichever flight is highlighted, then
+  // slowly rotate to end point (one path and not curving along with the flight path). Right now if it's a long path it
+  // only shows a portion"). The globe turns to where the round began, rests there a moment, then turns slowly and
+  // steadily along the one shortest line to where the bird came down, and stays there. (Until then it turned to the
+  // middle of the flight and held still: of a flight half-way round the world both ends were at the rim or behind it.)
+  const TOUR_REST = 1, TOUR_DEG = 15, TOUR_MIN = 1.5;          // seconds on the origin; degrees a second on the way; the shortest the way takes
+  const globeSpot = (p) => { const [lo, la] = lonLat(p); return [lo, clamp(la, -45, 60)]; };
   function showLeg(i) {
-    const L = S.legs[i], mid = slerp(L.from, L.land, 0.5), all = [L.from[0] + L.land[0] + L.ans[0], L.from[1] + L.land[1] + L.ans[1], L.from[2] + L.land[2] + L.ans[2]];
-    const wide = Math.hypot(...all) > 0.3 ? norm(all) : mid, near = Math.cos(65 * RAD);          // only when all three can be seen from there
-    const [lo, la] = lonLat(dot(mid, L.ans) < Math.cos(55 * RAD) && dot(wide, L.ans) > near && dot(wide, L.from) > near && dot(wide, L.land) > near ? wide : mid);
-    S.focus = i; atlas.from = [atlas.lon, atlas.lat]; atlas.to = [lo, clamp(la, -45, 60)]; atlas.k = 0; atlas.idle = 0; atlas.zoom = 1;
-    settleNames();
+    const L = S.legs[i];
+    S.focus = i; atlas.idle = 0; atlas.zoom = 1;
+    atlas.from = [atlas.lon, atlas.lat]; atlas.to = globeSpot(L.from); atlas.k = 0; atlas.secs = 0;
+    S.tour = { to: globeSpot(L.land), rest: TOUR_REST };
+    settleNames(S.tour.to);
   }
   // The way the bird went, in plain ink with no edge round it. TWO widths and no more (the player: "a certain thickness
   // when you were flapping and thin when you weren't ... cleaner"): thin the whole way, and over it each stretch of
@@ -3975,7 +4022,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     for (const a of atlasNames) {
       const s = project(a.p);
       if (paint) a.at = null;          // where the name stands as drawn, and half its width (for the tests)
-      if (!s || dot(a.p, cam.n) < cam.cos0 + 0.08 || (rounds && (a.i < rounds[0] || a.i > rounds[1]))) { a.spot = undefined; continue; }          // round the back, too close to the rim to read, or not one of the rounds held
+      if (!s || dot(a.p, cam.n) < cam.cos0 + 0.08 || (rounds && a.i !== S.focus)) { a.spot = undefined; continue; }          // round the back, too close to the rim to read, or not the round picked
       const name = a.name || a.c.name, size = Math.round((a.lost ? 17 : 15) * view.ui), q = size / 13;
       ctx.font = (a.water ? 'italic 600 ' : '700 ') + size + 'px ' + DISPLAY;
       const half = ctx.measureText(name).width / 2 + 4;
@@ -4005,9 +4052,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
     }
   }
   // The spot each name will have when the turn that has just begun ends: the names are placed for the view as it will be.
-  function settleNames() {
+  function settleNames(to) {
     const was = [atlas.lon, atlas.lat, S.blend];
-    [atlas.lon, atlas.lat] = atlas.to; S.blend = 0; placeCamera();
+    [atlas.lon, atlas.lat] = to || atlas.to; S.blend = 0; placeCamera();
     placeNames(nameBoxes(), false, false);
     for (const a of atlasNames) a.fix = a.spot;
     [atlas.lon, atlas.lat, S.blend] = was; placeCamera();
@@ -4030,7 +4077,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const legs = S.mode === 'over' && S.trip && S.legs;
     if (legs) drawLegs();
     const boxes = nameBoxes();
-    placeNames(boxes, true, !!(legs && atlas.to));
+    placeNames(boxes, true, !!(legs && (atlas.to || S.tour)));
     if (hover && !boxes.some((b) => !b.way && Math.abs(b.x - hover.x) < b.half && Math.abs(b.y - hover.y) < 12)) {
       nameplate(hover.c, hover.name, hover.x, hover.y - 18 * view.ui, hover.sea ? 'sea' : 'name', null, 1, Math.round(17 * view.ui));
     }
@@ -4051,7 +4098,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (S.mode === 'over') drawDrops();          // on Study's end globe a delivered capital's pin stands over the path's dots and over a name's tie, never under them
     for (const f of fx) if (!f.top) f.draw(Math.min(1, f.t / f.secs));
     if (S.mode === 'fly') drawRoute();
-    if (S.mode === 'fly' || S.blend > 0.02) { ctx.globalAlpha = S.mode === 'fly' ? 1 : S.blend; drawBird(); ctx.globalAlpha = 1; }
+    if (S.mode === 'fly') drawBird();          // no bird outside a flight (until 2026-11-13 one faded out above the globe for a second after Home or a flight's end: "a bird appears and fades away on top of the globe on the home page")
     if (S.mode === 'fly' && S.game === 'free') { drawBelow(); if (S.around && bird.down) drawAround(); }
     if (S.trip && S.trip.reveal && S.mode === 'fly') drawReveal();
     placed.length = 0;
@@ -4199,7 +4246,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (now) { [atlas.lon, atlas.lat] = to; atlas.to = null; return; }
     let from = [atlas.lon, atlas.lat];
     if (dot(unit(...from), unit(...to)) < -0.98) from = [from[0], from[1] + 20];       // no one way round from the far side
-    atlas.from = from; atlas.to = to; atlas.k = 0;
+    atlas.from = from; atlas.to = to; atlas.k = 0; atlas.secs = 0;
   }
   showStudy();
   showWhere(null, true);
@@ -4244,7 +4291,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   inkCanvas.addEventListener('pointerdown', (e) => {
     if (S.mode === 'fly') return;
     drag.on = true; drag.x = e.clientX; drag.y = e.clientY;
-    atlas.to = null; atlas.idle = 0;         // turning the globe by hand ends a turn it was making
+    atlas.to = null; atlas.secs = 0; S.tour = null; atlas.idle = 0;         // turning the globe by hand ends a turn it was making
     stage.classList.add('dragging');
     inkCanvas.setPointerCapture(e.pointerId);
   });
@@ -4275,7 +4322,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const box = stage.getBoundingClientRect(), x = e.clientX - box.left, y = e.clientY - box.top, at = unproject(x, y);
     const whole = S.mode === 'title' || !S.log.size ? view.Htitle : view.H1;
     atlas.zoom = clamp((atlas.zoom || 1) * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), 1, whole / view.H0);
-    atlas.to = null; atlas.idle = 0; hover = null;
+    atlas.to = null; atlas.secs = 0; S.tour = null; atlas.idle = 0; hover = null;
     for (let i = 0; i < 3 && at; i++) {          // turn the globe so that place is under the pointer again
       placeCamera();
       const s = projectLL(at[0], at[1]), k = cam.H / view.F / RAD;
@@ -4319,7 +4366,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   const setBird = (lon, lat, a, down) => Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down });
   window.birdsEye = { firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), flightSecs, parFor, capKm, cheapFor, judge, ringKm, hardOf, endlessRound, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
-    project: projectLL, unproject, speedAt, FLY_TOP, tripStreak, placed, seen: () => seen, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
+    project: projectLL, unproject, speedAt, FLY_TOP, tripStreak, placed, seen: () => seen, onMap: () => onMap(), drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
   if (gl) {
