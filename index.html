@@ -291,6 +291,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ticket.result .plus.right { color: var(--good); }
 .ticket.result .plus.wrong { color: var(--bad); }
 .ticket.result .parts b { color: var(--ink); }
+.ticket.result .parts b.miss { color: var(--bad); }
 #daycard { width: min(660px, 100%); }
 #daycard tr.on td { background: var(--paper-shade); }
 #daycard [data-i] { cursor: pointer; }
@@ -370,7 +371,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #debrief p { margin: 0; font-size: 13px; min-width: 0; }
 #debrief .tiles { border: 0; margin: 0 26px 0 14px; padding: 0 0 0 26px; border-left: var(--b2z) solid var(--paper-shade); gap: 26px; }
 #debrief .tiles b { font-size: 40px; }
-#debrief .tiles { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }          /* four tiles of one width (the widest word's), so the numbers stand at even steps */
+#debrief .tiles { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }          /* tiles of one width (the widest word's), so the numbers stand at even steps */
 /* the one control on screen in a flight: it opens the pause card (shown whenever pausing is allowed) */
 #pause { position: absolute; top: 14px; right: 16px; zoom: var(--ui, 1); width: 38px; height: 38px; padding: 0; display: grid; place-items: center; background: var(--paper); color: var(--ink); border: var(--b2z) solid var(--ink); border-radius: 3px; }
 #pause:hover { background: var(--paper-shade); }
@@ -1306,6 +1307,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const KEY = 'birds-eye-world-1';
   const KINDS = ['c', 'k', 'f', 's'], REGIONS = ['World', 'Africa', 'Americas', 'Asia', 'Europe', 'Oceania'];
   const save = { mem: {}, best: 0, sound: true, study: { kinds: KINDS.slice(), where: ['World'] }, trips: {}, endless: 0, skill: null };
+  const wholeWorld = (w) => !w.length || w.includes('World') || REGIONS.every((r) => r === 'World' || w.includes(r));      // no region, World itself, or all five
   try {
     const got = JSON.parse(localStorage.getItem(KEY)) || {};
     if (got.mem && typeof got.mem === 'object') {
@@ -1330,7 +1332,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const st = got.study;
     if (st && Array.isArray(st.kinds)) { const k = KINDS.filter((x) => st.kinds.includes(x)); if (k.length) save.study.kinds = k; }
     const w = st && (Array.isArray(st.where) ? st.where : [st.where]).filter((x) => REGIONS.includes(x));
-    if (w && w.length) save.study.where = w.includes('World') ? ['World'] : w;
+    if (w && w.length) save.study.where = wholeWorld(w) ? ['World'] : w;
   } catch (e) { /* private window, or nothing saved yet */ }
   const persist = () => {
     try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) { /* carry on without saving */ }
@@ -1494,7 +1496,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
     t: 0, energy: TANK, n: 0, streak: 0, bestStreak: 0, firstTry: 0, fresh: 0, blend: 0, idle: 0, lastGain: 0,
     tickets: [], last: null, history: [], spawnAt: 0, sinceNew: 2, recent: [], turn: 0, endAt: 0,
     log: new Map(), drops: [], look: null, gain: 0, fails: new Map(),
-    was: new Map(),            // Study: the box each thing delivered in this flight had when the flight began (for "mastered" on the end bar)
   };
   const REST = 2.5, END_REST = 4;       // seconds a globe holds still before it starts to turn: the title's, and Study's end globe on the start of the flight
   const atlas = { lon: -20, lat: 18, spin: 6, idle: 0, rest: REST, from: null, to: null, k: 1 };
@@ -1588,14 +1589,34 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function disputed(c, str, sub) {
     if (!c || !c.flag || !c.flagNote) return [str, sub];
     if (sub && sub.includes(c.name)) return [str, sub.replace(c.name, c.name + '*')];
-    return str === c.name && (!sub || sub.startsWith(CAP_WORD)) ? [str + '*', (sub ? sub + '\n' : '') + '*Flag disputed'] : [str, sub];
+    return str === c.name && (!sub || sub.startsWith(CAP_MARK)) ? [str + '*', (sub ? sub + '\n' : '') + '*Flag disputed'] : [str, sub];
   }
   // A country that a landing names carries its capital under its name (the player, 2026-11-12: 'It should say its
   // capital under the name of the country (e.g. "Capital: Canberra" underneath Australia if you were meant to go to
   // Ulaanbaatar. Should probably also do that just generally? Instead of only displaying the country name, display
-  // both.'). In their words, not as the capital's mark: a star beside a name on the map reads as "the city is here".
-  const CAP_WORD = 'Capital: ';
-  const capLine = (c) => (c && c.cap ? CAP_WORD + c.cap[0] : null);
+  // both.'). The capital's own mark stands for the word "Capital:" (the player, 2026-11-13: 'the capital symbol rather
+  // than like capital that's spelled out, and then the name of the capital ... on the second line and a little bit
+  // smaller': the top line is the subject, so the line under it reads as its capital). In the line's text the mark
+  // is CAP_MARK; where the line is drawn, that is the star in its circle (PIN_ART's shapes), as tall as the letters.
+  const CAP_MARK = '\u272A ';
+  const capLine = (c) => (c && c.cap ? CAP_MARK + c.cap[0] : null);
+  const CAP_STAR = new Path2D('M0.00,-7.00 L1.85,-2.55 L6.66,-2.16 L3.00,0.97 L4.11,5.66 L0.00,3.15 L-4.11,5.66 L-3.00,0.97 L-6.66,-2.16 L-1.85,-2.55 Z');
+  const markW = (size) => size * 0.92, markGap = (size) => size * 0.26;
+  // a line under a name: how wide it is (the font is set by the caller), and the line drawn with its middle at x
+  const subWidth = (line, size) => (line.startsWith(CAP_MARK) ? markW(size) + markGap(size) + ctx.measureText(line.slice(CAP_MARK.length)).width : ctx.measureText(line).width);
+  function subText(line, x, y, so) {
+    if (!line.startsWith(CAP_MARK)) { text(line, x, y, so); return; }
+    const rest = line.slice(CAP_MARK.length), d = markW(so.size);
+    ctx.font = '700 ' + so.size + 'px ' + DISPLAY;
+    if ('letterSpacing' in ctx) ctx.letterSpacing = so.track || '0.05em';
+    const w = ctx.measureText(rest).width, left = x - (d + markGap(so.size) + w) / 2, k = d / 23;
+    ctx.save();
+    ctx.translate(left + d / 2, y - so.size * 0.04); ctx.scale(k, k);
+    ctx.beginPath(); ctx.arc(0, 0, 10.5, 0, 7); ctx.fillStyle = PAPER; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 1.8; ctx.stroke();
+    ctx.fillStyle = INK; ctx.fill(CAP_STAR);
+    ctx.restore();
+    text(rest, left + d + markGap(so.size) + w / 2, y, so);
+  }
   // the lines under a name (one, or a capital and a flag's note), and how far the last one's middle is below the name's
   const subLines = (sub) => (sub ? sub.split('\n') : []);
   const subFall = (o, n) => (n ? o.size + 1 + (n - 1) * (subPx(o) + 1) : 0);
@@ -1610,17 +1631,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const so = Object.assign({}, o, { size: subPx(o), weight: 700, fill: o.sub || o.fill });
     const subs = subLines(sub), step = so.size + 1;
     ctx.font = (so.italic ? 'italic ' : '') + '700 ' + so.size + 'px ' + DISPLAY;
-    const sws = subs.map((line) => ctx.measureText(line).width), sw = Math.max(0, ...sws);
+    const sws = subs.map((line) => subWidth(line, so.size)), sw = Math.max(0, ...sws);
     if (!flag) {
       text(str, x, y, o);
-      subs.forEach((line, i) => text(line, x, y + o.size + 1 + i * step, so));
+      subs.forEach((line, i) => subText(line, x, y + o.size + 1 + i * step, so));
     } else {
       // the flag to the left; the name, and the lines under it, beside it and centred on it
       const total = fw + 8 + Math.max(tw, sw), left = x - total / 2, mid = y + subFall(o, subs.length) / 2, tx = left + fw + 8;
       ctx.drawImage(flagFor(c, fh), left, mid - fh / 2, fw, fh);
       if (!c.flagCut) { ctx.strokeStyle = 'rgba(19,38,59,.35)'; ctx.lineWidth = 1; ctx.strokeRect(left, mid - fh / 2, fw, fh); }
       text(str, tx + tw / 2, y, o);
-      subs.forEach((line, i) => text(line, tx + sws[i] / 2, y + o.size + 1 + i * step, so));
+      subs.forEach((line, i) => subText(line, tx + sws[i] / 2, y + o.size + 1 + i * step, so));
     }
     ctx.globalAlpha = 1;
   }
@@ -1682,7 +1703,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if ('letterSpacing' in ctx) ctx.letterSpacing = o.track || '0.05em';        // as it will be drawn: else the width is whatever was drawn last
     let w = ctx.measureText(str).width;
     const ss = subPx(o), subs = subLines(sub), fall = subFall(o, subs.length);
-    if (sub) { ctx.font = '700 ' + ss + 'px ' + DISPLAY; for (const line of subs) w = Math.max(w, ctx.measureText(line).width); }
+    if (sub) { ctx.font = '700 ' + ss + 'px ' + DISPLAY; for (const line of subs) w = Math.max(w, subWidth(line, ss)); }
     const fh = flagH(basePx()), mid = fall / 2, half = o.size * 0.8;
     if (c && c.flag) w += (c.flag.width / c.flag.height) * fh + 8;
     // rise and drop: how far what is drawn reaches above and below the name's line. up and down: the room kept for it
@@ -1991,7 +2012,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (tab === 'challenge' && runKind === 'day' && tripDone()) return;          // one trip a day (one begun is carried on)
     S.game = tab === 'challenge' ? 'trip' : tab;
     Object.assign(S, { mode: 'fly', paused: false, t: 0, energy: TANK, n: 0, streak: 0, bestStreak: 0, firstTry: 0, fresh: 0, route: null, legs: null, tickets: [], last: null,
-      spawnAt: 0.4, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, gain: 0, idle: 0, fails: new Map(), was: new Map() });
+      spawnAt: 0.4, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, gain: 0, idle: 0, fails: new Map() });
     S.log = new Map();
     S.drops = [];
     fx.length = 0; flashes.length = 0;
@@ -2027,7 +2048,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const ll = (p) => lonLat(p).map((v) => +v.toFixed(3)), t = S.tickets[0];
     save.flight = { n: S.n, energy: +S.energy.toFixed(3), streak: S.streak, best: S.bestStreak, first: S.firstTry, fresh: S.fresh,
       bird: [+bird.lon.toFixed(3), +bird.lat.toFixed(3), +bird.a.toFixed(3), bird.down ? 1 : 0, bird.at],
-      was: [...S.was], fails: [...S.fails], recent: S.recent.slice(), history: S.history.slice(-12), sinceNew: S.sinceNew, last: S.last,
+      fails: [...S.fails], recent: S.recent.slice(), history: S.history.slice(-12), sinceNew: S.sinceNew, last: S.last,
       log: [...S.log.values()].map((r) => [r.it.key, r.shown ? 1 : 0, r.isNew ? 1 : 0].concat(r.p ? ll(r.p) : [])),
       drops: S.drops.filter((d) => d.from).map((d) => ll(d.p).concat(ll(d.from), [d.km, d.city])),
       card: t ? [t.it.key, t.misses, t.shown ? 1 : 0, t.warm ? 1 : 0, t.isNew ? 1 : 0, t.from[0], t.from[1], t.fromTop ? 1 : 0] : null,
@@ -2038,7 +2059,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const f = save.flight, item = (key) => ITEMS.find((it) => it.key === key);
     try {
       Object.assign(S, { n: f.n, energy: clamp(f.energy, 0, TANK), streak: f.streak | 0, bestStreak: f.best | 0, firstTry: f.first | 0, fresh: f.fresh | 0, last: f.last || null });
-      S.was = new Map(f.was); S.fails = new Map(f.fails || []);
+      S.fails = new Map(f.fails || []);
       for (const [key, shown, isNew, lon, lat] of f.log) { const it = item(key); if (it) S.log.set(key, { it, shown: !!shown, isNew: !!isNew, p: lon === undefined ? null : unit(lon, lat) }); }
       // delivered capitals: their pins come back on the end globe (in the flight they left long ago)
       for (const [lon, lat, flon, flat, km, city] of f.drops || []) S.drops.push({ p: unit(lon, lat), from: unit(flon, flat), t: -1e6, left: 0, km, city });
@@ -2081,8 +2102,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const t = S.tickets[0];
     if (t && reaches(t.it, lon, lat)) { deliver(t, lon, lat); return; }
     if (t && t.it.kind === 'k' && here.c === t.it.c) { warm(t, p, lon, lat); return; }
-    // Coming down where you took off from is not a guess, and neither is the first landing of a flight.
-    if (!t || was === '*' || was === here.key) {
+    // The first landing of a flight is not a guess, and neither is one with no postcard aboard. Every other landing
+    // that is not the answer is a wrong one, also in the country or sea you took off from (the player, 2026-11-13:
+    // "It shouldn't have to be in 3 separate locations, I think. Just landing 3 times. So if the person wants to
+    // reveal, they can just press spacebar and land again to get X"). Until then a hop that came down where it took
+    // off was free, a rule of the original game.
+    if (!t || was === '*') {
       (here.sea ? sfx.splash : sfx.thud)();
       if (was === '*' && here.name) label(here.sea ? null : here.c, here.name, p, here.sea ? 'sea' : 'name', GROUND, here.sea ? null : capLine(here.c), UNDER);
       return;
@@ -2412,6 +2437,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const today = () => { const d = new Date(), two = (n) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()); };
   const KINDS_TRIP = { country: 'Country', flag: 'Flag', capital: 'Capital', capflag: 'Capital of', city: 'City' };
   const TICK = { spot: '✓', right: '✓', miss: '✗' };          // two marks: you got it or you did not
+  const NOT_EARNED = '<b class="tick miss">' + TICK.miss + '</b>';          // where speed or energy use points would stand after a wrong landing
   function seeded(str) {
     let h = 2166136261;
     for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
@@ -2671,7 +2697,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const most = roundMax(T, T.i, R.kind);
     node.innerHTML = '<div class="where"><span class="tick ' + tier + '">' + TICK[tier] + '</span> ' + esc(where) + '</div><div class="plus ' + (right ? 'right' : 'wrong') + '">' + pts + '<small>/' + most + '</small></div>' +
       '<div class="parts"><span>Accuracy <b>' + closeness + '</b>/' + (most - 40) + '</span>' +
-      (right ? '<span>Speed <b>' + speed + '</b>/20</span><span>Energy use <b>' + energy + '</b>/20</span>' : '') + '</div>' +      // only in play for a correct landing: a wrong one lists neither (0/20 read as slow and wasteful)
+      '<span>Speed ' + (right ? '<b>' + speed + '</b>' : NOT_EARNED) + '/20</span><span>Energy use ' + (right ? '<b>' + energy + '</b>' : NOT_EARNED) + '/20</span></div>' +      // always listed, so the card adds up to its total; a wrong landing shows its X where a number was not earned (the player's idea, 2026-11-13: "X out of 20"; 0/20 had read as slow and wasteful, and leaving them off as 74/160 beside 74/200)
       '<button class="go next" type="button">Next location</button>';
     node.querySelector('.next').addEventListener('click', () => { tripNext(); stage.focus({ preventScroll: true }); });
     ticketsEl.replaceChildren(node);
@@ -2757,8 +2783,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function statsRow(T, i) {
     const R = T.rounds[i], r = T.results[i];
     return '<tr' + (r.path ? ' data-i="' + i + '"' : '') + '><td class="n">' + (i + 1) + '</td>' + givenCell(R, true) + youCell(r) +
-      '<td class="num">' + out(r.closeness, roundMax(T, i, R.kind) - 40) + '</td><td class="num">' + (r.right ? out(r.speed, 20) : '') + '</td><td class="num">' + r.secs.toFixed(1) + ' s</td>' +
-      '<td class="num">' + (r.right ? out(r.energy || 0, 20) : '') + '</td><td class="pts">' + out(r.pts, roundMax(T, i, R.kind)) + '</td></tr>';
+      '<td class="num">' + out(r.closeness, roundMax(T, i, R.kind) - 40) + '</td><td class="num">' + (r.right ? out(r.speed, 20) : out(NOT_EARNED, 20)) + '</td><td class="num">' + r.secs.toFixed(1) + ' s</td>' +
+      '<td class="num">' + (r.right ? out(r.energy || 0, 20) : out(NOT_EARNED, 20)) + '</td><td class="pts">' + out(r.pts, roundMax(T, i, R.kind)) + '</td></tr>';
   }
   function rankedStats(T) {
     const rows = T.results.map((r, i) => statsRow(T, i)).join('');
@@ -2945,7 +2971,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const edge = it.kind === 's' && seaEdge(it, lon, lat) === 1;      // in the border zone between two waters
     if (t.isNew) learnSkill(it, t.shown || t.misses ? 0 : t.warm || edge ? 0.5 : 1);
     const grade = t.shown || t.misses ? AGAIN : t.warm || edge ? HARD : t.isNew ? EASY : OK;
-    if (!S.was.has(it.key)) S.was.set(it.key, m.box || 0);
     review(m, grade, now);
     if (grade === AGAIN) {                 // missed again in the same flight: wait three times as long each time
       const n = (S.fails.get(it.key) || 0) + 1;
@@ -3094,11 +3119,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     $('d-head').textContent = S.n === 1 ? 'postcard delivered' : 'postcards delivered';
     $('d-line').textContent = isBest && S.n > 0 ? 'Your best flight so far.' : save.best ? 'Your best is ' + save.best + '.' : '';
     $('d-tiles').hidden = !S.n;
-    // Four numbers (the player, 2026-11-12: 'Should also have the "in a row" stat in the study mode end screen. As well as
-    // "mastered this session"'): first try; the most first tries in a row, as Ranked's third number is; new; and
-    // mastered, the postcards that are mastered now (box 4 or more, as on the title card) and were not when the flight began.
-    const mastered = [...S.was].filter(([key, box]) => box < 4 && (save.mem[key] || {}).box >= 4).length;
-    $('d-tiles').innerHTML = [[S.firstTry, 'first try'], [S.bestStreak, 'in a row'], [S.fresh, 'new'], [mastered, 'mastered']].map(([n, word]) => '<div><b>' + n + '</b><span>' + word + '</span></div>').join('');
+    // Three numbers, in the player's order (2026-11-13: "new countries, then first try, then in a row, in that order"):
+    // new, the postcards asked for the first time (of any kind, so the word is "new" alone); first try; the most
+    // first tries in a row, as Ranked's third number is. "Mastered" stood here for a day (their wish of 2026-11-12) and
+    // went back to the Study tab alone: mastering takes two first tries about 16 days apart, so in one flight it reads 0.
+    $('d-tiles').innerHTML = [[S.fresh, 'new'], [S.firstTry, 'first try'], [S.bestStreak, 'in a row']].map(([n, word]) => '<div><b>' + n + '</b><span>' + word + '</span></div>').join('');
     $('console').hidden = true;
     $('debrief').hidden = false;
     measure();
@@ -3174,7 +3199,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (on && inRound()) return;
     S.paused = on;
     $('pause-head').textContent = asleep ? 'Fast asleep' : 'Paused';
-    $('restart').hidden = S.game === 'trip' && !!S.trip && !S.trip.endless;      // one Day Trip a day: it cannot be started again
+    // Restart is Ranked's alone. A Day Trip cannot be started again (one a day). Study and Free flight have none (the
+    // player, 2026-11-13: "we should get rid of the restart button on study mode. Also get rid of the restart button on
+    // free flight and just have, for study mode, just have the end game button and the home button and the carry on
+    // button"): a new Study flight starts from the end screen, after End flight.
+    $('restart').hidden = !(S.game === 'trip' && !!S.trip && !!S.trip.endless);
     $('end').hidden = S.game !== 'study';          // a Study flight can be ended here, for its end screen
     // what leaving does: Study keeps what you have learned and a Day Trip waits for you; a Ranked flight ends; Free flight has nothing to keep
     $('pause-note').hidden = S.game === 'free';
@@ -3910,7 +3939,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     S.idle = 0;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if ((k === 'r' || k === 'h') && !e.repeat && (S.paused || S.mode === 'over')) {
-      if (k === 'h') goHome(); else if (S.paused) restart(); else start();
+      if (k === 'h') goHome(); else if (!S.paused) start(); else if (!$('restart').hidden) restart();          // R restarts only where the pause card offers it
       e.preventDefault();
       return;
     }
@@ -3967,11 +3996,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
     save.study.kinds = on ? save.study.kinds.filter((x) => x !== k) : KINDS.filter((x) => x === k || save.study.kinds.includes(x));
     showStudy(); persist(); b.blur();       // so Space still takes off
   });
-  // Where: World, or any mix of regions. Picking a region drops World; dropping the last region is World again.
+  // Where: World, or any mix of regions. Picking a region drops World; dropping the last region is World again, and
+  // so is picking the fifth: every postcard has a region, so all five ask exactly what World asks, and one thing has
+  // one look (the player, 2026-11-13: "when i have every region selected, why doesn't it just switch to world?").
   for (const b of document.querySelectorAll('#where button[data-r]')) b.addEventListener('click', () => {
     const r = b.dataset.r, w = save.study.where.filter((x) => x !== 'World');
     if (r === 'World') save.study.where = ['World'];
-    else { const next = w.includes(r) ? w.filter((x) => x !== r) : REGIONS.filter((x) => x === r || w.includes(x)); save.study.where = next.length ? next : ['World']; }
+    else { const next = w.includes(r) ? w.filter((x) => x !== r) : REGIONS.filter((x) => x === r || w.includes(x)); save.study.where = wholeWorld(next) ? ['World'] : next; }
     showStudy(); persist(); showWhere(r); b.blur();
   });
   // The title globe shows where: it turns to the middle of the regions picked and rests there, and the countries
