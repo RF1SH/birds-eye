@@ -170,8 +170,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .arrows kbd { min-width: 26px; }
 .arrows .up { grid-column: 2; }
 .arrows kbd:not(.up) { grid-row: 2; }
-.star { display: inline-block; width: .62em; height: .62em; margin-right: .2em; vertical-align: .04em; fill: var(--ink); }
-p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em; }
+.star { display: inline-block; width: .92em; height: .92em; margin-right: .24em; vertical-align: -.11em; }
 
 #bottom { grid-row: 2; display: grid; justify-items: center; min-width: 0; }
 /* Study's results: a fun fact about a location from the flight, on a postcard beside the globe */
@@ -406,7 +405,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       <div id="card-title">
         <h1>Bird's <span class="eye">Eye<svg class="logo" viewBox="-27 -27 54 54" aria-hidden="true"><use href="#i-bird" transform="rotate(-18)"/></svg></span></h1>
         <div class="seg" role="tablist" aria-label="Mode">
-          <button type="button" role="tab" data-mode="study" aria-selected="true">Study</button><button type="button" role="tab" data-mode="challenge" aria-selected="false">Challenge</button><button type="button" role="tab" data-mode="free" aria-selected="false">Free flight</button>
+          <button type="button" role="tab" data-mode="challenge" aria-selected="false">Challenge</button><button type="button" role="tab" data-mode="study" aria-selected="true">Study</button><button type="button" role="tab" data-mode="free" aria-selected="false">Free flight</button>
         </div>
         <div id="pane-study">
           <div class="checks" id="kinds" role="group" aria-label="Locations"><button type="button" data-k="c">Countries</button><button type="button" data-k="k">Capitals</button><button type="button" data-k="f">Flags</button><button type="button" data-k="s">Seas</button></div>
@@ -1723,7 +1722,11 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
 
   // ---------- letters ----------
   const ticketsEl = $('tickets');
-  const STAR = '<svg class="star" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.2l2.7 5.8 6.3.8-4.7 4.3 1.3 6.2-5.6-3.1-5.6 3.1 1.3-6.2L1 7.8l6.3-.8z"/></svg>';
+  // A capital's mark wherever a capital is named (a postcard, a row of the day card, Free flight's card): the pin as the
+  // globe draws it (starAt), a star in a paper circle with an ink edge. The player: "a circle around the star like all
+  // the other times a capital is mentioned, and to match the way a capital looks in-game".
+  const PIN_ART = '<circle r="10.5" fill="' + PAPER + '" stroke="' + INK + '" stroke-width="1.8"/><path d="M0.00,-7.00 L1.85,-2.55 L6.66,-2.16 L3.00,0.97 L4.11,5.66 L0.00,3.15 L-4.11,5.66 L-3.00,0.97 L-6.66,-2.16 L-1.85,-2.55 Z" fill="' + INK + '"/>';
+  const STAR = '<svg class="star" viewBox="-11.5 -11.5 23 23" aria-hidden="true">' + PIN_ART + '</svg>';
   // The stamp: perforated edge, the bird on blue. The same on every postcard; country stamps belong to the album.
   const STAMP = '<svg class="stamp" viewBox="0 0 30 36" aria-hidden="true">' +
     '<rect x="1.5" y="1.5" width="27" height="33" fill="' + SEA + '" stroke="' + PAPER + '" stroke-width="3" stroke-dasharray="2 2"/>' +
@@ -1961,8 +1964,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       setTimeout(() => { i++; put(); el.classList.remove('fading'); }, 450);
     }, 45000);
   }
-  const PIN = '<svg viewBox="-13 -13 26 26" aria-hidden="true"><circle r="11.5" fill="' + PAPER + '" stroke="' + INK + '" stroke-width="2.2"/>' +
-    '<path transform="scale(.62) translate(-10 -10.5)" d="M10 1.2l2.7 5.8 6.3.8-4.7 4.3 1.3 6.2-5.6-3.1-5.6 3.1 1.3-6.2L1 7.8l6.3-.8z" fill="' + INK + '"/></svg>';
+  const PIN = '<svg viewBox="-11.5 -11.5 23 23" aria-hidden="true">' + PIN_ART + '</svg>';
   const esc = (t) => String(t).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
   // A population, rounded for reading at a glance: 212 M, 5.6 M, 450 K, 38 K, 458.
   const people = (n) => (n >= 1e7 ? Math.round(n / 1e6) + ' M' : n >= 1e6 ? (Math.round(n / 1e5) / 10) + ' M' : n >= 1e4 ? Math.round(n / 1e3) + ' K' : n >= 1e3 ? (Math.round(n / 100) / 10) + ' K' : String(n));
@@ -2649,11 +2651,11 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     const done = () => { btn.textContent = 'Copied'; };
     if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, () => {}); else done();
   }
-  // A round is picked by pointing at its row (in Ranked, its square) or clicking it: the globe turns to that round's
-  // flight. Nothing plays by itself (the player: "who's actually going to stick around ... for it to go through all 5
-  // rounds automatically"). A row that comes up under a mouse at rest does not count as pointing at it.
+  // A round is picked by clicking its row (in Ranked, its square): the globe turns to that round's flight. Not by
+  // pointing at it (the player: "it should be CLICKING on it. I kept accidentally switching to a different route when
+  // rotating the globe"). Nothing plays by itself ("who's actually going to stick around ... for it to go through all
+  // 5 rounds automatically").
   const pickRound = (e) => { const el = e.target.closest('[data-i]'), i = el ? +el.dataset.i : -1; if (S.mode === 'over' && S.legs && S.legs[i] && S.focus !== i) showLeg(i); };
-  $('daycard').addEventListener('mousemove', (e) => { if (e.movementX || e.movementY) pickRound(e); });
   $('daycard').addEventListener('click', pickRound);
   // one listener for the card's buttons, whichever view of it is showing
   $('daycard').addEventListener('click', (e) => {
@@ -3487,7 +3489,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     for (const d of S.drops) {
       if (!d.city || S.mode === 'title') continue;
       const s = project(d.p);
-      if (s) boxes.push({ x: s[0], y: s[1], half: 10 });
+      if (s) boxes.push({ x: s[0], y: s[1], half: 10 * view.mk });          // the pin is 9.5 across each way, times the scale of the marks
     }
     if (S.mode === 'over' && S.trip && S.legs) {
       const L = S.legs[S.focus], s = L && project(L.land), t = L && L.point && project(L.ans);
@@ -3558,7 +3560,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
         arc(S.route[i], S.route[i + 1], S.routeLost && i === S.route.length - 2 ? BAD : INK, 2.2 * view.ui, [0.1, 6 * view.ui]);
       S.route.forEach((q, i) => {
         const s = project(q);
-        if (!s) return;
+        if (!s || S.drops.some((d) => d.city && dot(d.p, q) > 0.999999)) return;          // a delivered capital's pin is its stop: a dot over it read as another icon (the player: "the poke ball looking icon")
         ctx.beginPath(); ctx.arc(s[0], s[1], 3.2 * view.ui, 0, 7);
         ctx.fillStyle = S.routeLost && i === S.route.length - 1 ? BAD : PAPER; ctx.fill();
         ctx.strokeStyle = INK; ctx.lineWidth = 1.2 * view.ui; ctx.stroke();
@@ -3583,8 +3585,9 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     ctx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
     ctx.setTransform(d, 0, 0, d, 0, 0);
     drawDots();
-    if (S.mode !== 'title') drawDrops();
+    if (S.mode === 'fly') drawDrops();
     if (S.mode !== 'fly' || S.blend < 1) drawAtlas();
+    if (S.mode === 'over') drawDrops();          // on Study's end globe a delivered capital's pin stands over the path's dots and over a name's tie, never under them
     for (const f of fx) if (!f.top) f.draw(Math.min(1, f.t / f.secs));
     if (S.mode === 'fly') drawRoute();
     if (S.mode === 'fly' || S.blend > 0.02) { ctx.globalAlpha = S.mode === 'fly' ? 1 : S.blend; drawBird(); ctx.globalAlpha = 1; }
