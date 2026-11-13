@@ -28,7 +28,7 @@
   --ink-soft: #4d5f73;
   --paper: #fffdf6;
   --paper-shade: #e6e1d3;
-  --yellow: #f3c544;      /* the stopwatch's and the ring's yellow and orange stages, the focus outline, a near miss's square, the beak */
+  --yellow: #f3c544;      /* the stopwatch's and the ring's yellow and orange stages, the focus outline, the beak */
   --orange: #ef8363;
   --c0: #ffd92f;          /* the eight country colours: ready-made map colours (ColorBrewer's Set2, Set3, Set1 and Dark2, Paul Tol's */
   --c1: #fc8d62;          /* bright), the eight easiest to tell apart of those that keep clear of the sea, the sand, the paper, */
@@ -323,7 +323,6 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
 .squares { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 14px; }
 .squares i { width: 22px; height: 22px; border-radius: 3px; background: var(--bad); }
 .squares i.right, .squares i.spot { background: var(--good); }
-.squares i.near { background: var(--yellow); }
 .squares i.none { background: var(--paper-shade); }
 .streak { font: 500 20px/1.1 var(--display); color: var(--ink); }
 .tiles { display: flex; gap: 28px; margin: 6px 0 12px; padding-top: 10px; border-top: var(--b2z) solid var(--ink); }
@@ -2172,9 +2171,15 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     return R.h;
   }
   const flagged = (R) => R.kind === 'flag' || R.kind === 'capflag';
-  const fallKm = (R) => TRIP_K * (1 + 2 * hardOf(R)) * (flagged(R) ? FLAG_X : 1);
+  const areaRound = (R) => R.kind === 'country' || R.kind === 'flag';
+  // The distance over which accuracy falls to about a third: from a country's nearest edge TRIP_K, from a capital or
+  // a city POINT_K (the map shows borders, not cities), up to three times as far for the least known, FLAG_X for a flag.
+  const fallKm = (R) => (areaRound(R) ? TRIP_K : POINT_K) * (1 + 2 * hardOf(R)) * (flagged(R) ? FLAG_X : 1);
+  // The circle round a capital or a city: inside it a landing is correct. It is where accuracy is above LIFT_CAP,
+  // which is more than being in the correct country alone can ever give (153 km for Paris, 279 for Port Vila).
+  const ringKm = (R) => SPOT_KM + fallKm(R) * Math.log(1 / LIFT_CAP);
   const worth = (T, R) => T.endless ? 100 * (1 + hardOf(R)) * (flagged(R) ? FLAG_X : 1) : DAY_ACC;
-  const TRIP_K = 150, CITY_KM = 50, SPOT_KM = 15, COUNT = 3, ENERGY_FLOOR = 2, ENERGY_ROOM = 1, ENERGY_WASTE = 21;
+  const TRIP_K = 150, POINT_K = 600, IN_COUNTRY = 0.25, IN_REGION = 0.1, LIFT_CAP = 0.8, SPOT_KM = 15, COUNT = 3, ENERGY_FLOOR = 2, ENERGY_ROOM = 1, ENERGY_WASTE = 21;
   const ADDRESS = 'https://rf1sh.github.io/birds-eye/';       // where the game lives: the last line of a shared result
   const TRIP_START = [0, 0];                  // every trip and run starts here: the middle of the map, off West Africa
   const INTRO_TURN = 0.9, INTRO_ZOOM = 1.7;   // the 3-2-1: seconds to turn the globe there, then to come down
@@ -2190,8 +2195,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   // day and 8 pm the next broke the streak.)
   const today = () => { const d = new Date(), two = (n) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()); };
   const KINDS_TRIP = { country: 'Country', flag: 'Flag', capital: 'Capital', capflag: 'Capital of', city: 'City' };
-  const TICK = { spot: '✓', right: '✓', near: '', miss: '✗' };
-  const NEAR_KM = 200;          // a miss closer than this still scores well, so it gets no ✗
+  const TICK = { spot: '✓', right: '✓', miss: '✗' };          // two marks: you got it or you did not
   function seeded(str) {
     let h = 2166136261;
     for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
@@ -2204,7 +2208,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   function makeTrip(day) {
     const r = seeded('daytrip:' + day), pick = (list) => list[Math.floor(r() * list.length)];
     const flagOk = PLAY.filter((c) => c.a2 && !c.flagNote), capped = PLAY.filter((c) => c.cap);
-    const capAt = (c) => ({ p: unit(c.cap[1], c.cap[2]), lon: c.cap[1], lat: c.cap[2], km: capKm(c), name: c.cap[0] });
+    const capAt = (c) => ({ p: unit(c.cap[1], c.cap[2]), lon: c.cap[1], lat: c.cap[2], name: c.cap[0] });
     let best = null, gap = Infinity;
     for (let tries = 0; tries < 200 && gap > DAY_BAND; tries++) {
       const used = new Set(), fresh = (list) => { const c = pick(list.filter((x) => !used.has(x.id))); used.add(c.id); return c; };
@@ -2215,7 +2219,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
         { kind: 'flag', c: c2, p: c2.u, lon: c2.lx, lat: c2.ly, name: c2.name },
         Object.assign({ kind: 'capital', c: c3 }, capAt(c3)),
         Object.assign({ kind: 'capflag', c: c4 }, capAt(c4)),
-        { kind: 'city', c: city.c, city, p: unit(city.lon, city.lat), lon: city.lon, lat: city.lat, km: CITY_KM, name: city.name } ];
+        { kind: 'city', c: city.c, city, p: unit(city.lon, city.lat), lon: city.lon, lat: city.lat, name: city.name } ];
       const off = Math.abs(rounds.reduce((a, R) => a + hardOf(R), 0) / 5 - DAY_H);
       if (off < gap) { gap = off; best = rounds; }
     }
@@ -2381,16 +2385,27 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     T.ready = false;
     if (tripMore(T)) tripCount(T.i + 1); else tripEnd();
   }
+  // What a landing gets. Correct or not, two states (the player, 2026-11-12: "the X versus the check, that's just if
+  // you get it or not"): a country or a flag, inside the country; a capital or a city, inside its circle, wherever the
+  // border runs. And its accuracy, as a share of the round's accuracy points, modeled on MapTap's scoring (the player's
+  // pick): a country, all of it inside, then falling with the distance to its nearest edge; a capital or a city, all of
+  // it on the SPOT_KM dot, then falling with the distance. A landing in the correct country never gets under a
+  // quarter, one in another country of the same region never under a tenth, and neither lift goes past LIFT_CAP.
+  function judge(R, lon, lat) {
+    const inC = reaches(R.c.where, lon, lat), at = regionAt(lon, lat);
+    const same = !inC && !!at.c && at.c !== R.c && (at.c.rg || []).some((r) => (R.c.rg || []).includes(r));
+    const lift = (raw) => { const floor = inC ? IN_COUNTRY : same ? IN_REGION : 0; return floor ? Math.max(raw, Math.min(floor + (1 - floor) * raw, LIFT_CAP)) : raw; };
+    if (areaRound(R)) { const d = inC ? 0 : kmToCountry(R.c, lon, lat); return { right: inC, d, share: inC ? 1 : lift(Math.exp(-Math.max(0, d - 1) / fallKm(R))) }; }
+    const d = kmBetween(lon, lat, R.lon, R.lat);
+    return { right: d <= ringKm(R), d, share: lift(Math.exp(-Math.max(0, d - SPOT_KM) / fallKm(R))) };
+  }
   function tripLand(here, lon, lat) {
     const T = S.trip;
     if (!T || T.wait) { (here.sea ? sfx.splash : sfx.thud)(); return; }      // between rounds: nothing counts
     const R = T.rounds[T.i], p = unit(lon, lat), countryRound = R.kind === 'country' || R.kind === 'flag';
-    const right = countryRound ? reaches(R.c.where, lon, lat) : R.kind === 'city' ? kmBetween(lon, lat, R.lon, R.lat) <= CITY_KM : reaches({ kind: 'k', c: R.c }, lon, lat);
-    const d = countryRound ? (right ? 0 : kmToCountry(R.c, lon, lat)) : kmBetween(lon, lat, R.lon, R.lat);
-    const tier = !right ? (d < NEAR_KM ? 'near' : 'miss') : !countryRound && d <= SPOT_KM ? 'spot' : 'right';
-    // Accuracy: all of it on the spot (a country: inside it; a city or capital: SPOT_KM, where the bird still stands on
-    // the city's dot), then falling with every km from there
-    const closeness = Math.round(worth(T, R) * Math.exp(-Math.max(0, d - (countryRound ? 1 : SPOT_KM)) / fallKm(R)));
+    const { right, d, share } = judge(R, lon, lat);
+    const tier = !right ? 'miss' : !countryRound && d <= SPOT_KM ? 'spot' : 'right';
+    const closeness = Math.round(worth(T, R) * share);
     const took = S.t - T.t0;
     const speed = right ? Math.round(20 * clamp(1 - Math.max(0, took - T.fair) / T.fair, 0, 1)) : 0;
     // energy use, when right: every point for the cheapest flight for the leg (cheapFor; for a country to its nearest
@@ -2400,7 +2415,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     const pts = closeness + speed + energy;
     T.score += pts;
     T.results.push({ kind: R.kind, name: R.name, country: R.c.name, a2: R.c.a2, pop: R.city ? R.city.pop : 0, right, tier, d: Math.round(d * 10) / 10, closeness, speed, energy, used: Math.round(used * 100) / 100, secs: Math.round(took * 10) / 10, pts, p: R.p });
-    Object.assign(T, { wait: true, ready: false, reveal: { from: p, to: R.p, km: R.km, right, area: countryRound } });
+    Object.assign(T, { wait: true, ready: false, reveal: { from: p, to: R.p, km: countryRound ? 0 : ringKm(R), right, area: countryRound } });
     T.results[T.results.length - 1].at = here.name || 'Open ocean';
     Object.assign(T.results[T.results.length - 1], { path: (T.trk || []).concat([[lon, lat, 0]]), from: T.from.slice(), goal: T.goal.slice(), land: [lon, lat] }); T.trk = null;
     // Ranked: a correct landing gives back what the flight cost, up to the cheapest flight and its room for error, and a
@@ -2414,9 +2429,9 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     $('trip-clock').hidden = true;
     // The answer, named where it is, the way Study names a delivery. A wrong landing is named in red too, unless it
     // is in the answer's own country: the answer's name already carries that country and its flag.
-    const col = right ? GOOD : tier === 'near' ? INK : BAD;        // the verdict is worn by the landing: its ring and its name
+    const col = right ? GOOD : BAD;        // the verdict is worn by the landing: its ring and its name
     if (countryRound) { if (right) flash(R.c, 1, FLASH); else flash(R.c, 0, 4, null, 0.5); }      // the answer: lit as a delivery is, or held paper-white while you find it
-    if (!right && here.name && (here.sea || here.c !== R.c)) label(here.sea ? null : here.c, here.name, p, tier === 'near' ? (here.sea ? 'sea' : 'name') : here.sea ? 'wrongsea' : 'wrong', GROUND, null, UNDER);
+    if (!right && here.name && (here.sea || here.c !== R.c)) label(here.sea ? null : here.c, here.name, p, here.sea ? 'wrongsea' : 'wrong', GROUND, null, UNDER);
     const sub = R.kind === 'city' ? R.c.name + ', population ~' + people(R.city.pop) : countryRound ? null : R.c.name;
     label(R.c, R.name, R.p, 'name', GROUND, sub, countryRound ? AREA : OVER);
     ring(p, 6, 30, col, 2.5, 0.5);
@@ -2426,8 +2441,9 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     const where = countryRound && right ? 'In ' + R.name : tier === 'spot' ? 'On ' + R.name : exactKm(d) + ' from ' + R.name;
     if (tier === 'spot') spotOn();
     const most = roundMax(T, T.i, R.kind);
-    node.innerHTML = '<div class="where"><span class="tick ' + tier + '">' + TICK[tier] + '</span> ' + esc(where) + '</div><div class="plus ' + (right ? 'right' : tier === 'near' ? '' : 'wrong') + '">' + pts + '<small>/' + most + '</small></div>' +
-      '<div class="parts"><span>Accuracy <b>' + closeness + '</b>/' + (most - 40) + '</span><span>Speed <b>' + speed + '</b>/20</span><span>Energy use <b>' + energy + '</b>/20</span></div>' +
+    node.innerHTML = '<div class="where"><span class="tick ' + tier + '">' + TICK[tier] + '</span> ' + esc(where) + '</div><div class="plus ' + (right ? 'right' : 'wrong') + '">' + pts + '<small>/' + most + '</small></div>' +
+      '<div class="parts"><span>Accuracy <b>' + closeness + '</b>/' + (most - 40) + '</span>' +
+      (right ? '<span>Speed <b>' + speed + '</b>/20</span><span>Energy use <b>' + energy + '</b>/20</span>' : '') + '</div>' +      // only in play for a correct landing: a wrong one lists neither (0/20 read as slow and wasteful)
       '<button class="go next" type="button">Next location</button>';
     node.querySelector('.next').addEventListener('click', () => { tripNext(); stage.focus({ preventScroll: true }); });
     ticketsEl.replaceChildren(node);
@@ -2437,10 +2453,11 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   }
   // The line from where you came down to the answer, and the circle that counted. A country has neither: anywhere in it
   // counts, so a line to one spot of it would be untrue (and the distance scored is to its nearest edge). It is lit
-  // and named, and while it is out of sight the edge arrow points to it.
+  // and named. Out of sight, nothing points to it: the round is over (the player, 2026-11-12, of the edge arrow that
+  // stood here: "im not going to that anymore. i already got it wrong").
   function drawReveal() {
     const v = S.trip.reveal, col = PAPER, edge = INK;
-    if (v.area) { if (!onScreen(project(v.to), 34 * view.mk)) edgeArrow(unit(bird.lon, bird.lat), v.to); return; }
+    if (v.area) return;
     if (v.km) reach(v.to, v.km, 1, col);
     arc(v.from, v.to, PAPER, 4 * view.mk); arc(v.from, v.to, INK, 2 * view.mk, [6 * view.mk, 6 * view.mk]);
     const s = project(v.to);
@@ -2461,14 +2478,14 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
         const x = rnd(CITIES.slice(0, 60 + 25 * n)), key = 'y:' + x.name + x.c.id;
         if (T.used.has(key) || (last && last.c === x.c)) continue;
         T.used.add(key);
-        return { kind, c: x.c, city: x, p: unit(x.lon, x.lat), lon: x.lon, lat: x.lat, km: CITY_KM, name: x.name };
+        return { kind, c: x.c, city: x, p: unit(x.lon, x.lat), lon: x.lon, lat: x.lat, name: x.name };
       }
       const ok = { country: () => true, flag: (c) => c.a2 && !c.flagNote, capital: (c) => c.cap, capflag: (c) => c.cap && c.a2 && !c.flagNote }[kind];
       const c = rnd(PLAY.slice(0, reach).filter(ok)), key = kind + ':' + c.id;
       if (T.used.has(key) || (last && last.c === c)) continue;
       T.used.add(key);
       if (kind === 'country' || kind === 'flag') return { kind, c, p: c.u, lon: c.lx, lat: c.ly, name: c.name };
-      return { kind, c, p: unit(c.cap[1], c.cap[2]), lon: c.cap[1], lat: c.cap[2], km: capKm(c), name: c.cap[0] };
+      return { kind, c, p: unit(c.cap[1], c.cap[2]), lon: c.cap[1], lat: c.cap[2], name: c.cap[0] };
     }
     const c = rnd(PLAY);
     return { kind: 'country', c, p: c.u, lon: c.lx, lat: c.ly, name: c.name };
@@ -2504,8 +2521,8 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   function statsRow(T, i) {
     const R = T.rounds[i], r = T.results[i];
     return '<tr' + (r.path ? ' data-i="' + i + '"' : '') + '><td class="n">' + (i + 1) + '</td>' + givenCell(R, true) + youCell(r) +
-      '<td class="num">' + out(r.closeness, roundMax(T, i, R.kind) - 40) + '</td><td class="num">' + out(r.speed, 20) + '</td><td class="num">' + r.secs.toFixed(1) + ' s</td>' +
-      '<td class="num">' + out(r.energy || 0, 20) + '</td><td class="pts">' + out(r.pts, roundMax(T, i, R.kind)) + '</td></tr>';
+      '<td class="num">' + out(r.closeness, roundMax(T, i, R.kind) - 40) + '</td><td class="num">' + (r.right ? out(r.speed, 20) : '') + '</td><td class="num">' + r.secs.toFixed(1) + ' s</td>' +
+      '<td class="num">' + (r.right ? out(r.energy || 0, 20) : '') + '</td><td class="pts">' + out(r.pts, roundMax(T, i, R.kind)) + '</td></tr>';
   }
   function rankedStats(T) {
     const rows = T.results.map((r, i) => statsRow(T, i)).join('');
@@ -2514,7 +2531,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       '<div class="scroll"><table class="stats">' + STATS_HEAD + rows + '</table></div>' +
       '<div class="row"><button class="go" id="trip-back" type="button">Back</button><button class="alt" id="trip-again" type="button">Play again</button></div>';
   }
-  const squaresHtml = (results) => results.map((r, i) => '<i class="' + (!r ? 'none' : r.right ? 'right' : r.tier) + '"' + (r ? ' title="' + esc(r.name) + '"' : '') + (r && r.path ? ' data-i="' + i + '"' : '') + '></i>').join('');
+  const squaresHtml = (results) => results.map((r, i) => '<i class="' + (!r ? 'none' : r.right ? 'right' : 'miss') + '"' + (r ? ' title="' + esc(r.name) + '"' : '') + (r && r.path ? ' data-i="' + i + '"' : '') + '></i>').join('');
   // Today's trip is saved as it goes, so one left part-way (Home between rounds, a closed window) is carried on from the
   // next round: the rounds flown, where the bird stands, the energy left, and the round whose clue is showing, if one is.
   function tripSave() {
@@ -2654,8 +2671,8 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   function youCell(r) {
     if (!r) return '<td class="you miss">Not reached</td>';
     const km = r.d || r.tier === 'spot' ? ' <small>' + exactKm(r.d) + '</small>' : '';
-    const what = r.right || !r.at ? '<span class="tick ' + r.tier + '">' + (r.right ? '\u2713' : TICK[r.tier]) + '</span>' : esc(r.at);      // a correct landing: a check mark, not the answer's name again
-    return '<td class="you ' + (r.right ? 'right' : r.tier === 'near' ? 'near' : 'miss') + '">' + what + km + '</td>';
+    const what = r.right || !r.at ? '<span class="tick ' + (r.right ? 'right' : 'miss') + '">' + (r.right ? '\u2713' : '\u2717') + '</span>' : esc(r.at);      // a correct landing: a check mark, not the answer's name again
+    return '<td class="you ' + (r.right ? 'right' : 'miss') + '">' + what + km + '</td>';
   }
   const TRIP_HEAD = '<tr class="head"><td></td><td>Given</td><td>You</td><td class="pts">Points</td></tr>';
   function tripRow(T, i) {
@@ -2663,10 +2680,10 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     return '<tr' + (r && r.path ? ' data-i="' + i + '"' : '') + '><td class="n">' + (i + 1) + '</td>' + givenCell(R, true) + youCell(r) +
       '<td class="pts">' + out(r ? r.pts : 0, roundMax(T, i, R.kind)) + '</td></tr>';
   }
-  // green right, yellow near, red missed (or not reached), a row of `per`
+  // green correct, red wrong (or not reached), a row of `per`
   function shareSquares(results, per) {
     let out = '';
-    results.forEach((r, i) => { out += (i && i % per === 0 ? '\n' : '') + (r && r.right ? '\u{1F7E9}' : r && r.tier === 'near' ? '\u{1F7E8}' : '\u{1F7E5}'); });
+    results.forEach((r, i) => { out += (i && i % per === 0 ? '\n' : '') + (r && r.right ? '\u{1F7E9}' : '\u{1F7E5}'); });
     return out;
   }
 
@@ -3425,7 +3442,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       c.stroke(); i = j;
     }
     const s = project(L.land);
-    if (s) { c.beginPath(); c.arc(s[0], s[1], 5.5 * u, 0, 7); c.fillStyle = L.right ? GOOD : L.tier === 'near' ? INK : BAD; c.fill(); c.strokeStyle = PAPER; c.lineWidth = 2 * u; c.stroke(); }
+    if (s) { c.beginPath(); c.arc(s[0], s[1], 5.5 * u, 0, 7); c.fillStyle = L.right ? GOOD : BAD; c.fill(); c.strokeStyle = PAPER; c.lineWidth = 2 * u; c.stroke(); }
   }
   let sheet = null;          // the faint rounds are drawn whole on a sheet of their own and laid on faintly, so that pieces which overlap do not darken
   function drawLegs() {
@@ -3763,7 +3780,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   // Ground speed in km a second at a height, flying flat out.
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   const setBird = (lon, lat, a, down) => Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down });
-  window.birdsEye = { names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), parFor, capKm, cheapFor, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds,
+  window.birdsEye = { names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), parFor, capKm, cheapFor, judge, ringKm, hardOf, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds,
     project: projectLL, unproject, speedAt, placed, seen: () => seen, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
