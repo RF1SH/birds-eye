@@ -2480,14 +2480,21 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
         T.used.add(key);
         return { kind, c: x.c, city: x, p: unit(x.lon, x.lat), lon: x.lon, lat: x.lat, name: x.name };
       }
+      // A country comes once in a run, whichever way it is asked (its name, its flag, its capital, the capital of its
+      // flag), until every country has been asked (the player, 2026-11-12, of New Zealand and then its flag three
+      // locations later: "This is competitive. It should be definitely not the same place ... until like you've maybe
+      // exhausted all of them"). Until then only the same clue was kept from coming twice.
+      if (PLAY.every((c) => T.used.has(c.id))) for (const c of PLAY) T.used.delete(c.id);
       const ok = { country: () => true, flag: (c) => c.a2 && !c.flagNote, capital: (c) => c.cap, capflag: (c) => c.cap && c.a2 && !c.flagNote }[kind];
-      const c = rnd(PLAY.slice(0, reach).filter(ok)), key = kind + ':' + c.id;
-      if (T.used.has(key) || (last && last.c === c)) continue;
-      T.used.add(key);
+      const fresh = (list) => list.filter((c) => ok(c) && !T.used.has(c.id) && !(last && last.c === c));
+      const near = fresh(PLAY.slice(0, reach)), c = rnd(near.length ? near : fresh(PLAY));          // the slice is used up: any country not asked yet
+      if (!c) continue;
+      T.used.add(c.id);
       if (kind === 'country' || kind === 'flag') return { kind, c, p: c.u, lon: c.lx, lat: c.ly, name: c.name };
       return { kind, c, p: unit(c.cap[1], c.cap[2]), lon: c.cap[1], lat: c.cap[2], name: c.cap[0] };
     }
-    const c = rnd(PLAY);
+    const left = PLAY.filter((c) => !T.used.has(c.id)), c = rnd(left.length ? left : PLAY);
+    T.used.add(c.id);
     return { kind: 'country', c, p: c.u, lon: c.lx, lat: c.ly, name: c.name };
   }
   // The run's card, the way a game's stats screen does it (Wordle's big numbers): the points, three
@@ -3780,7 +3787,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   // Ground speed in km a second at a height, flying flat out.
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   const setBird = (lon, lat, a, down) => Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down });
-  window.birdsEye = { names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), parFor, capKm, cheapFor, judge, ringKm, hardOf, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds,
+  window.birdsEye = { names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), parFor, capKm, cheapFor, judge, ringKm, hardOf, endlessRound, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds,
     project: projectLL, unproject, speedAt, placed, seen: () => seen, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
