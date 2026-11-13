@@ -504,7 +504,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
         <h2 id="pause-head">Paused</h2>
         <div class="row"><button class="go" id="resume" type="button">Carry on</button><button class="alt" id="end" type="button" hidden>End flight <kbd>E</kbd></button></div>
         <div class="row" style="margin-top: 12px"><button class="alt" id="restart" type="button">Restart <kbd>R</kbd></button><button class="alt" id="home" type="button">Home <kbd>H</kbd></button></div>
-        <p class="aside" id="pause-note" style="margin: 10px 0 0">Progress is saved.</p>
       </div>
       <button id="sound" type="button" aria-label="Sound on (M)" title="Sound (M)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path class="wave" d="M15.5 9a4.2 4.2 0 0 1 0 6"/><path class="wave" d="M18 6.5a7.7 7.7 0 0 1 0 11"/><path class="cross" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
     </div>
@@ -1357,6 +1356,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (Number.isFinite(got.best)) save.best = got.best;
     if (typeof got.sound === 'boolean') save.sound = got.sound;
     if (Number.isFinite(got.endless)) save.endless = got.endless;
+    const rk = got.ranked;
+    if (rk && Number.isFinite(rk.score) && Number.isFinite(rk.energy) && Array.isArray(rk.rounds) && Array.isArray(rk.results) && Array.isArray(rk.at) && Array.isArray(rk.used)) save.ranked = rk;
     if (got.skill && got.skill.k && got.skill.r) save.skill = got.skill;
     if (got.trips && typeof got.trips === 'object') for (const k in got.trips) { const v = got.trips[k]; if (/^\d{4}-\d\d-\d\d$/.test(k) && v && Number.isFinite(v.score) && Array.isArray(v.rounds)) save.trips[k] = v; }
     const fl = got.flight;
@@ -2057,7 +2058,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // 2026-11-13: "in all game modes, like study mode too, I think that the bird should never start in the air. It
     // should start grounded. And it should start zoomed out and then zoom in on where you are"). A new Study flight
     // and Free flight start where the title globe was looking. Until then they began at the top, as the original did.
-    Object.assign(bird, { lon: atlas.lon, lat: clamp(atlas.lat, -60, 75), a: 0, va: 0, vx: 0, vy: 0, down: true });
+    const [lon0, lat0] = S.game === 'trip' ? [atlas.lon, atlas.lat] : offCoast(atlas.lon, clamp(atlas.lat, -60, 75));          // a trip sets its own start (tripStart)
+    Object.assign(bird, { lon: lon0, lat: lat0, a: 0, va: 0, vx: 0, vy: 0, down: true });
     bird.at = regionAt(bird.lon, bird.lat).key;
     keys.flap = false;
     hover = null;
@@ -2083,6 +2085,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
   // Study and Free flight: the view comes down on the bird as a trip's does (INTRO_ZOOM). A new flight's bird stands
   // where the globe is looking, so nothing turns first; a flight carried on turns to where its bird stood (INTRO_TURN).
+  // No flight starts with water alone on the screen: where the globe is looking at open water with the nearest land
+  // more than START_SEES km off, the bird starts START_OFF km short of that land, on the line to it (so no other land
+  // is nearer). On land, or with a coast in view, it starts where the globe is looking. A trip's start is one spot.
+  const START_SEES = 350, START_OFF = 260;
+  function offCoast(lon, lat) {
+    let best = Infinity, at = null;
+    for (const c of LAND) for (const r of c.fine) for (let i = 0; i < r.length; i += 2) { const d = kmBetween(lon, lat, r[i] / 100, r[i + 1] / 100); if (d < best) { best = d; at = [r[i] / 100, r[i + 1] / 100]; } }
+    if (!at || best <= START_SEES || !regionAt(lon, lat).sea) return [lon, lat];
+    const [x, y] = lonLat(slerp(unit(lon, lat), unit(at[0], at[1]), (best - START_OFF) / best));
+    return [x, clamp(y, -60, 75)];
+  }
   function startView() {
     const to = unit(bird.lon, bird.lat);
     let from = unit(atlas.lon, atlas.lat);
@@ -2134,15 +2147,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
       $('count').textContent = S.n;
     } catch (e) { delete save.flight; persist(); }          // a kept flight that cannot be read: a new one
   }
-  // Ending a Study flight by choice, from the pause card: the end screen, and the postcard aboard is not a missed one
+  // Ending a flight by choice, from the pause card. Study: the end screen, and the postcard aboard is not a missed one
   // (the player: "should be able to end study session from pause screen, which would then take you to the end screen
-  // and WOULDN'T have a red missed on at the end").
+  // and WOULDN'T have a red missed on at the end"). Ranked, since Home keeps a flight there too: its score card.
   function endFlight() {
-    if (S.mode !== 'fly' || S.game !== 'study') return;
+    const ranked = S.game === 'trip' && !!S.trip && !!S.trip.endless;
+    if (S.mode !== 'fly' || (S.game !== 'study' && !ranked)) return;
     S.paused = false;
     $('card').hidden = true; $('card-pause').hidden = true; $('card-title').hidden = false;
     clearTimeout(pauseFactTimer); hideSleepFact();
-    land(true);
+    if (ranked) tripEnd(); else land(true);
   }
   function touchDown() {
     const lon = bird.lon, lat = bird.lat, was = bird.at, p = unit(lon, lat);
@@ -2480,8 +2494,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const worth = (T, R) => T.endless ? 100 * (1 + hardOf(R)) * (flagged(R) ? FLAG_X : 1) : DAY_ACC;
   const TRIP_K = 150, POINT_K = 600, IN_COUNTRY = 0.25, IN_REGION = 0.1, LIFT_CAP = 0.8, SPOT_KM = 15, COUNT = 3, ENERGY_FLOOR = 2, ENERGY_ROOM = 1, ENERGY_WASTE = 21;
   const ADDRESS = 'https://rf1sh.github.io/birds-eye/';       // where the game lives: the last line of a shared result
-  const TRIP_START = [0, 0];                  // every trip and run starts here: the middle of the map, off West Africa
-  const INTRO_TURN = 0.9, INTRO_ZOOM = 1.7;   // the 3-2-1: seconds to turn the globe there, then to come down
+  // Every trip and run starts here (the player, 2026-11-11: "start at the same place every time, so people arent
+  // confused"): in the Gulf of Guinea, 260 km off Ghana, so the coast of West Africa is on the screen when the view
+  // is down (the player, 2026-11-13: "right now, when you start, it's actually just all blue ... move the bird like
+  // still in the ocean, but near a coast. So then they at least like know potentially where they are"). Until then
+  // 0, 0: the nearest land 574 km off, and the view down shows 526 km above the bird.
+  const TRIP_START = [0, 3];
+  // The start of every flight: seconds to turn the globe there, to rest on the whole globe with the bird on it, then
+  // to come down (the player, 2026-11-13: "you should hold it in the higher up view for a second before zooming in,
+  // so the user can get a sense of where they are").
+  const INTRO_TURN = 0.9, INTRO_HOLD = 1, INTRO_ZOOM = 1.7;
   const exactKm = (km) => Math.max(1, Math.round(km)).toLocaleString('en') + ' km';     // competitive: every km shows. Whole km: a pixel on the ground is 1 to 1.6 km
   // The day is the player's own calendar day, as Wordle's is: everyone gets the same five for the same date, each from
   // their own midnight. (Until 2026-11-12 it was London's: the trip changed at 7 pm in New York, and a trip at 6 pm one
@@ -2604,9 +2626,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // counted in from the tutorial's start and scored as any round is. Its card has two buttons: the real game, and Keep practicing, which asks
   // more locations one after another under the label Practice. A wrong landing there has one sentence beside its card.
   // The words are the player's or the How to play card's own ("I don't want to over explain things").
-  const TUTOR_START = [88, -22];          // open water west of Australia: flying up brings it into view
+  const TUTOR_START = [110, -11];         // in the water 300 km south of Java, its coast on the screen: flying up brings Australia into view (until 2026-11-13 open water west of Australia, 2,400 km from any land)
   const LESSON_TANK = 28;                 // four seconds of flying up, about a Day Trip round's ring
-  const TUTOR_LEAD = 0.6;                 // seconds the view takes to rise from where the bird stands before the globe turns to a start (the tutorial's round, and the real game after it)
+  const TUTOR_LEAD = 0.6;                 // seconds the view takes to rise from where the bird stands before the globe turns to a start (the tutorial's round)
   const SAY = {
     space: 'Hold <kbd class="space">Space</kbd> to fly up.',
     arrows: 'Use <span class="arrows"><kbd class="up">&uarr;</kbd><kbd>&larr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd></span> to navigate.',
@@ -2629,7 +2651,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const lessonFlies = (T) => !!T.lesson && T.lesson !== 'rule' && !T.intro;
   function lessonTick(dt) {
     const T = S.trip;
-    if (T.intro) { if (T.intro.t >= INTRO_TURN + INTRO_ZOOM) T.intro = null; return; }          // the view comes down to the bird first
+    if (T.intro) { if (T.intro.t >= INTRO_TURN + INTRO_HOLD + INTRO_ZOOM) T.intro = null; return; }          // the view comes down to the bird first
     if (bird.down) return;
     if (T.lesson === 'space' && bird.a >= 0.3) lesson('arrows');          // held, not tapped: the map has begun to widen
     else if (T.lesson === 'arrows') {
@@ -2659,7 +2681,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     T.at = T.start; T.intro = { from, t: -TUTOR_LEAD };
     Object.assign(bird, { lon: T.at[0], lat: T.at[1], a: 0, va: 0, vx: 0, vy: 0, down: true, at: regionAt(T.at[0], T.at[1]).key });
     tripCount(0);
-    T.count += TUTOR_LEAD;
+    T.count += TUTOR_LEAD + INTRO_HOLD;
   }
   // Keep practicing: the kinds a Day Trip asks, in a day's order, each from the ten best known of its kind not asked
   // yet (a country comes once, however it is asked, as in Ranked). The tutorial's own location is Australia.
@@ -2685,17 +2707,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     T.used.add(R.c.id);
     return R;
   }
-  // The card's first button is the Challenge tab's own: today's trip as its button reads there, and Ranked's once
-  // today's trip is flown (the tutorial can be flown again from How to play on any day).
-  const tutorNext = () => (tripDone() ? 'Play ranked' : save.trips[today()] ? "Carry on today's trip" : "Start today's trip");
-  function tutorOut() {
-    const at = [bird.lon, bird.lat];
-    abandon();
-    [atlas.lon, atlas.lat] = at; atlas.to = null; atlas.zoom = 1;
-    runKind = tripDone() ? 'endless' : 'day';
-    takeOff();
-    S.trip.intro.t = -TUTOR_LEAD; S.trip.count += TUTOR_LEAD;          // the view rises from where the bird stood, then the globe turns to the start as it always does
-  }
+  // The card's first button goes Home, where the three tabs are (the player, 2026-11-13: "after the tutorial ... it
+  // shouldn't automatically go to the daily challenge or the ranked mode. I think the user should just be taken home so
+  // then they can choose whether they want to do challenge mode, study mode, or free flight. Because what if they want
+  // to do study mode after?"). Until then it started today's trip, or Ranked once the trip was flown.
   function tutorMore() {
     const T = S.trip;
     if (!T || !T.tutor || !T.ready) return;
@@ -2734,8 +2749,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function tripStart(kind) {
     const T = S.trip = kind === 'endless' ? { endless: true, start: TRIP_START, rounds: [], used: new Set() } : kind === 'tutor' ? { tutor: true, start: TUTOR_START, rounds: [], used: new Set() } : makeTrip(today());
     T.results = []; T.i = -1; T.score = 0; T.at = T.start;
-    if (T.endless) S.cap = S.energy = ENDLESS_TANK;
-    else if (!T.tutor) {
+    if (T.endless) {
+      S.cap = S.energy = ENDLESS_TANK;
+      // a flight kept is carried on: its locations and points, the energy left, and the bird where it stood
+      rankedSettle();
+      const was = save.ranked;
+      if (was) {
+        T.rounds = was.rounds.map(rankedRound);
+        T.results = was.results.map((r, i) => Object.assign({ p: T.rounds[i].p }, r));
+        T.score = was.score; T.used = new Set(was.used); T.at = was.at;
+        S.energy = clamp(was.energy, 0, ENDLESS_TANK);
+      }
+    } else if (!T.tutor) {
       // a trip begun earlier today is carried on: its rounds and points, and the bird where it stood
       tripSettle();
       const was = save.trips[today()];
@@ -2754,7 +2779,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     atlasNames = [];
     $('count').textContent = T.score;
     if (!T.endless && !T.tutor && !save.trips[today()]) { save.trips[today()] = { score: 0, rounds: [] }; persist(); }      // started: today's trip is used
-    if (T.tutor) lesson('space'); else tripCount(T.results.length);
+    if (T.tutor) lesson('space'); else { tripCount(T.results.length); T.count += INTRO_HOLD; }          // the count waits for the rest on the whole globe: the 3 stands a second longer
   }
   // 3, 2, 1 on the postcard, then the place
   function tripCount(i) {
@@ -2792,7 +2817,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     node.appendChild(addr);
     ticketsEl.replaceChildren(node);
     $('trip-clock').hidden = false;
-    if (!T.endless) tripSave();          // the clue has been seen: this round is open
+    if (T.endless) rankedKeep(); else tripSave();          // the clue has been seen: this round is open
     sfx.call();
     tutorBar();
     measure();
@@ -2808,7 +2833,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (T.lesson) { lessonTick(dt); return; }
     if (T.count) {
       const left = Math.ceil(T.count - S.t), el = $('trip-count');
-      if (el && el.textContent !== String(left)) el.textContent = Math.max(1, left);
+      if (el && el.textContent !== String(clamp(left, 1, COUNT))) el.textContent = clamp(left, 1, COUNT);          // a count that waits for the view shows its 3 for longer
       if (S.t >= T.count) tripShow(T.next);
     } else if (!T.wait) {
       showClock(S.t - T.t0);
@@ -2829,7 +2854,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const T = S.trip;
     if (!T || !T.ready) return;
     T.ready = false;
-    if (T.tutor) { tutorOut(); return; }          // Space and Enter press the card's first button, as on every card
+    if (T.tutor) { goHome(); return; }          // Space and Enter press the card's first button, as on every card
     if (tripMore(T)) tripCount(T.i + 1); else tripEnd();
   }
   // What a landing gets. Correct or not, two states (the player, 2026-11-12: "the X versus the check, that's just if
@@ -2871,7 +2896,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // no error, then a round of ranked should theoretically be endless.. it's the error that drains the energy").
     // Until then every correct landing gave back three quarters of par, so a perfect flyer ran down too.
     if (T.endless && right) S.energy = Math.min(S.cap, S.energy + Math.min(used, cheap + ENERGY_ROOM));
-    if (!T.endless) tripSave();
+    if (T.endless) rankedKeep(); else tripSave();
     $('count').textContent = T.score;
     $('trip-clock').hidden = true;
     // The answer, named where it is, the way Study names a delivery. A wrong landing is named in red too, unless it
@@ -2891,7 +2916,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     node.innerHTML = '<div class="where"><span class="tick ' + tier + '">' + TICK[tier] + '</span> ' + esc(where) + '</div><div class="plus ' + (right ? 'right' : 'wrong') + '">' + pts + '<small>/' + most + '</small></div>' +
       '<div class="parts"><span>Accuracy <b>' + closeness + '</b>/' + (most - 40) + '</span>' +
       '<span>Speed ' + (right ? '<b>' + speed + '</b>' : NOT_EARNED) + '/20</span><span>Energy use ' + (right ? '<b>' + energy + '</b>' : NOT_EARNED) + '/20</span></div>' +      // always listed, so the card adds up to its total; a wrong landing shows its X where a number was not earned (the player's idea, 2026-11-13: "X out of 20"; 0/20 had read as slow and wasteful, and leaving them off as 74/160 beside 74/200)
-      (T.tutor ? '<div class="two"><button class="go next" type="button">' + tutorNext() + '</button><button class="alt next" type="button">Keep practicing</button></div>' : '<button class="go next" type="button">Next location</button>');
+      (T.tutor ? '<div class="two"><button class="go next" type="button">Home</button><button class="alt next" type="button">Keep practicing</button></div>' : '<button class="go next" type="button">Next location</button>');
     node.querySelector('.next').addEventListener('click', () => { tripNext(); stage.focus({ preventScroll: true }); });
     if (T.tutor) node.querySelector('.alt').addEventListener('click', () => { tutorMore(); stage.focus({ preventScroll: true }); });
     ticketsEl.replaceChildren(node);
@@ -2953,6 +2978,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const T = S.trip;
     T.best = T.score > save.endless;
     if (T.best) save.endless = T.score;
+    delete save.ranked;          // the flight is over: nothing to carry on
     persist();
     rankedOverview(T);
   }
@@ -2999,6 +3025,54 @@ button { font: inherit; color: inherit; cursor: pointer; }
     for (const d in save.trips) if (d !== T.day) for (const r of save.trips[d].rounds) { delete r.path; delete r.from; delete r.goal; delete r.land; }      // only today's card can be opened again
     persist();
   }
+  // A Ranked flight is kept as a Study flight is (the player, 2026-11-13: "That should also be true of like the ranked
+  // and day trip runs. They should also be able to go home and resume later, right?"): left for Home between
+  // locations, or with the window closed, it is carried on from the Challenge tab, whose button then reads "Carry on".
+  // Kept from its first landing until it ends: out of energy, End flight on the pause card, or Restart. Written when
+  // a clue appears (open), after every landing, on Home and when the page goes. (Until then Home ended a Ranked
+  // flight and its points counted: an option of the builder's that the player had picked on 2026-11-12.)
+  const RANKED_PATHS = 40000;          // points of flown paths kept in all (about 0.7 MB), the newest rounds first: an older round keeps its result and loses its line on the end globe
+  const rankedRound = ([kind, id, city]) => {
+    const c = byId.get(id), x = c && kind === 'city' ? CITIES.find((y) => y.c === c && y.name === city) : null;
+    if (!c || !c.play) return null;
+    if (kind === 'city') return x ? { kind, c, city: x, p: unit(x.lon, x.lat), lon: x.lon, lat: x.lat, name: x.name } : null;
+    if (kind === 'country' || kind === 'flag') return { kind, c, p: c.u, lon: c.lx, lat: c.ly, name: c.name };
+    return c.cap ? { kind, c, p: unit(c.cap[1], c.cap[2]), lon: c.cap[1], lat: c.cap[2], name: c.cap[0] } : null;
+  };
+  function rankedKeep() {
+    const T = S.trip;
+    if (S.mode !== 'fly' || S.game !== 'trip' || !T || !T.endless) return;
+    const open = inRound();
+    if (!open && (!T.results.length || !tripMore(T))) { delete save.ranked; persist(); return; }          // nothing landed yet, or no energy to take off with: nothing to carry on
+    let room = RANKED_PATHS;
+    const results = T.results.map((r) => ({ kind: r.kind, name: r.name, country: r.country, a2: r.a2, pop: r.pop, right: r.right, tier: r.tier, d: r.d, closeness: r.closeness, speed: r.speed, secs: r.secs, energy: r.energy, used: r.used, pts: r.pts, at: r.at, path: r.path, from: r.from, goal: r.goal, land: r.land }));
+    for (let i = results.length - 1; i >= 0; i--) {
+      const r = results[i];
+      if (!r.path) continue;
+      room -= r.path.length;
+      if (room < 0) { delete r.path; delete r.from; delete r.goal; delete r.land; }
+    }
+    save.ranked = { score: T.score, energy: +S.energy.toFixed(3), at: [+bird.lon.toFixed(3), +bird.lat.toFixed(3)], used: [...T.used],
+      rounds: T.rounds.slice(0, T.results.length + (open ? 1 : 0)).map((R) => [R.kind, R.c.id, R.city ? R.city.name : 0]), results };
+    if (open) save.ranked.open = 1;
+    persist();
+  }
+  // A Ranked round left with its clue showing is a wrong landing, as a Day Trip's is (tripSettle): no points, and the
+  // energy stays as it stood when the game was left. A flight with no energy to take off with is over, and its points
+  // count; so is one whose locations can no longer be read.
+  function rankedSettle() {
+    const k = save.ranked;
+    if (!k) return;
+    const rounds = k.rounds.map(rankedRound), open = !!k.open;
+    delete k.open;
+    if (open && rounds.length === k.results.length + 1 && rounds[rounds.length - 1]) {
+      const R = rounds[rounds.length - 1];
+      k.results.push({ kind: R.kind, name: R.name, country: R.c.name, a2: R.c.a2, pop: R.city ? R.city.pop : 0, right: false, tier: 'miss', d: 0, closeness: 0, speed: 0, secs: 0, energy: 0, pts: 0, at: 'Not finished' });
+    }
+    const whole = rounds.every(Boolean) && rounds.length === k.results.length && k.results.length > 0;
+    if (!whole || !(k.energy > 0.5)) { if (k.score > save.endless) save.endless = k.score; delete save.ranked; }
+    if (open || !save.ranked) persist();
+  }
   const dayFlown = (day) => { const t = save.trips[day]; return !!t && t.rounds.length >= 5; };
   const tripDone = () => dayFlown(today());
   // A round left with its clue showing scores 0: the stopwatch cannot be stopped by leaving, any more than by pausing.
@@ -3036,7 +3110,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
     $('see-trip').hidden = !done;
     $('trip-streak').hidden = !streak;
     $('trip-streak').textContent = streakText(streak);
-    $('endless-best').hidden = !save.endless;
+    // A Ranked flight kept: its button reads "Carry on" and nothing stands beside it; the best is back when the
+    // flight has ended (the player, 2026-11-13, of the flight's points drawn there: "Not sure the utility of showing
+    // the current points. maybe just leave it blank. and then when you finish and return, it continues showing the
+    // best"; "It should still say carry on. It just shouldn't say your current score, like to the right of it").
+    rankedSettle();
+    $('go-endless').textContent = save.ranked ? 'Carry on' : 'Play ranked';
+    $('endless-best').hidden = !save.endless || !!save.ranked;
     $('endless-best').textContent = 'Best: ' + save.endless.toLocaleString('en');
   }
   setInterval(() => { if (S.mode === 'title') showTripNote(); }, 60000);       // a new day: today's button again
@@ -3332,8 +3412,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // Leave a flight part-way. Every delivery is saved as it happens; only the best count needs a look.
   function abandon(home) {
     if (S.mode !== 'fly') return;
-    if (S.game === 'trip' && S.trip && !S.trip.endless && !S.trip.tutor) tripSave();          // a Day Trip left part-way is kept as it stands, to carry on (the tutorial keeps nothing)
-    if (S.game === 'trip' && S.trip && S.trip.endless && S.trip.score > save.endless) save.endless = S.trip.score;      // a Ranked flight left part-way ends there, and its points count
+    const T = S.game === 'trip' ? S.trip : null;
+    if (T && !T.endless && !T.tutor) tripSave();          // a Day Trip left part-way is kept as it stands, to carry on (the tutorial keeps nothing)
+    // A Ranked flight left for Home is kept, and is no best until it ends. Left by Restart, or with no energy to take
+    // off with, it ends there and its points count.
+    if (T && T.endless) {
+      if (home) rankedKeep(); else delete save.ranked;
+      if (!save.ranked && T.score > save.endless) save.endless = T.score;
+    }
     const kept = home && S.game === 'study' && S.n > 0;          // a Study flight left for Home is carried on later: it is not over, so it is no best yet
     if (!kept && S.n > save.best) save.best = S.n;
     if (kept) keepFlight();
@@ -3391,6 +3477,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     heldAt = 0;
     stage.classList.remove('held'); $('held').hidden = true;
   }
+  const keptOnHome = () => (S.game === 'study' ? S.n > 0 : S.game === 'trip' && !!S.trip && !S.trip.tutor && (!S.trip.endless || (S.trip.results.length > 0 && tripMore(S.trip))));
   function setPaused(on, asleep) {
     if (S.mode !== 'fly' || S.paused === on) return;
     if (on && inRound()) return;
@@ -3400,11 +3487,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // player, 2026-11-13: "we should get rid of the restart button on study mode. Also get rid of the restart button on
     // free flight and just have, for study mode, just have the end game button and the home button and the carry on
     // button"): a new Study flight starts from the end screen, after End flight.
-    $('restart').hidden = !(S.game === 'trip' && !!S.trip && !!S.trip.endless);
-    $('end').hidden = S.game !== 'study';          // a Study flight can be ended here, for its end screen
-    // what leaving does: Study keeps what you have learned and a Day Trip waits for you; a Ranked flight ends; Free flight has nothing to keep
-    $('pause-note').hidden = S.game === 'free' || (S.game === 'trip' && !!S.trip && !!S.trip.tutor);          // the tutorial keeps nothing either
-    $('pause-note').textContent = S.game === 'trip' && !!S.trip && !!S.trip.endless ? 'Home ends this flight.' : 'Progress is saved.';
+    const ranked = S.game === 'trip' && !!S.trip && !!S.trip.endless;
+    $('restart').hidden = !ranked;
+    $('end').hidden = S.game !== 'study' && !ranked;          // a Study or a Ranked flight can be ended here, for its end screen
+    // The Home button says what leaving does (the player, 2026-11-13: "The home button should say something about how
+    // ... some way to communicate that it saves your progress and you can resume later. Because, or else you go home
+    // and you think that ... it's all gone and you have to restart"; their pick from picture PAUSE-question, the
+    // button's own words). Where the flight is kept it reads "Save and go home": a Study flight from its first
+    // delivery, a Ranked flight from its first landing, a Day Trip from its start. Free flight and the tutorial keep
+    // nothing, and there it reads "Home". (Until then a small line under the buttons: "Progress is saved.")
+    $('home').firstChild.textContent = keptOnHome() ? 'Save and go home ' : 'Home ';
     keys.left = keys.right = keys.up = keys.down = keys.flap = false;
     $('card-title').hidden = on;
     $('card-pause').hidden = !on;
@@ -3432,7 +3524,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       intro.t += dt;
       [atlas.lon, atlas.lat] = lonLat(slerp(intro.from, unit(...(S.trip ? S.trip.at : intro.at)), smooth(clamp(intro.t / INTRO_TURN, 0, 1))));
     }
-    S.blend = intro && intro.t < 0 ? Math.max(0, S.blend - dt / TUTOR_LEAD) : intro && intro.t < INTRO_TURN ? 0 : clamp(S.blend + (flying ? dt / INTRO_ZOOM : -dt / 1.3), 0, 1);
+    S.blend = intro && intro.t < 0 ? Math.max(0, S.blend - dt / TUTOR_LEAD) : intro && intro.t < INTRO_TURN + INTRO_HOLD ? 0 : clamp(S.blend + (flying ? dt / INTRO_ZOOM : -dt / 1.3), 0, 1);
     if (flying && S.intro && S.blend >= 1) S.intro = null;          // the view is down
     for (let i = fx.length - 1; i >= 0; i--) { fx[i].t += dt; if (fx[i].t >= fx[i].secs) fx.splice(i, 1); }
     for (let i = flashes.length - 1; i >= 0; i--) { flashes[i].t += dt; if (flashes[i].t >= flashes[i].secs) flashes.splice(i, 1); }
@@ -4156,7 +4248,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       e.preventDefault();
       return;
     }
-    if (k === 'e' && !e.repeat && S.paused && S.game === 'study') { endFlight(); e.preventDefault(); return; }
+    if (k === 'e' && !e.repeat && S.paused && !$('end').hidden) { endFlight(); e.preventDefault(); return; }          // E ends a flight only where the pause card offers it
     if (k === 'ArrowLeft' || k === 'a') keys.left = true;
     else if (k === 'ArrowRight' || k === 'd') keys.right = true;
     else if (k === 'ArrowUp' || k === 'w') keys.up = true;
@@ -4280,7 +4372,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
   $('resume').addEventListener('click', () => setPaused(false));
   $('restart').addEventListener('click', restart);
   $('end').addEventListener('click', endFlight);
-  window.addEventListener('pagehide', keepFlight);          // the window closed in a Study flight: it is carried on next time
+  window.addEventListener('pagehide', () => {          // the window closed in a Study or a Ranked flight: it is carried on next time
+    keepFlight();
+    const T = S.trip;
+    if (S.mode === 'fly' && S.game === 'trip' && T && T.endless) { rankedKeep(); if (!save.ranked && T.score > save.endless) { save.endless = T.score; persist(); } }
+  });
   $('home').addEventListener('click', goHome);
   $('home2').addEventListener('click', goHome);
 
