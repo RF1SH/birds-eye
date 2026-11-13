@@ -124,6 +124,9 @@ kbd.space { min-width: 88px; }
 .keys { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; align-items: center; margin: 0 0 18px; }
 .keys dt { display: flex; gap: 4px; }
 .keys dd { margin: 0; }
+/* How to play must fit a window 600 px high. The Challenge card has one row more than Study's (619 tall), so in a
+   window under 650 px high every How to play card is set a little closer: the same words at the same size. */
+@media (max-height: 650px) { .how { row-gap: 7px; margin-bottom: 10px; } .keys { margin-bottom: 10px; } }
 kbd {
   display: inline-block;
   min-width: 26px;
@@ -445,7 +448,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
           <dt><span class="arrows"><kbd class="up">&uarr;</kbd><kbd>&larr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd></span></dt><dd>navigate</dd>
           <dt><kbd class="space">Space</kbd></dt><dd>fly up</dd>
         </dl>
-        <div class="how">
+        <div class="how" data-for="study">
           <div class="ill"><span class="mini">Brazil<svg viewBox="0 0 30 36" aria-hidden="true"><use href="#i-stamp"/></svg></span></div>
           <p>Each postcard names a location or shows its flag. Fly there and land on it to deliver the postcard.</p>
           <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><path d="M2 42 Q28 30 54 42" fill="var(--sea)" stroke="var(--sea-line)"/><ellipse cx="28" cy="36" rx="6" ry="2.3" fill="rgba(19,38,59,.3)"/><path d="M28 33 L28 17" stroke="var(--ink-soft)" stroke-width="1.4" stroke-dasharray="2 3"/><use href="#i-bird" transform="translate(28 10) rotate(-90) scale(.42)"/><path d="M44 22 L44 8 M40 12 L44 7 L48 12" stroke="var(--ink)" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
@@ -454,6 +457,24 @@ button { font: inherit; color: inherit; cursor: pointer; }
           <p>Flying up uses energy. Each delivery replenishes some energy.</p>
           <div class="ill"><svg width="48" height="44" viewBox="-17 -22 48 44" aria-hidden="true"><path d="M16,0 L-9,-8.5 L-4,0 L-9,8.5 Z" transform="scale(1.4)" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
           <p>Three incorrect landings in a row will reveal the destination.</p>
+        </div>
+        <div class="how" data-for="challenge" hidden>
+          <div class="ill"><span class="mini">Brazil<svg viewBox="0 0 30 36" aria-hidden="true"><use href="#i-stamp"/></svg></span></div>
+          <p>Each postcard names a location or shows its flag. You have one landing to find it.</p>
+          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><path d="M2 42 Q28 30 54 42" fill="var(--sea)" stroke="var(--sea-line)"/><ellipse cx="28" cy="36" rx="6" ry="2.3" fill="rgba(19,38,59,.3)"/><path d="M28 33 L28 17" stroke="var(--ink-soft)" stroke-width="1.4" stroke-dasharray="2 3"/><use href="#i-bird" transform="translate(28 10) rotate(-90) scale(.42)"/><path d="M44 22 L44 8 M40 12 L44 7 L48 12" stroke="var(--ink)" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <p>Fly up to see more of the world and fly faster. Let go to glide down.</p>
+          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><circle cx="24" cy="22" r="19.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/><circle cx="24" cy="22" r="12.5" fill="none" stroke="var(--ink)" stroke-width="1.5"/><circle cx="24" cy="22" r="5.5" fill="var(--good)" stroke="var(--ink)" stroke-width="1.5"/><use href="#i-bird" transform="translate(39.5 27.5) scale(.42)"/></svg></div>
+          <p>The closer you land, the more points.</p>
+          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><text x="28" y="19" text-anchor="middle" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" font-size="16" fill="var(--ink)">3.9 s</text><rect x="1" y="26" width="54" height="4.4" rx="1.6" fill="var(--paper-shade)"/><path d="M2.6 26 H17 V30.4 H2.6 A1.6 1.6 0 0 1 1 28.8 V27.6 A1.6 1.6 0 0 1 2.6 26 Z" fill="var(--good)"/><rect x="27.4" y="24.2" width="1.2" height="8" fill="var(--ink)"/></svg></div>
+          <p>Land before the mark for full speed points.</p>
+          <div class="ill"><svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="15" fill="var(--paper)" stroke="var(--ink)" stroke-width="2"/><circle cx="22" cy="22" r="10.5" fill="none" stroke="var(--paper-shade)" stroke-width="6"/><path d="M22 11.5 A10.5 10.5 0 1 1 11.6 23.4" fill="none" stroke="var(--good)" stroke-width="6"/></svg></div>
+          <p>Flying up uses energy. The less you use, the more points.</p>
+        </div>
+        <div class="how" data-for="free" hidden>
+          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><path d="M2 42 Q28 30 54 42" fill="var(--sea)" stroke="var(--sea-line)"/><ellipse cx="28" cy="36" rx="6" ry="2.3" fill="rgba(19,38,59,.3)"/><path d="M28 33 L28 17" stroke="var(--ink-soft)" stroke-width="1.4" stroke-dasharray="2 3"/><use href="#i-bird" transform="translate(28 10) rotate(-90) scale(.42)"/><path d="M44 22 L44 8 M40 12 L44 7 L48 12" stroke="var(--ink)" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <p>Fly up to see more of the world and fly faster. Let go to glide down.</p>
+          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><rect x="6.6" y="2.6" width="42.8" height="38.8" rx="2" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.2"/><image href="flags/br.svg" x="11" y="7" width="15" height="10.5" preserveAspectRatio="none"/><text x="11" y="27.5" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" font-size="10" fill="var(--ink)">Brazil</text><path d="M11.5 32.5 H44 M11.5 36.5 H35" stroke="var(--paper-shade)" stroke-width="2" stroke-linecap="round"/></svg></div>
+          <p>Land on a country to learn more about it.</p>
         </div>
         <div class="row"><button class="go" id="go2" type="button">Take off</button><button class="alt" id="howto-back" type="button">Back <kbd>Esc</kbd></button></div>
       </div>
@@ -3988,7 +4009,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
   $('go-endless').addEventListener('click', () => { runKind = 'endless'; takeOff(); });
   $('see-trip').addEventListener('click', seeTrip);
   showTripNote();
+  // How to play is the card of the tab you are on (the player, 2026-11-13: "the how to play button should change for
+  // each tab"). Study's card is the player's own, line for line. A card's first button is its tab's own: Take off, or
+  // Carry on for a kept Study flight. The Challenge card has Back alone: that tab holds two games, so a button there
+  // could not say which one it starts (the player, the same day: "there's two different modes that you could have
+  // chosen from, so how would it know which one to take off?").
   function howTo(on) {
+    if (on) {
+      for (const el of document.querySelectorAll('#card-howto .how')) el.hidden = el.dataset.for !== tab;
+      $('go2').hidden = tab === 'challenge';
+      if (tab !== 'challenge') $('go2').textContent = $(tab === 'study' ? 'go' : 'go-free').textContent;
+    }
     $('card-title').hidden = on; $('card-howto').hidden = !on;
     measure();
     $(on ? 'howto-back' : 'howto-open').focus({ preventScroll: true });
