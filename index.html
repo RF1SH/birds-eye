@@ -3411,8 +3411,8 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   // The day's flight on the results globe (the player asked for it: "so you can see where the energy went").
   // The way the bird went is a line that is thin where it glided and thick where it flapped (two widths, rounded where
   // they meet). The shortest way is a row of ink dots, drawn only for the round picked, to the point the round was scored
-  // against (goalOf: a city or capital, and for a country its nearest point, never its middle). Where the bird came
-  // down is a dot: green in the answer, ink near it, red for a miss. The other rounds are the same lines, faint.
+  // against (goalOf: a city or capital, and for a country its nearest point, never its middle). Where a round started
+  // is a paper-white dot, where the bird came down a green or a red one. The other rounds are the same lines and dots, faint.
   const THIN = 1.8, THICK = 5.5, FAINT = 0.28;
   // The rounds a results globe holds at a time: the one picked and the two before and after it, five in all, with the
   // names of their answers. A Day Trip is five rounds, so it is all there. A Ranked flight is twenty or more, and drawn
@@ -3448,9 +3448,14 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       while (j < n && L.pts[j][1] && P[j]) { c.lineTo(P[j][0], P[j][1]); j++; }
       c.stroke(); i = j;
     }
-    const s = project(L.land);
-    if (s) { c.beginPath(); c.arc(s[0], s[1], 5.5 * u, 0, 7); c.fillStyle = L.right ? GOOD : BAD; c.fill(); c.strokeStyle = PAPER; c.lineWidth = 2 * u; c.stroke(); }
   }
+  // The two ends of a round: where it started a paper-white dot, where it came down a green or a red one (the player:
+  // "Maybe white origin dot with the already existing green/red end dots"). The same size, so they read as a pair.
+  function endDot(c, p, u, fill, edge) {
+    const s = project(p);
+    if (s) { c.beginPath(); c.arc(s[0], s[1], 5.5 * u, 0, 7); c.fillStyle = fill; c.fill(); c.strokeStyle = edge; c.lineWidth = (edge === INK ? 1.5 : 2) * u; c.stroke(); }
+  }
+  const startDot = (c, L, u) => endDot(c, L.from, u, PAPER, INK), landDot = (c, L, u) => endDot(c, L.land, u, L.right ? GOOD : BAD, PAPER);
   let sheet = null;          // the faint rounds are drawn whole on a sheet of their own and laid on faintly, so that pieces which overlap do not darken
   function drawLegs() {
     const u = view.ui, ga = ctx.globalAlpha, focus = S.focus, [lo, hi] = heldRounds();
@@ -3459,15 +3464,23 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     if (sheet.width !== inkCanvas.width || sheet.height !== inkCanvas.height) { sheet.width = inkCanvas.width; sheet.height = inkCanvas.height; }
     const c = sheet.getContext('2d');
     c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, sheet.width, sheet.height); c.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
-    S.legs.forEach((L, i) => { if (L && i !== focus && i >= lo && i <= hi) flown(c, L, u); });
+    // A round starts where the round before came down, so that dot is the start of the next one too: a faint round gets a
+    // start dot of its own only when no flight before it is drawn, and the picked round's white dot takes the place of
+    // the faint dot under it.
+    const P = S.legs[focus], met = (A, B) => !!A && !!B && dot(A.land, B.from) > 0.999999;
+    const faint = S.legs.map((L, i) => (L && i !== focus && i >= lo && i <= hi ? L : null));
+    faint.forEach((L) => { if (L) flown(c, L, u); });
+    faint.forEach((L, i) => {          // the dots after every faint line, so no line runs over a dot
+      if (!L) return;
+      if (!(i > lo && met(S.legs[i - 1], L))) startDot(c, L, u);
+      if (!met(L, P)) landDot(c, L, u);
+    });
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = ga * FAINT; ctx.drawImage(sheet, 0, 0); ctx.restore();
-    const L = S.legs[focus];
-    if (L) { arc(L.from, L.to, INK, 2.2 * u, [0.1, 6 * u]); flown(ctx, L, u); }
-    const first = S.legs.find(Boolean), s0 = lo === 0 && project(first.from);          // where the flight began
-    if (s0) { ctx.beginPath(); ctx.arc(s0[0], s0[1], 4 * u, 0, 7); ctx.fillStyle = PAPER; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 1.5 * u; ctx.stroke(); }
+    if (P) { arc(P.from, P.to, INK, 2.2 * u, [0.1, 6 * u]); flown(ctx, P, u); startDot(ctx, P, u); landDot(ctx, P, u); }          // both lines leave the white dot; the verdict's dot is on top
   }
   // What the names on a title or results globe keep off: the capital pins of a Study flight, and on a trip's globe the
-  // dot where the round picked came down, so a name never hides the verdict that dot wears. (A city's name stands
+  // two ends and the dotted shortest way of the round picked, so a name never hides the verdict the landing's dot
+  // wears, nor where that round started. (A city's name stands
   // round its dot anyway: when you came down right on the city, that dot is the city's, see placeNames.)
   function nameBoxes() {
     const boxes = [];
@@ -3479,6 +3492,14 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     if (S.mode === 'over' && S.trip && S.legs) {
       const L = S.legs[S.focus], s = L && project(L.land), t = L && L.point && project(L.ans);
       if (s && !(t && Math.hypot(s[0] - t[0], s[1] - t[1]) < 14 * view.ui)) boxes.push({ x: s[0], y: s[1], half: 8 * view.ui });
+      // ... and off the dot where it started and off its dotted shortest way: a name over the first dots made that line
+      // seem to start at the name (the player, of "Jordan" there: "two paths coming from different origins")
+      const f = L && project(L.from);
+      if (f) boxes.push({ x: f[0], y: f[1], half: 8 * view.ui });
+      for (let i = 1, N = L ? Math.max(8, Math.ceil(Math.acos(clamp(dot(L.from, L.to), -1, 1)) / RAD)) : 0; i <= N; i++) {
+        const q = project(slerp(L.from, L.to, i / N));
+        if (q) boxes.push({ x: q[0], y: q[1], half: 3 * view.ui, tall: 13 * view.ui, way: true });
+      }
     }
     return boxes;
   }
@@ -3490,11 +3511,12 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     const rounds = S.mode === 'over' && S.trip && S.legs ? heldRounds() : null;
     for (const a of atlasNames) {
       const s = project(a.p);
+      if (paint) a.at = null;          // where the name stands as drawn, and half its width (for the tests)
       if (!s || dot(a.p, cam.n) < cam.cos0 + 0.08 || (rounds && (a.i < rounds[0] || a.i > rounds[1]))) { a.spot = undefined; continue; }          // round the back, too close to the rim to read, or not one of the rounds held
       const name = a.name || a.c.name, size = Math.round((a.lost ? 17 : 15) * view.ui), q = size / 13;
       ctx.font = (a.water ? 'italic 600 ' : '700 ') + size + 'px ' + DISPLAY;
       const half = ctx.measureText(name).width / 2 + 4;
-      const free = (x, y) => rimIn({ x, y, half, up: 9 * q, down: 9 * q }) > 0.15 && !boxes.some((b) => Math.abs(b.x - x) < b.half + half && Math.abs(b.y - y) < 15 * q);
+      const free = (x, y) => rimIn({ x, y, half, up: 9 * q, down: 9 * q }) > 0.15 && !boxes.some((b) => Math.abs(b.x - x) < b.half + half && Math.abs(b.y - y) < (b.tall || 15 * q));
       const spots = a.city ? [[0, -14 * q], [0, 14 * q], [half + 8, 0], [-half - 8, 0]] : [[0, 0], [0, -16 * q], [0, 16 * q], [half + 10, 0], [-half - 10, 0], [0, -30 * q], [0, 30 * q]];
       const keep = !held ? undefined : a.fix !== undefined ? a.fix : a.spot;
       let at = null;
@@ -3504,6 +3526,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
       if (!at) { if (!held) a.spot = undefined; continue; }
       boxes.push({ x: at[0], y: at[1], half });
       if (!paint) continue;
+      a.at = at; a.half = half;
       // A city's own dot: a trip's answer paper-white, Study's capital not delivered red. Where a round came down right on
       // the city, the dot of that landing stands for both, so the verdict it wears is not hidden under the city's dot
       // (the player, of a correct landing on Havana: "wondering why havana wasn't green"). The name stands by that dot
@@ -3545,7 +3568,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
     if (legs) drawLegs();
     const boxes = nameBoxes();
     placeNames(boxes, true, !!(legs && atlas.to));
-    if (hover && !boxes.some((b) => Math.abs(b.x - hover.x) < b.half && Math.abs(b.y - hover.y) < 12)) {
+    if (hover && !boxes.some((b) => !b.way && Math.abs(b.x - hover.x) < b.half && Math.abs(b.y - hover.y) < 12)) {
       nameplate(hover.c, hover.name, hover.x, hover.y - 18 * view.ui, hover.sea ? 'sea' : 'name', null, 1, Math.round(17 * view.ui));
     }
     ctx.globalAlpha = 1;
@@ -3787,7 +3810,7 @@ p .star { width: .8em; height: .8em; margin: 0 .22em 0 0; vertical-align: -.04em
   // Ground speed in km a second at a height, flying flat out.
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   const setBird = (lon, lat, a, down) => Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down });
-  window.birdsEye = { names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), parFor, capKm, cheapFor, judge, ringKm, hardOf, endlessRound, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds,
+  window.birdsEye = { names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), parFor, capKm, cheapFor, judge, ringKm, hardOf, endlessRound, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     project: projectLL, unproject, speedAt, placed, seen: () => seen, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
