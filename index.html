@@ -2707,13 +2707,21 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // The fair time of a round: THINK seconds to read the clue and think, and FLIGHT_X times as long as the cheapest
   // flight for the leg is in the air. That flight is timed in the table its energy comes from, so the fair time and
   // energy use are judged against one flight, in every window: 0.9 s in the air for 600 km, 2.1 for 4,000, 2.7 for
-  // 8,500, 3.3 for 14,000, 3.7 for the far side of the world. The half more is room for a flight that is not the
-  // cheapest (a bird that climbs until it sees the location is in the air about half a second longer). Speed points
-  // are full up to the fair time and fall to none at twice it. Neither number has been checked against a person yet.
+  // 8,500, 3.3 for 14,000, 3.7 for the far side of the world. The quarter more is room for a flight that is not the
+  // cheapest. Speed points are full up to the fair time and fall to none at twice it (the player's stopwatch line:
+  // the mark in its middle, then yellow, orange, red), in Day Trip and Ranked alike.
+  // 2 s and a quarter since 2026-11-14. Until then 5 s and a half, numbers nobody chose and no person had been timed
+  // against. The player, of the family's play-test: "my brother ... got 20 out of 20 for speed on every single one
+  // ... extremely lenient, which makes it not competitive. So maybe just we could find new cutoff values". Checked
+  // against people (`audit/sp1.py`, `sp2.py`: slepemapy.cz 2016, 49,710 correct answers finding a country on the
+  // world map: the fastest tenth in 2.6 s, the fastest quarter 3.3, the middle 4.6, the slow quarter 7.4, their
+  // pointing included): with 5 s and a half about 7 of 10 such answers got all 20 points and the middle player 20;
+  // with 2 s and a quarter between 1 in 8 and 1 in 4 does, the middle player gets 12 to 15 and about 1 in 4 none.
+  // (The ranges: what the pointing took, 0.5 to 1 s, and how clean the flight is, 1.15 to 1.4 times the cheapest,
+  // are guesses.) Their pick from picture SPEED-question: both games.
   // (Until 2026-11-13 the flight was a rule of thumb, min(3.4, 1 + km / 3500) s and 1.6 s more past 14,000 km, from
-  // a pilot that climbed until it saw the location: up to 1.6 s too long on a far leg, so the time left to think
-  // ran from 5.6 s on a hop to 9 s on the far side of the world.)
-  const THINK = 5, FLIGHT_X = 1.5;
+  // a pilot that climbed until it saw the location: up to 1.6 s too long on a far leg.)
+  const THINK = 2, FLIGHT_X = 1.25;
   const flightSecs = (km) => cheapRow(km)[2];
   const fairSecs = (km) => THINK + FLIGHT_X * flightSecs(km);
   // Energy use: the share of its 20 points left after spending `spent` on a round whose cheapest flight costs `cheap`.
