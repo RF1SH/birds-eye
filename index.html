@@ -2704,14 +2704,26 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   const cheapRow = (km) => { const rows = carryTable(), need = km * STEER + STEER_KM; return rows.find((r) => r[0] >= need) || rows[rows.length - 1]; };
   const cheapFor = (km) => Math.max(ENERGY_FLOOR, cheapRow(km)[1]);
-  // The fair time of a round: THINK seconds to read the clue and think, and FLIGHT_X times as long as the cheapest
-  // flight for the leg is in the air. That flight is timed in the table its energy comes from, so the fair time and
-  // energy use are judged against one flight, in every window: 0.9 s in the air for 600 km, 2.1 for 4,000, 2.7 for
-  // 8,500, 3.3 for 14,000, 3.7 for the far side of the world. The quarter more is room for a flight that is not the
-  // cheapest. Speed points are full up to the fair time and fall to none at twice it (the player's stopwatch line:
-  // the mark in its middle, then yellow, orange, red), in Day Trip and Ranked alike.
-  // 2 s and a quarter since 2026-11-14. Until then 5 s and a half, numbers nobody chose and no person had been timed
-  // against. The player, of the family's play-test: "my brother ... got 20 out of 20 for speed on every single one
+  // The fair time of a round: THINK seconds to read the clue and think, by the kind of clue, and FLIGHT_X times as
+  // long as the cheapest flight for the leg is in the air. That flight is timed in the table its energy comes from,
+  // so the fair time and energy use are judged against one flight, in every window: 0.9 s in the air for 600 km, 2.1
+  // for 4,000, 2.7 for 8,500, 3.3 for 14,000, 3.7 for the far side of the world. Speed points are full up to the fair
+  // time and fall to none at twice it (the player's stopwatch line: the mark in its middle, then yellow, orange,
+  // red), in Day Trip and Ranked alike.
+  // The mark stands where the fastest 5 in 100 real players were (the player, 2026-11-14: "only the top 5th
+  // percentile should get 20/20"), and a capital or a flag clue gets more time than a country's name (the same day,
+  // of my "not done": "this should be done"). From people (`audit/sp4.py`, `sp5.py`: slepemapy.cz 2016, the world
+  // map, correct answers): the fastest 5 in 100 found a country in 2.32 s (49,710 answers) and a capital in 2.41 s
+  // (5,065), their pointing included. Less the pointing (0.75 s, a GUESS) and the tenth of a second the rounding to
+  // 20 allows: 1.5 s for a country, 1.6 for a capital or a city. A flag: half a second more (a GUESS: no timings of
+  // people naming flags were found). The flight: 1.15 times the cheapest (a GUESS at a clean flight: nobody's
+  // flying has been timed). With these about 5 in 100 such answers get all 20 points (3 to 13 over the guesses'
+  // range), the middle player 9 for a country and 6 for a capital, and about 3 in 10 none.
+  // To come, the player's word the same day: "when we get a lot of data and/or get a server, it should be percentile
+  // based" (PLAN 71).
+  // Before that, for an hour on 2026-11-14: 2 s and a quarter more than the cheapest flight, for every kind of clue
+  // (their pick from picture SPEED-question; about 1 in 5 answers got all 20). Until then 5 s and a half, numbers
+  // nobody chose and no person had been timed against. The player, of the family's play-test: "my brother ... got 20 out of 20 for speed on every single one
   // ... extremely lenient, which makes it not competitive. So maybe just we could find new cutoff values". Checked
   // against people (`audit/sp1.py`, `sp2.py`: slepemapy.cz 2016, 49,710 correct answers finding a country on the
   // world map: the fastest tenth in 2.6 s, the fastest quarter 3.3, the middle 4.6, the slow quarter 7.4, their
@@ -2721,9 +2733,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // are guesses.) Their pick from picture SPEED-question: both games.
   // (Until 2026-11-13 the flight was a rule of thumb, min(3.4, 1 + km / 3500) s and 1.6 s more past 14,000 km, from
   // a pilot that climbed until it saw the location: up to 1.6 s too long on a far leg.)
-  const THINK = 2, FLIGHT_X = 1.25;
+  const THINK = { country: 1.5, flag: 2, capital: 1.6, capflag: 2.1, city: 1.6 }, FLIGHT_X = 1.15;
   const flightSecs = (km) => cheapRow(km)[2];
-  const fairSecs = (km) => THINK + FLIGHT_X * flightSecs(km);
+  const fairSecs = (km, kind) => (THINK[kind] || THINK.country) + FLIGHT_X * flightSecs(km);
   // Energy use: the share of its 20 points left after spending `spent` on a round whose cheapest flight costs `cheap`.
   // All of them up to ENERGY_ROOM over the cheapest flight (a seventh of a second of flapping: a hand lets go of Space
   // about that late; the player: "there should be a little room for error"). Past that they fall on a curve, fast at
@@ -2922,7 +2934,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // 2026-11-12 there was one tank for the day, three times the day's cheapest flights, and a trip that ran dry ended
     // before round 5.
     if (!T.endless) S.cap = S.energy = cheap + ENERGY_ROOM + ENERGY_WASTE;
-    Object.assign(T, { i, t0: S.t, e0: S.energy, from: [bird.lon, bird.lat], goal, km, cheap, wait: false, count: 0, fair: fairSecs(km) });
+    Object.assign(T, { i, t0: S.t, e0: S.energy, from: [bird.lon, bird.lat], goal, km, cheap, wait: false, count: 0, fair: fairSecs(km, R.kind) });
     const node = document.createElement('div'), addr = document.createElement('div');
     node.className = 'ticket ask'; addr.className = 'addr';
     const what = R.kind === 'flag' || R.kind === 'capflag' ? flagImg(R.c, 'A flag') :
@@ -4611,7 +4623,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // Ground speed in km a second at a height, flying flat out.
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   const setBird = (lon, lat, a, down) => Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down });
-  window.birdsEye = { lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km) => fairSecs(km), flightSecs, parFor, capKm, cheapFor, judge, ringKm, hardOf, endlessRound, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
+  window.birdsEye = { lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, hardOf, endlessRound, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     project: projectLL, unproject, speedAt, FLY_TOP, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
