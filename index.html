@@ -1358,14 +1358,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const c = it.c;
     // a water: from another water, up to EDGE km over the line counts (seaEdge says how well); from land, only 30 km offshore
     if (it.kind === 's') return seaEdge(it, lon, lat) >= 0;
-    if (it.kind === 'k') {
-      // A capital letter must come down near the city: in its country or just offshore, not next door.
-      const off = kmBetween(lon, lat, c.cap[1], c.cap[2]);
-      if (off > capKm(c)) return false;
-      if (c.tiny) return true;
-      const here = regionAt(lon, lat);
-      return off <= 15 || !here.c || here.c === c;
-    }
+    // A capital's postcard must come down inside the capital's circle, whatever country that is (as in Day Trip and
+    // Ranked; until 2026-11-15 only in the capital's own country or at sea, or within 15 km)
+    if (it.kind === 'k') return kmBetween(lon, lat, c.cap[1], c.cap[2]) <= capKm(c);
     if (c.tiny && kmBetween(lon, lat, c.lx, c.ly) < TINY_KM) return true;
     const slack = c.r < 12 ? 22 : c.r < 30 ? 12 : 4;
     if (around(lon, lat, slack, (x, y) => within(c, x, y))) return true;
@@ -1602,8 +1597,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const BONUS = 19;            // ...plus 1 + BONUS * BONUS_FADE^n, n = letters delivered so far:
   const BONUS_FADE = 0.96;     //    20 for the first, 9.4 by the twentieth, and never below 1
   const BULLSEYE = 2;          // extra for a capital landed within a third of its radius
-  const CAP_MIN = 150;         // a capital letter must land this close to the city (km)...
-  const CAP_MAX = 250;         // ...up to this much for a very big country
+  // A capital's circle: a landing inside it is correct, in every game, whatever the clue and whatever country the
+  // landing is in. One circle for every capital and every city (the player's pick, 2026-11-15: "One circle, 150 km").
+  // Until then a lesser known location had a wider one, and a flag clue one half again as wide (149 to 617 km; their
+  // "Hard = more forgiving" of 2026-11-11, made when every round was worth the same: with a hard round worth more its
+  // hardness counted twice), and Study had its own: 150 to 250 km by the country's size, and only in the capital's own
+  // country or at sea (so Bratislava's postcard on Vienna was a miss in Study and correct in Day Trip and Ranked).
+  // The capital of a country drawn as a dot has the dot's own line (capKm): one circle round one dot.
+  const CIRCLE_KM = 150;
   const FLASH = 1.2;           // seconds the place you land on stays lit
   const LOOK = 2.4;            // seconds the view pulls back to show where a capital is, or where you are being shown
   const IDLE_SLEEP = 45;       // seconds on the ground with no key pressed before the bird dozes off...
@@ -1659,7 +1660,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     }
     return parRows[clamp(Math.ceil(seeHeight(km) * 100) - 1, 0, 99)];
   }
-  const capKm = (c) => (c.tiny ? TINY_KM : clamp(0.065 * Math.sqrt(c.km), CAP_MIN, CAP_MAX));
+  const capKm = (c) => (c.tiny ? TINY_KM : CIRCLE_KM);
   const fmtKm = (km) => (km < 995 ? Math.round(km / 10) * 10 : Math.round(km / 100) * 100).toLocaleString('en') + ' km';
 
   // ---------- small animations, driven by the game clock so they pause with it ----------
@@ -2564,10 +2565,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const CITIES = (D.cities || []).map(([name, cid, lon, lat, pop]) => ({ name, c: byId.get(cid), lon, lat, pop })).filter((x) => x.c);
   // How hard a location is, 0 (everyone knows it) to 1: how far down its kind it ranks by readers of its
   // English Wikipedia page (worked out in tools/assemble.py from data/fame.json). A flag is FLAG_X harder than
-  // the name. Harder means more forgiving, the way GeoGuessr's points fall off more slowly on a bigger
-  // map: the distance for points to fall to a third grows from TRIP_K to 3 times it. In Day Trip every
-  // round is worth the same, so a miss on a hard location never costs more than on an easy one; in
-  // Ranked, with no fixed total, a harder location is also worth more.
+  // the name. How hard a location is counts once, in what its round is worth (worth); the accuracy points fall
+  // with the distance the same way for every location (fallKm).
   const FAME = D.fame || {}, FLAG_X = 1.5, DAY_ACC = 160;
   const fameKey = (R) => R.kind === 'city' ? 'y:' + R.name + '|' + R.c.id : (R.kind === 'capital' || R.kind === 'capflag' ? 'k:' : 'c:') + R.c.id;
   function hardOf(R) {
@@ -2576,14 +2575,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   const flagged = (R) => R.kind === 'flag' || R.kind === 'capflag';
   const areaRound = (R) => R.kind === 'country' || R.kind === 'flag';
-  // The distance over which accuracy falls to about a third: from a country's nearest edge TRIP_K, from a capital or
-  // a city POINT_K (the map shows borders, not cities), up to three times as far for the least known, FLAG_X for a flag.
-  const fallKm = (R) => (areaRound(R) ? TRIP_K : POINT_K) * (1 + 2 * hardOf(R)) * (flagged(R) ? FLAG_X : 1);
-  // The circle round a capital or a city: inside it a landing is correct. It is where accuracy is above LIFT_CAP,
-  // which is more than being in the correct country alone can ever give (153 km for Paris, 279 for Port Vila).
-  const ringKm = (R) => SPOT_KM + fallKm(R) * Math.log(1 / LIFT_CAP);
+  // The circle round a capital or a city: inside it a landing is correct. One circle, CIRCLE_KM, for every capital
+  // and city, whatever the clue; the capital of a country drawn as a dot has the dot's own line (capKm).
+  const ringKm = (R) => (R.kind === 'city' ? CIRCLE_KM : capKm(R.c));
+  // The distance over which accuracy falls to about a third. From a country's nearest edge TRIP_K, for every country,
+  // whatever the clue (until 2026-11-15 up to three times as far for a lesser known country, and FLAG_X for a flag:
+  // 150 to 675 km. The player's pick: one fall). From a capital or a city: such that the circle is where accuracy is
+  // LIFT_CAP, which is more than being in the correct country alone can ever give: 605 km for the 150 km circle (the
+  // map shows borders, not cities), 134 km for a dot's 45 km.
+  const fallKm = (R) => (areaRound(R) ? TRIP_K : (ringKm(R) - SPOT_KM) / Math.log(1 / LIFT_CAP));
   const worth = (T, R) => T.endless ? 100 * (1 + hardOf(R)) * (flagged(R) ? FLAG_X : 1) : DAY_ACC;
-  const TRIP_K = 150, POINT_K = 600, IN_COUNTRY = 0.25, IN_REGION = 0.1, LIFT_CAP = 0.8, SPOT_KM = 15, COUNT = 3, ENERGY_FLOOR = 2, ENERGY_ROOM = 1, ENERGY_WASTE = 21;
+  const TRIP_K = 150, IN_COUNTRY = 0.25, IN_REGION = 0.1, LIFT_CAP = 0.8, SPOT_KM = 15, COUNT = 3, ENERGY_FLOOR = 2, ENERGY_ROOM = 1, ENERGY_WASTE = 21;
   const ADDRESS = 'https://rf1sh.github.io/birds-eye/';       // where the game lives: the last line of a shared result
   // Every trip and run starts here (the player, 2026-11-11: "start at the same place every time, so people arent
   // confused"): in the Gulf of Guinea, 260 km off Ghana, so the coast of West Africa is on the screen when the view
