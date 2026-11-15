@@ -23,5 +23,10 @@ Material from others is not covered by this notice. It stays under its own terms
   License (ODbL) 1.0. The derived file data/slepemapy.json is offered under the same license.
   opendatacommons.org/licenses/odbl/1-0
 - How well known each location is: page-view statistics of English Wikipedia, Wikimedia Foundation.
+- How hard each location is to land (what a round is worth, which five a day asks): worked out from the sources
+  above together with the statistics JetPunk shows on its quiz pages (jetpunk.com), cityquiz.io's mention rate, and
+  MapTap's Atlas (maptap.gg). None of their numbers is in the game or in this repository: data/hard.json holds only
+  numbers derived from all the sources together.
+- Names and positions of the cities of a Day Trip's last round: Natural Earth, populated places 1:10m (public domain).
 - Memory model: FSRS version 5 with its published default weights (the open-spaced-repetition project).
 - Typefaces: Barlow Condensed and B612, loaded from Google Fonts under their own open licenses.
