@@ -3398,14 +3398,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
     S.spawnAt = S.t + (it.kind === 'k' ? 0.9 : 0.6);
 
     if (it.kind === 'k') {
-      // The letter goes on to the city itself, and the view pulls back if the city is out of sight.
+      // The city itself is marked and named, and the view pulls back if the city is out of sight.
       const city = unit(c.cap[1], c.cap[2]);
       const sub = (spot ? c.name : c.name + ', ' + fmtKm(off) + ' away') + (c.capNote ? ' (' + c.capNote + ')' : '');          // "France, 120 km away": a distance says what it is (the player's pick, as the number by the line to a capital)
       S.drops.push({ p: city, from: p, t: S.t, city: c.cap[0], km: capKm(c) });
       flash(c, 1, FLASH);
       label(c, c.cap[0], city, 'name', GROUND, sub, OVER);
-      ring(city, 4, spot ? 26 : 16, INK, 2.5, 0.5);
-      if (spot) ring(city, 4, 44, PAPER, 3, 0.7);
+      ring(city, 10, spot ? 26 : 16, INK, 2.5, 0.5);          // the rings start at the symbol's own edge (10: its half width) and just outside it, so they never cross the symbol that stands there from the landing on
+      if (spot) ring(city, 12, 44, PAPER, 3, 0.7);
       S.drops[S.drops.length - 1].hold = Math.max(LOOK, lookAt(city));
     } else if (c.water) {
       S.drops.push({ p, t: S.t });
@@ -3811,14 +3811,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
     ctx.globalAlpha = 1;
   }
 
-  // A postcard in flight (a capital's card travelling on to its city): a small card with its stamp.
-  function postcard(x, y, s) {
-    s *= view.mk;
-    const w = 12 * s, h = 8 * s;
-    ctx.fillStyle = PAPER; ctx.strokeStyle = INK; ctx.lineWidth = 1.2 * view.mk;
-    ctx.beginPath(); ctx.rect(x - w / 2, y - h / 2, w, h); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = SEA; ctx.fillRect(x + w / 2 - 4.2 * s, y - h / 2 + 1.2 * s, 3 * s, 3.4 * s);
-  }
   // How close a capital landing must be: a circle on the globe round the city.
   function reach(p, km, alpha, col) {
     col = col || PAPER;
@@ -3861,8 +3853,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     return last;
   }
 
-  // Each delivered letter stays where it was left, for the rest of the flight. A capital letter
-  // flies on from where you landed to the city, leaving a thread behind it.
+  // A capital delivered: the capital's symbol stands at the city from the moment of the landing, and a dotted line
+  // draws itself out from where you landed to it. (Until 2026-11-15 a small card flew along that line for 0.8 s and
+  // turned into the symbol at its end. The player: "some weird boxy shape ... like it's buffering", "It's literally
+  // just a box. Who would even know that that's a postcard?")
   function drawDrops() {
     const big = clamp(0.7 + (cam.pxRad / R_KM) * 0.5, 0.75, 1);
     for (const d of S.drops) {
@@ -3881,10 +3875,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
         if (d.left === undefined && !bird.down) d.left = Math.max(age, 1.2);          // its name goes on take-off (see label), and the pin with it
         const pin = S.mode !== 'fly' ? 1 : Math.max(shown, d.left === undefined ? 1 : clamp(1 - (age - d.left) / 0.35, 0, 1));
         if (reveal && S.mode === 'fly') reach(d.p, d.km, shown);
-        const s = project(slerp(d.from, d.p, k));
+        const s = project(d.p);
         if (s && pin > 0) {
           ctx.globalAlpha = pin * rimDot(s, 10 * view.mk);
-          if (k >= 1) starAt(s[0], s[1], 6 * big, view.mk); else postcard(s[0], s[1], 1.3);
+          starAt(s[0], s[1], 6 * big, view.mk);
           ctx.globalAlpha = 1;
         }
         continue;
