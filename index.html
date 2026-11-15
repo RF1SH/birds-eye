@@ -1232,7 +1232,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const TINY = PLAY.filter((c) => c.tiny);
   const LAND = PLAY.concat(CONTEXT).sort((a, b) => a.km - b.km);    // smallest first, so Lesotho wins over South Africa
   const DOT_KM = 22;            // a landing this close to a tiny country's dot is in it...
-  const TINY_KM = 35;           // ...and this close counts when the letter is for that tiny country
+  // ...and this close counts when the letter is for that tiny country. 45 km (35 until 2026-11-15; the player, of a
+  // capital 100 km from its dot: "Should we make the error margin wider?", and in the first notes: "Vatican City and
+  // places like it should have wider error margin"). One ordinary tap of an arrow key moves the bird 50 km just above
+  // the ground, and the line was 70 km across. 45 is the widest that keeps every two dots' lines apart (Saint Kitts
+  // and Antigua lie 94 km from each other); at 75 three pairs' lines cross. Their pick from a picture.
+  const TINY_KM = 45;
   // A country that is nothing but small islands is hard to land on, so its own waters are the country: 22 km out from
   // its coasts and the water between its islands (c.zone in the data: the rings of its line, made by
   // tools/build_zones.py for the countries with no land border and under 30,000 km² of land), and for one drawn as a
