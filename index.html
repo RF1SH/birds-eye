@@ -331,20 +331,26 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #daycard .score span { display: block; font: 400 13px/1.4 var(--text); color: var(--ink-soft); }
 .score small { font-size: 24px; font-weight: 600; color: var(--ink-soft); margin-left: 2px; }
 #daycard table { width: 100%; border-collapse: collapse; font-size: 13px; }
-#daycard td { padding: 6px 0; border-top: var(--b1z) solid var(--paper-shade); vertical-align: middle; }
+/* A row is one line, and every part of it stands on one baseline as a line of text does: the round's number, the clue,
+   the gray words after it, the mark, the result, the points. */
+#daycard td { padding: 10px 0; border-top: var(--b1z) solid var(--paper-shade); vertical-align: baseline; }
 #daycard tr.head td { border: 0; padding: 0 0 4px; font-size: 13px; color: var(--ink-soft); }
-#daycard td.n { width: 22px; color: var(--ink-soft); }
-#daycard td.asked { width: 52%; padding-right: 12px; }
-#daycard .kind { display: block; font: 700 11.5px/1 var(--text); color: var(--ink-soft); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 3px; }
-#daycard .big { font: 700 18px/1.1 var(--display); display: inline-flex; align-items: center; gap: 6px; }
+#daycard td.n { width: 22px; min-width: 22px; color: var(--ink-soft); }
+#daycard td.asked { width: 44%; padding-right: 12px; }
+/* the clue as the postcard gave it, then in gray what it did not say */
+#daycard .big { font: 700 18px/1.1 var(--display); display: inline-flex; align-items: baseline; gap: 6px; vertical-align: baseline; }
+#daycard .big:has(.of) { gap: 7px; }
+#daycard .big:not(:last-child) { margin-right: 9px; }
+#daycard .big .star { margin-right: 0; flex: none; position: relative; top: .11em; margin-top: -.11em; }          /* the symbol as it stands in a line of text (.star: vertical-align -.11em) */
 #daycard img { height: 20px; border: 1px solid rgba(19,38,59,.3); }
-#daycard td.ans { color: var(--ink-soft); padding-right: 12px; }
-#daycard td.you { white-space: nowrap; padding-right: 10px; }
-#daycard td.you { font-weight: 700; }
-#daycard td.you.right { color: var(--good); }
-#daycard td.you.miss { color: var(--bad); }
-#daycard td.you small { font-weight: 400; color: var(--ink-soft); margin-left: 4px; font-size: 13px; }
-#daycard .big small { display: inline; margin-left: 6px; font: 400 13px/1 var(--text); color: var(--ink-soft); }
+#daycard .big img { flex: none; position: relative; top: 3.7px; margin-top: -3.7px; }          /* a flag's middle on the middle of the capital letters; it adds nothing to the row's height */
+#daycard .was { display: inline-block; font: 400 13px/1.2 var(--text); color: var(--ink-soft); vertical-align: baseline; }
+/* You: the mark, then where the bird came down (red) and how far; the cell wraps with each part kept whole */
+#daycard td.you { padding-right: 12px; color: var(--ink-soft); }
+#daycard td.you .res { display: flex; align-items: flex-start; gap: 6px; }
+#daycard td.you .part { display: inline-block; }
+#daycard td.you .at { color: var(--bad); font-weight: 700; }
+#daycard td.you .km { white-space: nowrap; }
 #daycard td.pts { text-align: right; font: 700 20px/1 var(--display); font-variant-numeric: tabular-nums; width: 60px; }
 #daycard tr.head td.pts { font: 400 13px/1 var(--text); }
 #daycard .sum { margin: 10px 0 12px; padding-top: 10px; border-top: var(--b2z) solid var(--ink); display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--ink-soft); }
@@ -362,7 +368,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #daycard td.num small { display: inline; font-size: 1em; color: var(--ink-soft); }
 #daycard .stats td.pts { padding-left: 16px; width: auto; white-space: nowrap; }
 #daycard .stats td.num { text-align: right; font-variant-numeric: tabular-nums; padding-left: 10px; white-space: nowrap; }
-#daycard .stats td.asked { width: auto; }
+#daycard .stats td.asked { width: 32%; }          /* a fixed share, so the table stays inside its card whatever the names (until 2026-11-15 long names pushed the Points column past it) */
 #daycard .stats tr.head td.num { text-align: right; }
 
 
@@ -2602,12 +2608,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // to come down (the player, 2026-11-13: "you should hold it in the higher up view for a second before zooming in,
   // so the user can get a sense of where they are").
   const INTRO_TURN = 0.9, INTRO_HOLD = 1, INTRO_ZOOM = 1.7;
+  // The countries whose name takes "the" in a sentence: "In the United States", "757 km from the Dominican Republic"
+  // (until 2026-11-15 the result card wrote the name as it is). The Gambia carries its own.
+  const THE = new Set(['Bahamas', 'Central African Republic', 'Comoros', 'DR Congo', 'Dominican Republic', 'Maldives', 'Marshall Islands', 'Netherlands', 'Philippines', 'Republic of the Congo', 'Seychelles',
+    'Solomon Islands', 'United Arab Emirates', 'United Kingdom', 'United States']);
+  const the = (name) => (THE.has(name) ? 'the ' : '') + name;
   const exactKm = (km) => Math.max(1, Math.round(km)).toLocaleString('en') + ' km';     // competitive: every km shows. Whole km: a pixel on the ground is 1 to 1.6 km
   // The day is the player's own calendar day, as Wordle's is: everyone gets the same five for the same date, each from
   // their own midnight. (Until 2026-11-12 it was London's: the trip changed at 7 pm in New York, and a trip at 6 pm one
   // day and 8 pm the next broke the streak.)
   const today = () => { const d = new Date(), two = (n) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()); };
-  const KINDS_TRIP = { country: 'Country', flag: 'Flag', capital: 'Capital', capflag: 'Capital of', city: 'City' };
   const TICK = { spot: '✓', right: '✓', miss: '✗' };          // two marks: you got it or you did not
   const NOT_EARNED = '<b class="tick miss">' + TICK.miss + '</b>';          // where speed or energy use points would stand after a wrong landing
   function seeded(str) {
@@ -3052,13 +3062,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const col = right ? GOOD : BAD;        // the verdict is worn by the landing: its ring and its name
     if (countryRound) { if (right) flash(R.c, 1, FLASH); else flash(R.c, 0, 4, null, 0.5); }      // the answer: lit as a delivery is, or held paper-white while you find it
     if (!right && here.name && (here.sea || here.c !== R.c)) label(here.sea ? null : here.c, here.name, p, here.sea ? 'wrongsea' : 'wrong', GROUND, here.sea ? null : underName(here), UNDER);
-    const sub = R.kind === 'city' ? R.c.name + ', population ~' + people(R.city.pop) : countryRound ? capLine(R.c) : R.c.name;          // a country round's answer: its capital under its name, as under any country a landing names
+    // a country round's answer: its capital under its name, as under any country a landing names. A capital: its country,
+    // left out where the capital has the country's own name (Singapore, Monaco: until 2026-11-15 the name stood twice)
+    const sub = R.kind === 'city' ? R.c.name + ', population ~' + people(R.city.pop) : countryRound ? capLine(R.c) : R.c.name === R.name ? null : R.c.name;
     label(R.c, R.name, R.p, 'name', GROUND, sub, countryRound ? AREA : OVER);
     ring(p, 6, 30, col, 2.5, 0.5);
     (right ? (tier === 'spot' ? sfx.spot : sfx.drop) : sfx.miss)();
     const node = document.createElement('div');
     node.className = 'ticket result';
-    const where = countryRound && right ? 'In ' + R.name : tier === 'spot' ? 'On ' + R.name : exactKm(d) + ' from ' + R.name;
+    const where = countryRound && right ? 'In ' + the(R.name) : tier === 'spot' ? 'On ' + R.name : exactKm(d) + ' from ' + (countryRound ? the(R.name) : R.name);
     if (tier === 'spot') spotOn();
     const most = roundMax(T, T.i, R.kind);
     node.innerHTML = '<div class="where"><span class="tick ' + tier + '">' + TICK[tier] + '</span> ' + esc(where) + '</div><div class="plus ' + (right ? 'right' : 'wrong') + '">' + pts + '<small>/' + most + '</small></div>' +
@@ -3148,15 +3160,21 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // every leg: what was given, where you came down, and each part of the points
   const STATS_HEAD = '<tr class="head"><td></td><td>Given</td><td>You</td><td class="num">Accuracy</td><td class="num">Speed</td><td class="num">Time</td><td class="num">Energy use</td><td class="pts">Points</td></tr>';
   const out = (n, of) => n + '<small>/' + of + '</small>';
-  function givenCell(R, answer) {
-    const flag = R.kind === 'flag' || R.kind === 'capflag' ? flagImg(R.c, '') : '';
-    const name = !answer && flag ? '' : (R.kind === 'capital' || R.kind === 'capflag' ? STAR : '') + esc(R.name) +
-      (answer && R.kind !== 'country' && R.kind !== 'flag' ? '<small>' + esc(R.c.name) + '</small>' : '');
-    return '<td class="asked"><span class="kind">' + KINDS_TRIP[R.kind] + '</span><span class="big">' + flag + name + '</span></td>';
+  // A round's row on the day card and in Flight stats. Given: the clue in bold as the postcard gave it (a name, a flag,
+  // [symbol] name, [symbol] of [flag]), then in gray what it did not say: the flag's country, "Vilnius, Lithuania" for
+  // a capital asked by its flag, the country of a capital or a city; nothing where that would say the clue's own name
+  // again (Singapore). Until 2026-11-15 one line held the clue, the answer and its country under a label of the
+  // round's kind, so "Given" headed what was not given (the player, of rounds 3 and 4: "this looks off, doesn't it?
+  // ... it's hard to understand what's going on in that"; their pick from a picture).
+  const clueOf = (R) => R.kind === 'capflag' ? STAR + '<span class="of">of</span>' + flagImg(R.c, '') : R.kind === 'flag' ? flagImg(R.c, '') : (R.kind === 'capital' ? STAR : '') + esc(R.name);
+  const wasOf = (R) => R.kind === 'country' ? '' : R.kind === 'flag' ? R.c.name : R.c.name === R.name ? (R.kind === 'capflag' ? R.name : '') : R.kind === 'capflag' ? R.name + ', ' + R.c.name : R.c.name;
+  function givenCell(R) {
+    const was = wasOf(R);
+    return '<td class="asked"><span class="big">' + clueOf(R) + '</span>' + (was ? '<span class="was">' + esc(was) + '</span>' : '') + '</td>';
   }
   function statsRow(T, i) {
     const R = T.rounds[i], r = T.results[i];
-    return '<tr' + (r.path ? ' data-i="' + i + '"' : '') + '><td class="n">' + (i + 1) + '</td>' + givenCell(R, true) + youCell(r) +
+    return '<tr' + (r.path ? ' data-i="' + i + '"' : '') + '><td class="n">' + (i + 1) + '</td>' + givenCell(R) + youCell(r, R) +
       '<td class="num">' + out(r.closeness, roundMax(T, i, R.kind) - 40) + '</td><td class="num">' + (r.right ? out(r.speed, 20) : out(NOT_EARNED, 20)) + '</td><td class="num">' + r.secs.toFixed(1) + ' s</td>' +
       '<td class="num">' + (r.right ? out(r.energy || 0, 20) : out(NOT_EARNED, 20)) + '</td><td class="pts">' + out(r.pts, roundMax(T, i, R.kind)) + '</td></tr>';
   }
@@ -3360,18 +3378,24 @@ button { font: inherit; color: inherit; cursor: pointer; }
     el.hidden = false; el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
     clearTimeout(spotOn.t); spotOn.t = setTimeout(() => { el.hidden = true; el.classList.remove('go'); }, 2300);
   }
-  // a round's row on the end card: its number, the clue, the answer always named, how you did, the points
-  // You: where you came down, green when right, red when wrong, and how far off for a point or a miss
-  function youCell(r) {
-    if (!r) return '<td class="you miss">Not reached</td>';
-    const km = r.d || r.tier === 'spot' ? ' <small>' + exactKm(r.d) + '</small>' : '';
-    const what = r.right || !r.at ? '<span class="tick ' + (r.right ? 'right' : 'miss') + '">' + (r.right ? '\u2713' : '\u2717') + '</span>' : esc(r.at);      // a correct landing: a check mark, not the answer's name again
-    return '<td class="you ' + (r.right ? 'right' : 'miss') + '">' + what + km + '</td>';
+  // You: a check or an X on every row (the player: "the X versus the check, that's just if you get it or not"); where
+  // the bird came down, in red, when wrong and not in the answer's own country (the map does not name it there either);
+  // then how far, as "362 km away" (a bare number: "what does that thing really mean?"). A correct country keeps its
+  // check alone ("could just be a chekc?"). Two rows have no landing: they keep their words, with an X and no distance:
+  // "Not reached", and "Not finished" (a round left with its clue showing). Each part stays whole when the cell wraps.
+  function youCell(r, R) {
+    const X = '<span class="tick miss">\u2717</span>', cell = (mark, parts) => '<td class="you"><div class="res">' + mark + '<span class="did">' + parts.map((x) => '<span class="part">' + x + '</span>').join(' ') + '</span></div></td>';
+    if (!r) return cell(X, ['Not reached']);
+    if (r.at === 'Not finished') return cell(X, ['Not finished']);
+    const area = R.kind === 'country' || R.kind === 'flag';
+    const at = !r.right && r.at && r.at !== R.c.name ? '<b class="at">' + esc(r.at) + '</b>' : '';
+    const km = area && r.right ? '' : '<span class="km">' + exactKm(r.d) + '</span> away';
+    return cell(r.right ? '<span class="tick right">\u2713</span>' : X, [at && km ? at + ',' : at, km].filter(Boolean));
   }
   const TRIP_HEAD = '<tr class="head"><td></td><td>Given</td><td>You</td><td class="pts">Points</td></tr>';
   function tripRow(T, i) {
     const R = T.rounds[i], r = T.results[i];
-    return '<tr' + (r && r.path ? ' data-i="' + i + '"' : '') + '><td class="n">' + (i + 1) + '</td>' + givenCell(R, true) + youCell(r) +
+    return '<tr' + (r && r.path ? ' data-i="' + i + '"' : '') + '><td class="n">' + (i + 1) + '</td>' + givenCell(R) + youCell(r, R) +
       '<td class="pts">' + out(r ? r.pts : 0, roundMax(T, i, R.kind)) + '</td></tr>';
   }
   // green correct, red wrong (or not reached), a row of `per`
@@ -4646,7 +4670,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // Ground speed in km a second at a height, flying flat out.
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   const setBird = (lon, lat, a, down) => Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down });
-  window.birdsEye = { lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, hardOf, endlessRound, flagClue, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
+  window.birdsEye = { lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, hardOf, endlessRound, flagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     project: projectLL, unproject, speedAt, FLY_TOP, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
