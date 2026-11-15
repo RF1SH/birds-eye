@@ -3013,7 +3013,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const pts = closeness + speed + energy;
     T.score += pts;
     T.results.push({ kind: R.kind, name: R.name, country: R.c.name, a2: R.c.a2, pop: R.city ? R.city.pop : 0, right, tier, d: Math.round(d * 10) / 10, closeness, speed, energy, used: Math.round(used * 100) / 100, secs: Math.round(took * 10) / 10, pts, p: R.p });
-    Object.assign(T, { wait: true, ready: false, reveal: { from: p, to: R.p, km: countryRound ? 0 : ringKm(R), right, area: countryRound } });
+    Object.assign(T, { wait: true, ready: false, reveal: { from: p, to: R.p, km: countryRound ? 0 : ringKm(R), right, area: countryRound, cap: R.kind === 'capital' || R.kind === 'capflag' } });
     T.results[T.results.length - 1].at = here.name || 'Open ocean';
     Object.assign(T.results[T.results.length - 1], { path: (T.trk || []).concat([[lon, lat, 0]]), from: T.from.slice(), goal: T.goal.slice(), land: [lon, lat] }); T.trk = null;
     // Ranked: a correct landing gives back what the flight cost, up to the cheapest flight and its room for error, and a
@@ -3062,7 +3062,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (v.km) reach(v.to, v.km, 1, col);
     arc(v.from, v.to, PAPER, 4 * view.mk); arc(v.from, v.to, INK, 2 * view.mk, [6 * view.mk, 6 * view.mk]);
     const s = project(v.to);
-    if (s) { ctx.globalAlpha = rimDot(s, 7 * view.mk); ctx.beginPath(); ctx.arc(s[0], s[1], 7 * view.mk, 0, 7); ctx.fillStyle = PAPER; ctx.fill(); ctx.strokeStyle = edge; ctx.lineWidth = 3 * view.mk; ctx.stroke(); ctx.globalAlpha = 1; }
+    // A capital wears the capital's symbol at its spot, as in Study and Free flight; a city, a plain dot. (Until 2026-11-15
+    // a capital had the plain dot too: the first build of Day Trip, never looked at again. The player: "we have the
+    // capital symbol there when it's listed on the second line underneath the country, so wanted to be consistent",
+    // and of a picture of it: "definitely the symbol on the map".)
+    if (s && v.cap) { ctx.globalAlpha = rimDot(s, 10 * view.mk); starAt(s[0], s[1], 7, view.mk); ctx.globalAlpha = 1; }
+    else if (s) { ctx.globalAlpha = rimDot(s, 7 * view.mk); ctx.beginPath(); ctx.arc(s[0], s[1], 7 * view.mk, 0, 7); ctx.fillStyle = PAPER; ctx.fill(); ctx.strokeStyle = edge; ctx.lineWidth = 3 * view.mk; ctx.stroke(); ctx.globalAlpha = 1; }
   }
   // The endless run: never the same place twice, countries first, then flags, capitals, capitals of
   // flags and cities, each from a growing slice of its easiest-first list.
@@ -4349,10 +4354,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (S.trip && S.trip.reveal && S.mode === 'fly') drawReveal();
     placed.length = 0;
     if (S.mode === 'fly') { const g = project(unit(bird.lon, bird.lat)); if (g) placed.push(birdBox(g)); }
-    // Day Trip's answer: names keep off the line from where you came down to it, and off the answer's dot
+    // Day Trip's answer: names keep off the line from where you came down to it, and off the answer's mark (a
+    // capital's symbol is 11.4 across each way from its middle, a city's dot 8.5, times the scale of the marks)
     if (S.trip && S.trip.reveal && !S.trip.reveal.area && S.mode === 'fly') {
-      const v = S.trip.reveal;
-      for (let i = 0; i <= 24; i++) { const s = project(slerp(v.from, v.to, i / 24)); if (s) placed.push({ x: s[0], y: s[1], half: 8, up: 6, down: 6 }); }
+      const v = S.trip.reveal, m = (v.cap ? 11.5 : 8.5) * view.mk;
+      for (let i = 0; i < 24; i++) { const s = project(slerp(v.from, v.to, i / 24)); if (s) placed.push({ x: s[0], y: s[1], half: 8, up: 6, down: 6 }); }
+      const s = project(v.to); if (s) placed.push({ x: s[0], y: s[1], half: m, up: m, down: m });
     }
     for (const f of fx) if (f.top) f.draw(Math.min(1, f.t / f.secs));
     if (S.mode === 'fly') { drawRouteKm(); drawHud(); }
