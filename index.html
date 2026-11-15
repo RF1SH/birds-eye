@@ -287,12 +287,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #console.tutor #status { min-width: 0; }          /* in a narrow window the bar gives way (its sentence wraps), never the postcard that asks */
 #console.tutor #tickets:has(.ticket.ask) { flex: none; }
 #console.lesson #tickets { display: none; }          /* no postcard yet: the bar stands in the middle */
-#console.lesson #status { min-height: calc(66.5px + 2 * var(--b2z)); }        /* as tall as the countdown's postcard that comes next (its two lines, its padding, its border), so nothing moves when it does */
+#console.lesson #status { min-height: calc(68px + 2 * var(--b2z)); }        /* as tall as the countdown's postcard that comes next (its two lines, its padding, its border), so nothing moves when it does */
 /* a first visit: the title and two buttons, nothing else */
 #card.first .seg, #card.first #howto-open, #card.first #pane-study, #card.first #pane-free, #card.first #pane-soon { display: none; }
 .ticket.ask .addr { min-width: 170px; }
-.ticket .kind { display: block; margin-bottom: 4px; font: 700 11.5px/1 var(--text); color: var(--ink-soft); text-transform: uppercase; letter-spacing: .06em; }
+/* The small line says what to find. 14 px (11.5 until 2026-11-15; the player: "the font is too small, so some people may miss it and just see the
+   flag and go to that country and not realize that you were actually asking for the capital"). The count's line is the same, so all cards stay alike. */
+.ticket .kind { display: block; margin-bottom: 3px; font: 700 14px/1 var(--text); color: var(--ink-soft); text-transform: uppercase; letter-spacing: .06em; }
 .ticket .what { display: flex; align-items: center; justify-content: center; gap: 8px; }
+/* a capital asked by its flag: [the capital's symbol] of [flag], the three evenly apart */
+.ticket .what:has(.of) { gap: 11px; }
+.ticket .what:has(.of) .star { margin-right: 0; }
 .ticket .what img { height: 44px; margin: 0; }
 /* The result: where you came down over the parts of the points, each out of its most, then the round's points and
    the button, both level with the two lines (every piece is placed by name, so nothing drops to a row of its own). */
@@ -2949,9 +2954,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
     Object.assign(T, { i, t0: S.t, e0: S.energy, from: [bird.lon, bird.lat], goal, km, cheap, wait: false, count: 0, fair: fairSecs(km, R.kind) });
     const node = document.createElement('div'), addr = document.createElement('div');
     node.className = 'ticket ask'; addr.className = 'addr';
-    const what = R.kind === 'flag' || R.kind === 'capflag' ? flagImg(R.c, 'A flag') :
+    // The small line says what to find, the big line is the clue. A capital asked by its flag reads [the capital's
+    // symbol] of [flag] under "Find the capital" (until 2026-11-15 the flag alone under "Find the capital of". The
+    // player: "some people may miss it and just see the flag and go to that country ... maybe like '[symbol for
+    // capital] of [flag]'"; their pick from a picture: the symbol and a larger small line, both). A capital asked by
+    // its own name has no "of": [symbol] Minsk.
+    const what = R.kind === 'capflag' ? STAR + '<span class="of">of</span>' + flagImg(R.c, 'A flag') : R.kind === 'flag' ? flagImg(R.c, 'A flag') :
       (R.kind === 'capital' ? STAR : '') + esc(R.name) + (R.kind === 'city' ? '<small style="display:inline;margin:0 0 0 6px">' + esc(R.c.name) + '</small>' : '');
-    addr.innerHTML = '<span class="kind">' + { country: 'Find the country', flag: 'Find the country', capital: 'Find the capital', capflag: 'Find the capital of', city: 'Find the city' }[R.kind] + '</span><span class="what">' + what + '</span>';
+    addr.innerHTML = '<span class="kind">' + { country: 'Find the country', flag: 'Find the country', capital: 'Find the capital', capflag: 'Find the capital', city: 'Find the city' }[R.kind] + '</span><span class="what">' + what + '</span>';
     node.appendChild(addr);
     ticketsEl.replaceChildren(node);
     $('trip-clock').hidden = false;
