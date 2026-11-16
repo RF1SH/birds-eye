@@ -1679,7 +1679,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     log: new Map(), drops: [], look: null, gain: 0, fails: new Map(),
   };
   const REST = 2.5, END_REST = 4;       // seconds a globe holds still before it starts to turn: the title's, and Study's end globe on the start of the flight
-  const atlas = { lon: -20, lat: 18, spin: 6, idle: 0, rest: REST, from: null, to: null, k: 1 };
+  const atlas = { lon: -20, lat: 18, spin: 6, idle: 0, rest: REST, from: null, to: null, k: 1, way: null };
   // Height on the camera: 0 on the ground, 1 at the top, evenly spaced in the logarithm.
   const heightFor = (a) => Math.exp(lerp(Math.log(view.H0), Math.log(view.H1), clamp(a, 0, 1)));
   // The flight is the same over the ground in every window (the player's pick, 2026-11-13: "Yes, the same"). The
@@ -3998,14 +3998,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (!flying) {             // title and results: the globe turns slowly; drag it to turn it yourself
       if (atlas.to) {
         atlas.k = Math.min(1, atlas.k + dt / (atlas.secs || 1.3));
-        const p = slerp(unit(...atlas.from), unit(...atlas.to), smooth(atlas.k));
-        [atlas.lon, atlas.lat] = lonLat(p);
-        if (atlas.k >= 1) { atlas.to = null; atlas.secs = 0; }
+        const way = atlas.way && atlas.way.to === atlas.to ? atlas.way : null;          // a results globe's sideways turn (showLeg); any other turn takes the shortest line
+        if (way) [atlas.lon, atlas.lat] = alongWay(way, way.even ? steady(atlas.k) : smooth(atlas.k));
+        else [atlas.lon, atlas.lat] = lonLat(slerp(unit(...atlas.from), unit(...atlas.to), smooth(atlas.k)));
+        if (atlas.k >= 1) { atlas.to = null; atlas.secs = 0; atlas.way = null; }
       } else if (S.tour && S.mode === 'over' && S.legs && !drag.on) {          // a results globe on a round's origin: a rest, then the slow turn to its end (showLeg)
         S.tour.rest -= dt;
         if (S.tour.rest <= 0) {
           const here = [atlas.lon, atlas.lat], deg = Math.acos(clamp(dot(unit(...here), unit(...S.tour.to)), -1, 1)) / RAD;
-          if (deg > 0.5) { atlas.from = here; atlas.to = S.tour.to; atlas.k = 0; atlas.secs = Math.max(TOUR_MIN, deg / TOUR_DEG); }
+          if (deg > 0.5) {
+            atlas.from = here; atlas.to = S.tour.to; atlas.k = 0;
+            atlas.way = flownWay(S.legs[S.focus], here, S.tour.to); atlas.secs = Math.max(TOUR_MIN, atlas.way.length / TOUR_DEG);
+          }
           S.tour = null;
         }
       } else if (!drag.on) {
@@ -4511,14 +4515,51 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // One round on the globe (the player, 2026-11-13: "globe should start on origin of whichever flight is highlighted, then
   // slowly rotate to end point (one path and not curving along with the flight path). Right now if it's a long path it
   // only shows a portion"). The globe turns to where the round began, rests there a moment, then turns slowly and
-  // steadily along the one shortest line to where the bird came down, and stays there. (Until then it turned to the
-  // middle of the flight and held still: of a flight half-way round the world both ends were at the rim or behind it.)
+  // steadily to where the bird came down, and stays there. (Until 2026-11-13 it turned to the middle of the flight and held
+  // still: of a flight half-way round the world both ends were at the rim or behind it.)
+  // It turns SIDEWAYS only: its middle goes along the longitudes the bird flew (east or west, all the way round if the bird
+  // went so), smoothed so it never follows a bend, at one speed; the latitude moves once, from the start's to the landing's.
+  // The quick turn to a round's start goes sideways too, the short way round. (Until 2026-11-16 both turns took the one
+  // shortest line between their two ends: from Uruguay to the Sulu Sea that line runs over the South Pole, and the flown line
+  // stayed at the rim. The player, 2026-11-15: "it should be much more clear and sort of stick to the middle latitudes
+  // generally ... the center of the path is always in view, but it's not like jerking and going up and down to follow the
+  // path ... it should be smooth"; picked from a mock 2026-11-16, with the round's whole line on the globe from the start:
+  // "line all there".)
   const TOUR_REST = 1, TOUR_DEG = 15, TOUR_MIN = 1.5;          // seconds on the origin; degrees a second on the way; the shortest the way takes
   const globeSpot = (p) => { const [lo, la] = lonLat(p); return [lo, clamp(la, -45, 60)]; };
+  // one speed, eased in and out over only the first and last tenth
+  const steady = (k) => { const a = 0.1; return k < a ? k * k / (2 * a * (1 - a)) : k > 1 - a ? 1 - (1 - k) * (1 - k) / (2 * a * (1 - a)) : (k - a / 2) / (1 - a); };
+  // A way for the globe's middle: [lon, lat] points with the longitudes unwrapped, walked by the share of its length.
+  function wayOf(C, to, even) {
+    const at = [0];
+    for (let j = 1; j < C.length; j++) at.push(at[j - 1] + Math.hypot((C[j][0] - C[j - 1][0]) * Math.cos(((C[j][1] + C[j - 1][1]) / 2) * RAD), C[j][1] - C[j - 1][1]));
+    return { C, at, length: at[at.length - 1], to, even };
+  }
+  function alongWay(w, e) {
+    const want = e * w.length, C = w.C;
+    let j = 0;
+    while (j < C.length - 2 && w.at[j + 1] < want) j++;
+    const f = clamp((want - w.at[j]) / Math.max(1e-9, w.at[j + 1] - w.at[j]), 0, 1);
+    return [wrapLon(lerp(C[j][0], C[j + 1][0], f)), lerp(C[j][1], C[j + 1][1], f)];
+  }
+  function flownWay(L, from, to) {
+    const n = L.pts.length, U = [from[0]];
+    for (let i = 1; i < n; i++) U.push(U[i - 1] + wrapLon(lonLat(L.pts[i][0])[0] - lonLat(L.pts[i - 1][0])[0]));
+    const end = U[n - 1] + wrapLon(to[0] - U[n - 1]), N = 60, C = [];
+    for (let j = 0; j <= N; j++) {          // each longitude the average of the flown ones round it, over a fifth of the flight each way (less near the ends)
+      const c = (j / N) * (n - 1), h = Math.min(0.2 * (n - 1), c, n - 1 - c);
+      let sum = 0, m = 0;
+      for (let i = Math.ceil(c - h); i <= Math.floor(c + h); i++) { sum += U[i]; m++; }
+      C.push([j === N ? end : m ? sum / m : U[Math.round(c)], lerp(from[1], to[1], j / N)]);
+    }
+    return wayOf(C, to, true);
+  }
   function showLeg(i) {
     const L = S.legs[i];
     S.focus = i; atlas.idle = 0; atlas.zoom = 1;
-    atlas.from = [atlas.lon, atlas.lat]; atlas.to = globeSpot(L.from); atlas.k = 0; atlas.secs = 0;
+    atlas.from = [atlas.lon, atlas.lat]; atlas.to = globeSpot(L.from); atlas.k = 0;
+    const side = wrapLon(atlas.to[0] - atlas.from[0]);
+    atlas.way = wayOf([atlas.from, [atlas.from[0] + side, atlas.to[1]]], atlas.to, false); atlas.secs = Math.max(1.3, Math.abs(side) / 90);
     S.tour = { to: globeSpot(L.land), rest: TOUR_REST };
     settleNames(S.tour.to);
   }
@@ -4985,7 +5026,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // Ground speed in km a second at a height, flying flat out.
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   const setBird = (lon, lat, a, down) => Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down });
-  window.birdsEye = { lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, flagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
+  window.birdsEye = { showLeg, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, flagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     project: projectLL, unproject, speedAt, FLY_TOP, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
