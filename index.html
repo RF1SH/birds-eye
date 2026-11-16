@@ -2400,7 +2400,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
       if (c.pop) html += '<p class="people">Population: ~' + people(c.pop) + '</p>';
       if (c.cap) html += '<div class="capline">' + PIN + esc(c.cap[0]) + '</div>';
     } else html += '<h2 class="' + (here.sea ? 'sea' : '') + '">' + esc(water ? water.name : here.name) + '</h2>' + (here.note ? '<div class="capline">' + esc(here.note) + '</div>' : '');
-    const facts = FACTS[c ? 'c:' + c.id : water ? 's:' + water.id : ''] || [];
+    // ONE fact, the first of the place's list (the player's pick of 2026-11-15, PLAN 105; their test for it, PLAN 37b: would
+    // a friend say "oh, that's interesting"? Until then every fact of the list, two or three)
+    const facts = (FACTS[c ? 'c:' + c.id : water ? 's:' + water.id : ''] || []).slice(0, 1);
     if (facts.length) html += '<ul>' + facts.map((f) => '<li>' + esc(f) + '</li>').join('') + '</ul>';
     if (c && c.flagNote) html += '<p class="note">*Flag disputed. ' + esc(c.flagNote) + '</p>';
     box.innerHTML = html;
@@ -4942,7 +4944,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // Ground speed in km a second at a height, flying flat out.
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   const setBird = (lon, lat, a, down) => Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down });
-  window.birdsEye = { lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, flagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
+  window.birdsEye = { lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, flagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     project: projectLL, unproject, speedAt, FLY_TOP, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
