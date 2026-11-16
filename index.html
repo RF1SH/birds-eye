@@ -2456,6 +2456,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
         for (let i = Math.max(0, Math.floor(b.x0 / CELL)); i <= Math.min(cols - 1, Math.floor(b.x1 / CELL)); i++) { n++; if (grid[j * cols + i] === c) inside++; }
       return n ? inside / n : 0;
     };
+    // how much of a box is over the given country and how much over water: [0 to 1, 0 to 1]
+    const mix = (b, c) => {
+      let n = 0, inside = 0, wet = 0;
+      for (let j = Math.max(0, Math.floor(b.y0 / CELL)); j <= Math.min(rows - 1, Math.floor(b.y1 / CELL)); j++)
+        for (let i = Math.max(0, Math.floor(b.x0 / CELL)); i <= Math.min(cols - 1, Math.floor(b.x1 / CELL)); i++) { const v = grid[j * cols + i]; n++; if (v === c) inside++; else if (v === 'sea' || (v && v.water)) wet++; }
+      return n ? [inside / n, wet / n] : [0, 0];
+    };
     const bottom = view.h - view.deck;
     const boxes = (card ? [card] : []).concat([{ x0: view.w - 70 * view.ui, x1: view.w, y0: 0, y1: 66 * view.ui }]);      // the card, and the pause button in the corner
     const hit = (b, M) => b.x0 < M || b.y0 < M || b.x1 > view.w - M || b.y1 > bottom - M || boxes.some((o) => b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0);
@@ -2495,7 +2502,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // first). away: how far a dot's middle is from a name; a dot over or under counts half again as far as one level with
     // it. TWICE: nearly twice as far as its own dot. (The capital's name needs no such room: its mark is a star, and no
     // city's dot is taken for it.)
-    const TWICE = 1.8, names = [];
+    const TWICE = 1.8, WHOLLY = 0.95, names = [];
     const away = (b, o) => { const x = (o.x0 + o.x1) / 2, y = (o.y0 + o.y1) / 2; return Math.hypot(Math.max(b.x0 - x, 0, x - b.x1), 1.5 * Math.max(b.y0 - y, 0, y - b.y1)); };
     const crowds = (b, gap, own) => dots.some((o) => o !== own && !over(o, own) && away(b, o) < TWICE * gap);
     const crowded = (it) => { const air = about(it.s, 11 * k); return dots.some((o) => o.city && over(air, o)) || names.some((n) => away(n.b, it.dot) < TWICE * n.gap); };
@@ -2523,8 +2530,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
         if (it.n >= 6 && side > 5) return;
         const b = { x0: x0 - 3, x1: x0 + w + 3, y0: y0 - 2, y1: y0 + h + 2 };
         if (named(b, 14) || crowds(b, gap, it.dot)) return;
-        // most inside the country (8 tenths is as good as all of it), the earlier side first
-        let sc = Math.min(share(b, A.c), 0.8) - 0.04 * side;
+        // most inside the country (8 tenths is as good as all of it), or wholly on the water beside it, which is nearly as
+        // good (a city on the coast, as an atlas has it: until 2026-11-15 the water counted for nothing, and a name
+        // lay across the country's thick outline before it stood on the sea: the border with Mexico ran through
+        // "Los Angeles" like a hyphen); then the earlier side first
+        const [inside, wet] = mix(b, A.c);
+        let sc = (inside >= 0.8 ? 0.8 : wet >= WHOLLY ? 0.7 : inside) - 0.04 * side;
         for (const o of items) if (o.n > it.n && o.dot && (over(b, o.dot) || (!it.cap && away(b, o.dot) < TWICE * gap)) && !hit(o.dot, 14) && !crowded(o)) sc -= Math.max(0.3, 1.2 - 0.1 * o.n);          // (not for one that has no room as it is)
         if (!best || sc > best.sc) best = { b, sc, x0, y0 };
       });
