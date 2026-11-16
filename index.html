@@ -4613,6 +4613,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // then spun slowly (the player's design of 2026-11-12, before flights were long enough to tangle).
   // Degrees a second along a hop, its shortest and longest; seconds on each stop; dotted lines kept; seconds the lines take to go.
   const REPLAY_DEG = 40, REPLAY_MIN = 0.45, REPLAY_MAX = 5, REPLAY_STOP = 0.25, REPLAY_KEEP = 5, REPLAY_FADE = 0.6;
+  // Once the lines have gone, the bird stands OFF_REST seconds in full view, then flies off the screen in OFF_SECS (flyOff).
+  const OFF_REST = 0.5, OFF_SECS = 3;
   // How the globe follows the line's tip: it holds still while the tip is within dz degrees of the middle, then turns at
   // gain times the distance past that (at most vmax degrees a second, eased in at soft); up and down more gently.
   const FOLLOW = { dz: 10, gain: 3, vmax: 60, soft: 4, gainY: 2, vmaxY: 30, softY: 2.5 };
@@ -4658,6 +4660,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // The bird of the replay: the game's own bird, flapping for the first eight tenths of a hop and gliding in, as high as the
   // hop is long, squashed a moment as it lands. It stays on the last stop delivered while the red line is drawn.
   function replayBird(R, dt) {
+    if (R.bird.off || R.bird.gone) { flyOff(R.bird, dt); return; }
     const B = R.bird, lost = S.routeLost && R.i === R.n - 1 && R.t >= 0, k = R.k;
     const flying = R.t >= 0 && !R.done && !lost && k < 1;
     B.at = R.t < 0 ? R.Q[0] : R.done || lost ? R.Q[S.routeLost ? R.n - 1 : R.n] : flying ? slerp(R.Q[R.i], R.Q[R.i + 1], k) : R.Q[R.i + 1];
@@ -4673,10 +4676,47 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const spread = !flying ? 0.42 : flap ? 0.72 + 0.28 * Math.cos(B.beat) : 1;
     B.spread += (spread - B.spread) * Math.min(1, dt * (flap ? 30 : 9));
     B.squash = Math.max(0, B.squash - dt / 0.18);
+    // Once the lines have gone, it stands OFF_REST seconds where it can be seen whole, on a globe that is not turning fast (the
+    // follow eases out at about 11 degrees a second at the end of a replay; after "Skip to the end" it waits for the turn to
+    // its stop; turned away by hand, it waits until it is looked at again), then flies off.
+    const ready = R.done && R.t - R.total >= REPLAY_FADE && !drag.on && Math.hypot(R.v, R.w) < 12 && dot(B.at, cam.n) > cam.cos0 + 0.08;
+    B.still = ready ? (B.still || 0) + dt : 0;
+    if (B.still >= OFF_REST) flyOff(B, 0);
+  }
+  // The replay's last beat, the player's idea (2026-11-16: "maybe at the end the bird flies off the screen to the right ...
+  // a nice side view of the bird as it flies off the screen to the right, or top view, whatever you think. Maybe that
+  // happens while the red line is being formed, or maybe after ... it might be a pretty animation and might add a little
+  // flair to it"): seen from above as everywhere in the game, after the red line and the lines' going. It takes off
+  // flapping from where it stood, turns to face right, climbs (drawn ever higher above its shadow, which shrinks and goes)
+  // and glides out over the screen's right edge. The finished globe has no bird.
+  function flyOff(B, dt) {
+    if (B.gone) return;
+    if (!B.off) {          // where it stood on the screen, and the height it climbs to: up to 110 px x the scale, never over the screen's top
+      const g = project(B.at), y0 = g[1] - 4 * view.mk;
+      B.off = { x: g[0], y: g[1], y0, to: Math.max(36 * birdSize(), y0 - 110 * view.mk), t: 0 };
+    }
+    const f = clamp((B.off.t += dt) / OFF_SECS, 0, 1), up = 1 - (1 - f) ** 2;          // up quickly at first, then on at that height
+    B.x = B.off.x + (view.w + 30 * birdSize() - B.off.x) * Math.pow(f, 1.6);          // ever faster, as a bird leaving, out over the right edge
+    B.y = lerp(B.off.y0, B.off.to, up);
+    B.a = 1.6 * up;          // how high it is, for its shadow
+    B.h += Math.atan2(Math.sin(-B.h), Math.cos(-B.h)) * Math.min(1, dt * 9);          // it turns to face right
+    const flap = f < 0.65;
+    B.beat += dt * (flap ? 15 : 0);
+    B.spread += ((flap ? 0.72 + 0.28 * Math.cos(B.beat) : 1) - B.spread) * Math.min(1, dt * (flap ? 30 : 9));
+    if (f >= 1) B.gone = true;
   }
   function drawReplayBird() {
     const R = S.replay, B = R && R.bird;
-    if (!B) return;
+    if (!B || B.gone) return;
+    if (B.off) {          // flying off: in the air over the screen, its shadow under it on the globe while it is still low
+      const size = birdSize(), go = clamp(1 - B.a / 0.8, 0, 1), sh = 1 - 0.5 * B.a;
+      if (go > 0 && Math.hypot(B.x - cam.cx, B.off.y - cam.cy) < cam.rho) {
+        ctx.fillStyle = 'rgba(19,38,59,' + ((0.34 - 0.14 * B.a) * go).toFixed(3) + ')';
+        ctx.beginPath(); ctx.ellipse(B.x, B.off.y, 15 * size * sh, 6 * size * sh, 0, 0, 7); ctx.fill();
+      }
+      birdShape(B.x, B.y, size, B.spread, 0, B.h);
+      return;
+    }
     const g = project(B.at), seen = clamp((dot(B.at, cam.n) - cam.cos0 - 0.02) / 0.06, 0, 1);          // it fades out near the globe's rim
     if (!g || seen <= 0) return;
     if (R.t < 0) { const q = project(slerp(R.Q[0], R.Q[1], 0.02)); if (q) B.h = Math.atan2(q[1] - g[1], q[0] - g[0]); }          // waiting on the start, it faces its first hop
