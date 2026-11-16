@@ -2405,8 +2405,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (c && c.flagNote) html += '<p class="note">*Flag disputed. ' + esc(c.flagNote) + '</p>';
     box.innerHTML = html;
     box.hidden = false;
-    // on the map round you: the capital and the best known cities of the part of the country you stand on, by name alone
-    S.around = here.name ? { c: c || { name: '' }, land: c || (here.sea ? null : CONTEXT.find((x) => x.id === here.key)) || null, water, t: S.t, list: c ? freeCities(c, bird.lon, bird.lat).slice(0, 6) : [] } : null;
+    // on the map round you: the capital and the best known cities of the part of the country you stand on (up to ten), by name alone
+    S.around = here.name ? { c: c || { name: '' }, land: c || (here.sea ? null : CONTEXT.find((x) => x.id === here.key)) || null, water, t: S.t, list: c ? freeCities(c, bird.lon, bird.lat) : [] } : null;
     measure();
     // One arrival, everything on one clock and one curve: the view comes to rest on the whole of where you landed, the card
     // comes in, all that is not the place you came down in goes pale (which is what says where you are: no flash), and the
@@ -2457,43 +2457,100 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const bottom = view.h - view.deck;
     const boxes = (card ? [card] : []).concat([{ x0: view.w - 70 * view.ui, x1: view.w, y0: 0, y1: 66 * view.ui }]);      // the card, and the pause button in the corner
     const hit = (b, M) => b.x0 < M || b.y0 < M || b.x1 > view.w - M || b.y1 > bottom - M || boxes.some((o) => b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0);
-    const size = freePx(), k = size / 28, big = Math.round(size * 1.25), small = Math.round(size * 0.62);
+    // the sizes: the capital's name 1.1 of Free flight's own name size, a city's 0.8, the names round about 0.62 (47, 34 and
+    // 27 px on a 1913 px screen; until 2026-11-15 the capital 1.25 and a city 1: ten names of that size found no room)
+    const size = freePx(), k = size / 28, big = Math.round(size * 1.1), town = Math.round(size * 0.8), small = Math.round(size * 0.62);
     const L = { key: view.w + 'x' + view.h + ':' + Math.round(view.slide), cities: [], near: [], k };
-    // the cities: every dot first, then each name beside its dot, on whichever side keeps it most inside the country.
-    // Names only: no population under them (the player's pick of 2026-11-15 from a picture of both; until then each city's
-    // stood under its name, small and grey. The country's own is on the card)
-    const items = (A.c.cap ? [{ p: unit(A.c.cap[1], A.c.cap[2]), name: A.c.cap[0], cap: true }] : [])
-      .concat(A.list.map((x) => ({ p: unit(x.lon, x.lat), name: x.name })));
-    const shown = [];
-    for (const it of items) {
-      const s = project(it.p);
-      if (!s) continue;
-      const r = (it.cap ? 12 : 8) * k, dot = { x0: s[0] - r, x1: s[0] + r, y0: s[1] - r, y1: s[1] + r };
-      if (hit(dot, 14)) continue;
-      boxes.push(dot);
-      shown.push(Object.assign({ s }, it));
+    const over = (a, o) => a.x0 < o.x1 && a.x1 > o.x0 && a.y0 < o.y1 && a.y1 > o.y0, about = (s, r) => ({ x0: s[0] - r, x1: s[0] + r, y0: s[1] - r, y1: s[1] + r });
+    // The capital and the cities (the player's pick of 2026-11-15 from pictures FREE-3 to FREE-6). The capital takes its
+    // room first, then the cities, best known first: each its dot and its name together, or neither (a dot without a name
+    // says nothing: until then every dot was put down first, and Washington's star, Milan and Volgograd stood bare).
+    // A name keeps clear of the bird's own body, of the dots of the tiny countries and, where it can, of the dots of the
+    // cities still to come: the better known the city that would lose its spot, the more it costs. Beside its dot comes
+    // before under or over it; from the seventh city on, beside its dot or not at all (under or over, between other
+    // dots, it is hard to tell whose name it is). Names only: no population under them (the player's pick of 2026-11-15
+    // from a picture of both; until then each city's stood under its name, small and grey. The country's own is on the card)
+    const bg = project(unit(bird.lon, bird.lat)), bb = bg && birdBox(bg), br = bb && Math.max(26 * birdSize() * onMap(), 8);
+    const body = bb ? { x0: bb.x - br, x1: bb.x + br, y0: bb.y - 0.62 * br, y1: bb.y + 0.62 * br } : null;          // the bird as drawn, not the square of room it keeps in a flight
+    const named = (b, M) => hit(b, M) || (body && over(b, body));          // no room for a name
+    const tinies = dotsShow() < 1 ? [] : TINY.map((t) => ({ t, s: project(t.u) })).filter((q) => q.s && !hit(about(q.s, 6 * k), 0));          // (from higher up their dots are faint or not drawn: drawDots)
+    const items = [];
+    if (A.c.cap) items.push({ p: unit(A.c.cap[1], A.c.cap[2]), name: A.c.cap[0], cap: true, n: -1 });
+    A.list.forEach((x, n) => items.push({ p: unit(x.lon, x.lat), name: x.name, n }));
+    for (const it of items) {          // where each would stand; one off the screen or under the card is not tried
+      it.s = project(it.p);
+      it.dot = it.s && about(it.s, (it.cap ? 12 : 7) * k);
+      if (it.dot && hit(it.dot, 14)) it.dot = null;
     }
-    for (const it of shown) {
-      const s = it.s, sz = it.cap ? big : size;
+    L.tried = items.length; L.out = [];          // for the tests: how many were tried, and which found no room
+    const cap = items.find((it) => it.cap && it.dot), dots = [];
+    if (cap) dots.push(cap.dot);
+    for (const q of tinies) dots.push(q.dot = about(q.s, 11 * k));          // (a capital's star may stand on one: Rome's on Vatican City's)
+    boxes.push(...dots);
+    // A name must read as its own dot's: every other dot stands clearly farther from it than its own does (Chicago's
+    // name, to the right of its dot, ended at Washington's star and read as the star's; Okayama's stood right over
+    // Hiroshima's dot; Fukuoka's dot stood level with "Hiroshima", before it, where a name's own dot is looked for
+    // first). away: how far a dot's middle is from a name; a dot over or under counts half again as far as one level with
+    // it. TWICE: nearly twice as far as its own dot. (The capital's name needs no such room: its mark is a star, and no
+    // city's dot is taken for it.)
+    const TWICE = 1.8, names = [];
+    const away = (b, o) => { const x = (o.x0 + o.x1) / 2, y = (o.y0 + o.y1) / 2; return Math.hypot(Math.max(b.x0 - x, 0, x - b.x1), 1.5 * Math.max(b.y0 - y, 0, y - b.y1)); };
+    const crowds = (b, gap, own) => dots.some((o) => o !== own && !over(o, own) && away(b, o) < TWICE * gap);
+    const crowded = (it) => { const air = about(it.s, 11 * k); return dots.some((o) => o.city && over(air, o)) || names.some((n) => away(n.b, it.dot) < TWICE * n.gap); };
+    for (const it of items) {
+      if (!it.dot) continue;
+      const s = it.s, sz = it.cap ? big : town;
+      // a city's dot needs a little air from the next city's, or the two read as one blot (Kyoto's and Osaka's on Japan's
+      // view; a star's room and a tiny country's have that air in them)
+      if (!it.cap) { if (hit(it.dot, 14) || crowded(it)) { it.dot = null; L.out.push([it.name, 'dot']); continue; } boxes.push(it.dot); dots.push(it.dot); it.dot.city = true; }
       ctx.font = '700 ' + sz + 'px ' + DISPLAY;
       if ('letterSpacing' in ctx) ctx.letterSpacing = '0.05em';
       const w = ctx.measureText(it.name).width;
       const gap = (it.cap ? 22 : 13) * k, h = sz;
-      // the first of these that is free and mostly inside the country: right of the dot, level, then nudged
-      // up or down; the left; below; above. If none is, whichever free one is most inside.
-      const mid = s[1] - sz * 0.55, nudge = h * 0.45;
-      const sides = [[s[0] + gap, mid], [s[0] + gap, mid - nudge], [s[0] + gap, mid + nudge * 0.6], [s[0] - gap - w, mid],
-        [s[0] - w / 2, s[1] + gap * 0.7], [s[0] - w / 2, s[1] - gap * 0.7 - h]];
+      // beside the dot: to its right, level, then nudged up or down, then to its left the same way; then under it and
+      // over it: its middle on the dot, then ending at the dot, then starting at it (a long name by the screen's edge,
+      // where the level spots lie over other cities: Washington, D.C. with the Atlantic off the screen and Chicago to
+      // its left)
+      // (a city the bird stands on: its name stands beside the bird, as far from it as from a dot)
+      const on = body && over(it.dot, body), r = gap * 0.5, east = (on ? Math.max(s[0], body.x1 - r) : s[0]) + gap, west = (on ? Math.min(s[0], body.x0 + r) : s[0]) - gap - w;
+      const mid = s[1] - sz * 0.55, nudge = h * 0.45, under = (on ? Math.max(s[1], body.y1 - r) : s[1]) + gap * 0.7, above = (on ? Math.min(s[1], body.y0 + r) : s[1]) - gap * 0.7 - h, end = s[0] + r - w, start = s[0] - r;
+      const sides = [[east, mid], [east, mid - nudge], [east, mid + nudge * 0.6], [west, mid], [west, mid - nudge], [west, mid + nudge * 0.6],
+        [s[0] - w / 2, under], [s[0] - w / 2, above], [end, under], [end, above], [start, under], [start, above]];
       let best = null;
-      for (const [x0, y0] of sides) {
+      sides.forEach(([x0, y0], side) => {
+        if (it.n >= 6 && side > 5) return;
         const b = { x0: x0 - 3, x1: x0 + w + 3, y0: y0 - 2, y1: y0 + h + 2 };
-        if (hit(b, 14)) continue;
-        const sc = share(b, A.c);
-        if (sc >= 0.8) { best = { b, sc, x0, y0 }; break; }
+        if (named(b, 14) || crowds(b, gap, it.dot)) return;
+        // most inside the country (8 tenths is as good as all of it), the earlier side first
+        let sc = Math.min(share(b, A.c), 0.8) - 0.04 * side;
+        for (const o of items) if (o.n > it.n && o.dot && (over(b, o.dot) || (!it.cap && away(b, o.dot) < TWICE * gap)) && !hit(o.dot, 14) && !crowded(o)) sc -= Math.max(0.3, 1.2 - 0.1 * o.n);          // (not for one that has no room as it is)
         if (!best || sc > best.sc) best = { b, sc, x0, y0 };
-      }
+      });
+      if (!best) { if (!it.cap) { boxes.splice(boxes.indexOf(it.dot), 1); dots.splice(dots.indexOf(it.dot), 1); it.dot = null; L.out.push([it.name, 'name']); continue; } }
+      else { boxes.push(best.b); if (!it.cap) names.push({ b: best.b, gap }); }
       L.cities.push({ it, sz, at: best && { dx: best.x0 - s[0], dy: best.y0 + sz / 2 - s[1] } });          // the name: how far from its dot it starts
-      if (best) boxes.push(best.b);
+    }
+    // The tiny countries round about are named too: each beside its dot, in the neighbors' lettering, a notch smaller
+    // (until 2026-11-15 their dots stood bare: three in the picture of Italy). Round about: within NEAR_DOT_KM of the
+    // outline of where you landed. Not one whose dot lies under the capital's star (Vatican City's under Rome's).
+    const edge = A.land && A.land.fine ? partPoints(A.land, partAt(A.land, bird.lon, bird.lat)) : A.water && !isOcean(A.water) ? seaShape(A.water) : [];
+    const nearCos = Math.cos(NEAR_DOT_KM / R_KM);
+    for (const { t, s, dot: own } of tinies) {
+      if (t === A.c || !edge.some((q) => dot(q, t.u) >= nearCos)) continue;
+      if (cap && Math.hypot(cap.s[0] - s[0], cap.s[1] - s[1]) < 22 * k) continue;
+      const px = Math.round(small * 0.8), label = t.name.toUpperCase(), g2 = 17 * k;
+      ctx.font = '700 ' + px + 'px ' + DISPLAY;
+      if ('letterSpacing' in ctx) ctx.letterSpacing = '0.12em';
+      const w = ctx.measureText(label).width;
+      for (const [x, y] of [[s[0] + g2 + w / 2, s[1]], [s[0] - g2 - w / 2, s[1]], [s[0], s[1] + g2 + px * 0.5], [s[0], s[1] - g2 - px * 0.5]]) {
+        const b = { x0: x - w / 2 - 4, x1: x + w / 2 + 4, y0: y - px * 0.7, y1: y + px * 0.7 };
+        if (named(b, 20) || crowds(b, g2, own)) continue;
+        const spot = unproject(x, y);
+        if (!spot) continue;
+        boxes.push(b);
+        L.near.push({ name: label, p: unit(spot[0], spot[1]), small: px, water: false, track: '0.12em', tiny: t.name });
+        break;
+      }
     }
     // then the seas round about, in blue italics, and the countries, in grey capitals, biggest first: each at
     // the spot of the screen where its name sits most inside it (nearest a country's own label point)
@@ -2515,7 +2572,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       for (const n of seen.get(c)) {
         const x = (n % cols + 0.5) * CELL, y = (Math.floor(n / cols) + 0.5) * CELL;
         const b = { x0: x - w / 2 - 6, x1: x + w / 2 + 6, y0: y - px * 0.75, y1: y + px * 0.75 };
-        if (hit(b, 36)) continue;
+        if (named(b, 36)) continue;
         const inside = share(b, c);
         if (inside < (water ? 0.85 : 0.6)) continue;
         // roomiest first: how much of a wider box round the name is still inside, then nearness to a country's own label point
@@ -2530,9 +2587,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
       L.near.push({ name: label, p: unit(spot[0], spot[1]), small: px, water, track });          // p: the spot of the map the name stands on
     }
     L.pxRad = cam.pxRad;          // the scale the names are laid out at
-    L.seaPieces = A.c.fine || !A.water ? null : D.seas.filter((x) => x.w === WATERS.indexOf(A.water));
+    L.own = A.land && A.land.fine ? A.land : null;          // the land you came down in: a country, or a land that is never asked (Greenland)
+    L.seaPieces = L.own || !A.water ? null : D.seas.filter((x) => x.w === WATERS.indexOf(A.water));
     L.lands = L.seaPieces && L.seaPieces.length ? [...seen.keys()].filter((q) => !q.water) : null;
-    L.pale = !!(A.c.fine || L.lands);
+    L.pale = !!(L.own || L.lands);
     return L;
   }
   // What stands out: the country you came down in (everything else washed pale, its border thick), or the water (the
@@ -2545,7 +2603,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (L.washKey === key) return;
     L.washKey = key;
     let hole = null, land = null;
-    if (A.c.fine) hole = tracePath(new Path2D(), A.c.fine);
+    if (L.own) hole = tracePath(new Path2D(), L.own.fine);
     else if (L.lands) {
       hole = new Path2D();
       for (const x of L.seaPieces) tracePath(hole, x.rings);
@@ -2553,7 +2611,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       for (const q of L.lands) tracePath(land, q.fine);
       for (const q of TINY) if (q.fine && project(q.u)) tracePath(land, q.fine);          // the small islands too
     }
-    L.border = A.c.fine ? hole : null;
+    L.border = L.own ? hole : null;
     if (!hole) { L.wash = null; return; }
     const d = view.dpr, layer = L.wash || document.createElement('canvas'), g = layer.getContext('2d');
     const lw = Math.round(view.w * d), lh = Math.round(view.h * d);
@@ -2579,6 +2637,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // ocean is wider than one side of the globe, and a country drawn as a dot has nothing to show closer: there the view
   // stays at the ground view. null: nothing to fit (an ocean), the map slides aside for the card as it did.
   const FIT_PAD_X = 96, FIT_PAD_Y = 64, FIT_IN = 3;          // the pads: px on a 1913 x 1073 screen
+  const NEAR_DOT_KM = 150;          // a tiny country this near the outline of where you landed is named beside its dot
   function partPoints(land, part) {
     const all = land.partPts || (land.partPts = {});
     if (!all[part]) {
@@ -4052,8 +4111,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   // Low enough for a dot to mean something.
   // countries too small to see are dots, once you are low enough for a dot to mean something
+  const dotsShow = () => clamp((cam.pxRad / R_KM - 0.1) / 0.12, 0, 1);
   function drawDots() {
-    const show = clamp((cam.pxRad / R_KM - 0.1) / 0.12, 0, 1);
+    const show = dotsShow();
     if (show <= 0) return;
     for (const c of TINY) {
       const s = project(c.u);
