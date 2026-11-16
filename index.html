@@ -2550,8 +2550,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
       const sides = [[east, mid], [east, mid - nudge], [east, mid + nudge * 0.6], [west, mid], [west, mid - nudge], [west, mid + nudge * 0.6],
         [s[0] - w / 2, under], [s[0] - w / 2, above], [end, under], [end, above], [start, under], [start, above]];
       let best = null;
-      sides.forEach(([x0, y0], side) => {
-        if (it.n >= 6 && side > 5) return;
+      const tryAt = ([x0, y0], side) => {
+        if (it.n >= 6 && side > 5 && side < 12) return;
         const b = { x0: x0 - 3, x1: x0 + w + 3, y0: y0 - 2, y1: y0 + h + 2 };
         if (named(b, 14) || crowds(b, gap, it.dot)) return;
         // most inside the country (8 tenths is as good as all of it), or wholly on the water beside it, which is nearly as
@@ -2562,7 +2562,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
         let sc = (inside >= 0.8 ? 0.8 : wet >= WHOLLY ? 0.7 : inside) - 0.04 * side;
         for (const o of items) if (o.n > it.n && o.dot && (over(b, o.dot) || (!it.cap && away(b, o.dot) < TWICE * gap)) && !hit(o.dot, 14) && !crowded(o)) sc -= Math.max(0.3, 1.2 - 0.1 * o.n);          // (not for one that has no room as it is)
         if (!best || sc > best.sc) best = { b, sc, x0, y0 };
-      });
+      };
+      sides.forEach(tryAt);
+      // No spot: the name slides along its dot's side in finer steps, as a map's lettering does (the sliding-label model:
+      // van Kreveld, Strijk and Wolff 1999). In a 1440 x 900 window "Chicago" missed the room between "New York City" and
+      // "Washington, D.C." by 2 px on every landing in the United States. Only for a name that has no spot at all, so no
+      // name that stands today moves.
+      if (!best) [[east, mid - nudge * 0.25], [east, mid - nudge * 0.5], [east, mid + nudge * 0.3], [west, mid - nudge * 0.25], [west, mid - nudge * 0.5], [west, mid + nudge * 0.3]].forEach((q, i) => tryAt(q, sides.length + i));
       if (!best) { if (!it.cap) { boxes.splice(boxes.indexOf(it.dot), 1); dots.splice(dots.indexOf(it.dot), 1); it.dot = null; L.out.push([it.name, 'name']); continue; } }
       else { boxes.push(best.b); if (!it.cap) names.push({ b: best.b, gap }); }
       L.cities.push({ it, sz, at: best && { dx: best.x0 - s[0], dy: best.y0 + sz / 2 - s[1] } });          // the name: how far from its dot it starts
