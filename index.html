@@ -392,6 +392,30 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #place li::marker { color: var(--ink-soft); }
 #place .people { margin: calc(8 * var(--u)) 0 0; font-size: calc(16 * var(--u)); color: var(--ink-soft); }
 #place .note { margin: calc(10 * var(--u)) 0 0; font-size: calc(13 * var(--u)); color: var(--ink-soft); }
+/* In a window 900 px wide or narrower the card lies along the bottom and the place is shown whole above it (the player's
+   pick of 2026-11-16 from pictures NARROW-1 to NARROW-3; as Google Maps has its card at a phone's width, and as the day
+   card goes under the globe in a narrow window). Flat: the flag, then name / population / capital, then the fact beside
+   them. Until then the card stood at the left in every window and lay over the country: in a window 800 x 600 Rome was
+   under it. A place with no flag (a sea, Greenland): the name starts at the card's edge. */
+@media (max-width: 900px) {
+  #place { align-self: end; justify-self: center; width: 100%; max-width: calc(760 * var(--u)); box-sizing: border-box; display: grid; grid-template-columns: auto auto minmax(0, 1fr);
+    column-gap: calc(18 * var(--u)); align-items: center; padding: calc(14 * var(--u)) calc(20 * var(--u)); }
+  #place .flag { grid-column: 1; grid-row: 1 / span 3; height: calc(56 * var(--u)); margin: 0; align-self: center; }
+  #place h2 { grid-column: 2; grid-row: 1; font-size: calc(32 * var(--u)); }
+  #place .people { grid-column: 2; grid-row: 2; margin-top: calc(5 * var(--u)); }
+  #place .capline { grid-column: 2; grid-row: 3; margin-top: calc(6 * var(--u)); font-size: calc(21 * var(--u)); }
+  #place h2:first-child, #place h2:first-child ~ .capline { grid-column: 1 / span 2; }
+  #place ul { grid-column: 3; grid-row: 1 / span 3; align-self: stretch; align-content: center; margin: 0; padding: 0 0 0 calc(36 * var(--u)); border-top: 0; border-left: var(--b1) solid var(--paper-shade); }
+  #place .note { grid-column: 1 / -1; grid-row: 4; }
+}
+/* at a phone's width the fact goes under them */
+@media (max-width: 560px) {
+  #place { grid-template-columns: auto minmax(0, 1fr); column-gap: calc(14 * var(--u)); padding: calc(12 * var(--u)) calc(16 * var(--u)); }
+  #place .flag { height: calc(46 * var(--u)); }
+  #place h2 { font-size: calc(28 * var(--u)); }
+  #place ul { grid-column: 1 / -1; grid-row: 4; margin: calc(10 * var(--u)) 0 0; padding: calc(9 * var(--u)) 0 0 calc(20 * var(--u)); border-left: 0; border-top: var(--b1) solid var(--paper-shade); }
+  #place .note { grid-row: 5; }
+}
 #debrief {
   display: grid;
   grid-template-columns: auto auto auto auto;
@@ -2667,8 +2691,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     else if (A.water && !isOcean(A.water)) pts = seaShape(A.water);
     if (!pts || !pts.length) return null;
     pts = pts.concat([me]);
-    const u = view.ui / 1.5, padX = FIT_PAD_X * u, padY = FIT_PAD_Y * u, left = card && view.w > 900 ? card.x1 : 0;
-    const x0 = left + padX, x1 = view.w - padX, y0 = padY, y1 = view.h - view.deck - padY, rx = (x0 + x1) / 2, ry = (y0 + y1) / 2;
+    const u = view.ui / 1.5, padX = FIT_PAD_X * u, padY = FIT_PAD_Y * u, left = card && view.w > 900 ? card.x1 : 0, under = card && view.w <= 900 ? card.y0 : view.h - view.deck;          // the room beside the card, or above it in a narrow window (the card lies along the bottom there)
+    const x0 = left + padX, x1 = view.w - padX, y0 = padY, y1 = under - padY, rx = (x0 + x1) / 2, ry = (y0 + y1) / 2;
     const saved = Object.assign({}, cam);
     let mid = norm(pts.reduce((a, q) => [a[0] + q[0], a[1] + q[1], a[2] + q[2]], [0, 0, 0])), H = low, whole = true;
     const holds = (h) => { aim(mid, h, rx, ry); return pts.every((q) => { const at = project(q); return at && at[0] >= x0 && at[0] <= x1 && at[1] >= y0 && at[1] <= y1; }); };
