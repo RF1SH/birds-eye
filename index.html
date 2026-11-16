@@ -2394,8 +2394,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (c) {
       if (c.a2) html += flagImg(c, 'Flag of ' + esc(c.name), 'flag');
       html += '<h2>' + esc(c.name) + (c.flagNote ? '*' : '') + '</h2>';
-      if (c.cap) html += '<div class="capline">' + PIN + esc(c.cap[0]) + '</div>';
+      // the country's population straight under the country's name, the capital after it (the player, 2026-11-15, of the
+      // number under the capital's name: "it's unclear whether the population on the side card is talking about the
+      // country or the capital"; their pick from picture FREE-2)
       if (c.pop) html += '<p class="people">Population: ~' + people(c.pop) + '</p>';
+      if (c.cap) html += '<div class="capline">' + PIN + esc(c.cap[0]) + '</div>';
     } else html += '<h2 class="' + (here.sea ? 'sea' : '') + '">' + esc(water ? water.name : here.name) + '</h2>' + (here.note ? '<div class="capline">' + esc(here.note) + '</div>' : '');
     const facts = FACTS[c ? 'c:' + c.id : water ? 's:' + water.id : ''] || [];
     if (facts.length) html += '<ul>' + facts.map((f) => '<li>' + esc(f) + '</li>').join('') + '</ul>';
