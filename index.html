@@ -433,6 +433,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #debrief .tiles { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }          /* tiles of one width (the widest word's), so the numbers stand at even steps */
 /* the one control on screen in a flight: it opens the pause card (shown whenever pausing is allowed) */
 #skip { position: absolute; z-index: 6; zoom: var(--ui, 1); font-size: 16px; padding: 5px 10px 6px; white-space: nowrap; }      /* Study's replay, paused: over the end card (showSkip); the tutorial's Skip, in size */
+/* beside it, how to go on: in the style of Day Trip's key under its globe (paper-white, no box), with an edge in the
+   background's navy, which cannot be seen on the dark and keeps the words readable over the map when it is zoomed in */
+#skip-note { position: absolute; z-index: 6; zoom: var(--ui, 1); margin: 0; font: 400 14px/1 var(--text); letter-spacing: .02em; color: var(--paper); white-space: nowrap; pointer-events: none;
+  text-shadow: 0 0 1px var(--space), 0 0 2px var(--space), 0 0 2px var(--space), 0 0 3px var(--space), 0 0 3px var(--space); }
 #pause { position: absolute; top: 14px; right: 16px; zoom: var(--ui, 1); width: 38px; height: 38px; padding: 0; display: grid; place-items: center; background: var(--paper); color: var(--ink); border: var(--b2z) solid var(--ink); border-radius: 3px; }
 #pause:hover { background: var(--paper-shade); }
 #nogl { position: absolute; inset: auto 16px 16px; margin: 0; padding: 12px 14px; background: var(--paper); border: 2px solid var(--ink); border-radius: 3px; }
@@ -574,6 +578,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   <div id="funfact" hidden aria-live="polite"></div>
   <p id="held" hidden>Click to carry on</p>
   <button class="alt" id="skip" type="button" hidden>Skip to the end</button>
+  <p id="skip-note" hidden>Click to carry on</p>
   <button id="pause" type="button" aria-label="Pause (P)" title="Pause (P)" hidden><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M8.5 5v14M15.5 5v14" stroke="currentColor" stroke-width="4" fill="none"/></svg></button>
   <p id="nogl" hidden>This browser cannot draw the globe (it needs WebGL 2). A recent Chrome, Edge, Firefox or Safari can.</p>
 </div>
@@ -4002,7 +4007,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
     if (!flying) {             // title and results: the globe turns slowly; drag it to turn it yourself
       if (globeHold.on) {          // an end globe paused by a press: everything holds, and the globe is the player's to turn
-        if (drag.on || (globeHold.still += dt) < HOLD_SECS) return;
+        if (drag.on || zoomedIn() || (globeHold.still += dt) < HOLD_SECS) return;          // zoomed in, it waits until it is zoomed out
         resumeGlobe();
       }
       if (atlas.back) {          // turning back to where a paused turn stopped, then on with it
@@ -4743,7 +4748,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // A press on an end globe pauses what it is doing (Study's replay, a round's turn on Day Trip's and Ranked's), and the
   // globe still turns by hand; a click goes on, as does leaving it alone for HOLD_SECS (no click, drag or mouse movement).
   // Turned by hand meanwhile, a turn first turns back to where it stopped; Study's replay goes back after the line's tip.
-  // The wheel pauses it too. While Study's replay is paused, "Skip to the end" stands over the end card. (The player,
+  // The wheel pauses it too, and zoomed in it stays paused: a click or still seconds go on only once it is zoomed out to its
+  // own view again (the player, 2026-11-16: "it should only be playing when it's zoomed out at the normal view ... 5 seconds
+  // idle on Zoom or a click while zoomed should not resume it, because then it's just confusing"). While Study's replay is
+  // paused, "Skip to the end" stands over the end card; after it the globe turns to the last stop (their pick). (The player,
   // 2026-11-16, of Fable's replay, where a click ended it with every name on: "I think this is a pretty bad decision ...
   // when you click on it, it should pause the animation ... and you can still rotate the globe ... a little button should
   // pop up in a tasteful place"; their picks by button: "Over the card", "Skip to the end", "click again. also resume if it
@@ -4752,6 +4760,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const HOLD_SECS = 5;
   const globeHold = { on: false, still: 0, down: null, at: null };
   const turning = () => S.mode === 'over' && (S.replay ? !S.replay.done : !!S.legs && !!(atlas.to || S.tour || atlas.back));
+  const zoomedIn = () => (atlas.zoom || 1) > 1.0001;
   function holdGlobe(press) {
     if (!turning()) return false;
     globeHold.down = press ? [press[0], press[1], globeHold.on] : null;
@@ -4783,17 +4792,26 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function skipToEnd() {
     const R = S.replay;
     if (!R || R.done) return;
-    R.t = Math.max(R.t, R.total); R.free = true;          // the globe stays where it is
+    R.t = Math.max(R.t, R.total);          // the globe turns to the last stop, as at the end of a replay
     holdOff();
   }
-  // "Skip to the end": centred under the globe, just over the end card (the tutorial's Skip, in the same lettering)
+  // "Skip to the end": centred under the globe, just over the end card (the tutorial's Skip, in the same lettering). Beside
+  // it, how to go on: "Click to carry on", and zoomed in, where a click does not go on, "Zoom out to carry on" (the player's
+  // idea, 2026-11-16: "maybe when it's paused, there should be a little note somewhere that is reasonable that says, click to
+  // resume. Maybe somewhere next to skip to the end in like a muted font"; picked from a picture, "Build it as drawn").
+  // "Carry on" is the game's word for going on: the pause card's button, and the line when you come back mid-round.
   function showSkip() {
-    const b = $('skip'), on = globeHold.on && !!S.replay && !S.replay.done && S.mode === 'over';
-    if (b.hidden !== !on) b.hidden = !on;
+    const b = $('skip'), note = $('skip-note'), on = globeHold.on && !!S.replay && !S.replay.done && S.mode === 'over';
+    if (b.hidden !== !on) b.hidden = note.hidden = !on;
     if (!on) return;
+    const words = zoomedIn() ? 'Zoom out to carry on' : 'Click to carry on';
+    if (note.textContent !== words) note.textContent = words;
     const st = stage.getBoundingClientRect(), card = $('debrief').getBoundingClientRect(), r = b.getBoundingClientRect(), z = view.ui;
     b.style.left = (view.ox - r.width / 2) / z + 'px';
     b.style.top = (card.top - st.top - r.height - 12) / z + 'px';
+    const left = view.ox + r.width / 2, nh = note.getBoundingClientRect().height;
+    note.style.left = (left + 14) / z + 'px';
+    note.style.top = (card.top - st.top - r.height / 2 - 12 - nh / 2) / z + 'px';
   }
   // The way the bird went, in plain ink with no edge round it. TWO widths and no more (the player: "a certain thickness
   // when you were flapping and thin when you weren't ... cleaner"): thin the whole way, and over it each stretch of
@@ -5233,6 +5251,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     atlas.zoom = clamp((atlas.zoom || 1) * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), 1, whole / view.H0);
     if (!holdGlobe(null)) { atlas.to = null; atlas.secs = 0; S.tour = null; atlas.back = null; if (S.replay) S.replay.free = true; }
     atlas.idle = 0; hover = null;
+    showSkip();          // zoomed in or out again: the note under the globe says how to go on
     for (let i = 0; i < 3 && at; i++) {          // turn the globe so that place is under the pointer again
       placeCamera();
       const s = projectLL(at[0], at[1]), k = cam.H / view.F / RAD;
@@ -5245,7 +5264,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     endDrag();
     const h = globeHold.down;
     globeHold.down = null;
-    if (h && h[2] && Math.hypot(e.clientX - h[0], e.clientY - h[1]) < 5) resumeGlobe();          // a click on a paused end globe: it goes on
+    if (h && h[2] && Math.hypot(e.clientX - h[0], e.clientY - h[1]) < 5 && !zoomedIn()) resumeGlobe();          // a click on a paused end globe: it goes on (zoomed in, not yet)
   });
   stage.addEventListener('pointermove', () => { globeHold.still = 0; });          // a mouse moving keeps it paused
   $('skip').addEventListener('click', skipToEnd);
