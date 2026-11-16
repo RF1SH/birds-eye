@@ -432,6 +432,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #debrief .tiles b { font-size: 40px; }
 #debrief .tiles { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }          /* tiles of one width (the widest word's), so the numbers stand at even steps */
 /* the one control on screen in a flight: it opens the pause card (shown whenever pausing is allowed) */
+#skip { position: absolute; z-index: 6; zoom: var(--ui, 1); font-size: 16px; padding: 5px 10px 6px; white-space: nowrap; }      /* Study's replay, paused: over the end card (showSkip); the tutorial's Skip, in size */
 #pause { position: absolute; top: 14px; right: 16px; zoom: var(--ui, 1); width: 38px; height: 38px; padding: 0; display: grid; place-items: center; background: var(--paper); color: var(--ink); border: var(--b2z) solid var(--ink); border-radius: 3px; }
 #pause:hover { background: var(--paper-shade); }
 #nogl { position: absolute; inset: auto 16px 16px; margin: 0; padding: 12px 14px; background: var(--paper); border: 2px solid var(--ink); border-radius: 3px; }
@@ -572,6 +573,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   </div>
   <div id="funfact" hidden aria-live="polite"></div>
   <p id="held" hidden>Click to carry on</p>
+  <button class="alt" id="skip" type="button" hidden>Skip to the end</button>
   <button id="pause" type="button" aria-label="Pause (P)" title="Pause (P)" hidden><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M8.5 5v14M15.5 5v14" stroke="currentColor" stroke-width="4" fill="none"/></svg></button>
   <p id="nogl" hidden>This browser cannot draw the globe (it needs WebGL 2). A recent Chrome, Edge, Firefox or Safari can.</p>
 </div>
@@ -1678,8 +1680,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     tickets: [], last: null, history: [], spawnAt: 0, sinceNew: 2, recent: [], turn: 0, endAt: 0,
     log: new Map(), drops: [], look: null, gain: 0, fails: new Map(),
   };
-  const REST = 2.5, END_REST = 4;       // seconds a globe holds still before it starts to turn: the title's, and Study's end globe on the start of the flight
-  const atlas = { lon: -20, lat: 18, spin: 6, idle: 0, rest: REST, from: null, to: null, k: 1, way: null };
+  // Seconds a globe holds still before it starts to turn: the title's; and Study's end globe on where the flight started,
+  // its bird standing there, before the replay begins (4 s, the player's of 2026-11-12, then half that: "I think it pauses
+  // in the beginning for too long. I think it should be half the amount of time", 2026-11-16, and "pause for 1-2 secs")
+  const REST = 2.5, END_REST = 2;
+  const atlas = { lon: -20, lat: 18, spin: 6, idle: 0, rest: REST, from: null, to: null, k: 1, way: null, back: null };
   // Height on the camera: 0 on the ground, 1 at the top, evenly spaced in the logarithm.
   const heightFor = (a) => Math.exp(lerp(Math.log(view.H0), Math.log(view.H1), clamp(a, 0, 1)));
   // The flight is the same over the ground in every window (the player's pick, 2026-11-13: "Yes, the same"). The
@@ -2200,10 +2205,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (tab === 'challenge' && runKind === 'day' && tripDone()) return;          // one trip a day (one begun is carried on)
     S.game = tab === 'challenge' ? 'trip' : tab;
     Object.assign(S, { mode: 'fly', paused: false, t: 0, energy: TANK, n: 0, streak: 0, bestStreak: 0, firstTry: 0, fresh: 0, route: null, legs: null, tickets: [], last: null,
-      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, gain: 0, idle: 0, fails: new Map(), intro: null });
+      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, gain: 0, idle: 0, fails: new Map(), intro: null, began: null, replay: null });
     S.log = new Map();
     S.drops = [];
     fx.length = 0; flashes.length = 0;
+    holdOff();
     ticketsEl.replaceChildren();
     // Every flight starts on the ground with the whole globe in view, and the view comes down on the bird (the player,
     // 2026-11-13: "in all game modes, like study mode too, I think that the bird should never start in the air. It
@@ -2212,6 +2218,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const [lon0, lat0] = S.game === 'trip' ? [atlas.lon, atlas.lat] : offCoast(atlas.lon, clamp(atlas.lat, -60, 75));          // a trip sets its own start (tripStart)
     Object.assign(bird, { lon: lon0, lat: lat0, a: 0, va: 0, vx: 0, vy: 0, down: true });
     bird.at = locationAt(bird.lon, bird.lat).key;
+    if (S.game === 'study') S.began = unit(bird.lon, bird.lat);          // where the flight starts: its end globe's replay starts there (a flight carried on brings its own)
     keys.flap = false;
     hover = mouse = null;
     $('card').hidden = true;
@@ -2270,7 +2277,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       bird: [+bird.lon.toFixed(3), +bird.lat.toFixed(3), +bird.a.toFixed(3), bird.down ? 1 : 0, bird.at],
       fails: [...S.fails], recent: S.recent.slice(), history: S.history.slice(-12), sinceNew: S.sinceNew, last: S.last,
       log: [...S.log.values()].map((r) => [r.it.key, r.shown ? 1 : 0, r.isNew ? 1 : 0].concat(r.p ? ll(r.p) : [])),
-      drops: S.drops.filter((d) => d.from).map((d) => ll(d.p).concat(ll(d.from), [d.km, d.city])),
+      drops: S.drops.filter((d) => d.from).map((d) => ll(d.p).concat(ll(d.from), [d.km, d.city])), began: S.began ? ll(S.began) : null,
       card: t ? [t.it.key, t.misses, t.shown ? 1 : 0, t.warm ? 1 : 0, t.isNew ? 1 : 0, t.from[0], t.from[1]] : null,
       cols: PLAY.map((c) => c.col).join('') };
     persist();
@@ -2283,6 +2290,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       for (const [key, shown, isNew, lon, lat] of f.log) { const it = item(key); if (it) S.log.set(key, { it, shown: !!shown, isNew: !!isNew, p: lon === undefined ? null : unit(lon, lat) }); }
       // delivered capitals: their pins come back on the end globe (in the flight they left long ago)
       for (const [lon, lat, flon, flat, km, city] of f.drops || []) S.drops.push({ p: unit(lon, lat), from: unit(flon, flat), t: -1e6, left: 0, km, city });
+      S.began = Array.isArray(f.began) ? unit(f.began[0], f.began[1]) : null;          // a flight kept before its start was: its replay starts at its first delivery
       if (typeof f.cols === 'string' && f.cols.length === PLAY.length) PLAY.forEach((c, i) => { const col = +f.cols[i]; if (col >= 0 && col < FILL.length) c.col = col; });      // the flight's own colors
       const [lon, lat] = f.bird;          // on the ground, under where it was if it was left in the air: no flight starts in the air
       Object.assign(bird, { lon, lat, a: 0, va: 0, vx: 0, vy: 0, down: true, at: locationAt(lon, lat).key });
@@ -3600,7 +3608,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function showResults(T, from) {
     S.mode = 'over'; S.landedAt = performance.now(); S.look = null; atlas.zoom = 1;
     $('spoton').hidden = true;               // the stamp of the last landing does not stay up over the card
-    S.route = null;           // Study's path of deliveries; a trip's flights are in S.legs
+    S.route = null; S.replay = null;           // Study's path of deliveries; a trip's flights are in S.legs
+    holdOff();
     stage.classList.remove('flying'); stage.classList.add('atlas');
     keys.left = keys.right = keys.up = keys.down = keys.flap = false;
     fx.length = 0;
@@ -3841,20 +3850,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
     S.route = [...S.log.values()].map((r) => r.p || pointOf(r.it));
     S.routeLost = !!lost;
     if (lost) S.route.push(pointOf(lost));
-    // No turn along the path (played, it was "pretty jumpy ... pure confusion"). The globe opens on where the flight
-    // started and holds still there for END_REST seconds, then spins slowly and steadily as the title's does, the way
-    // the path leads (the player: "have it still ... for like the first ... 3 to 5 seconds ... you can see, like, oh,
-    // this is where I started. Oh, it's moving. Cool"). With one stop or none there is no path: it rests on what is named.
-    const path = S.route.length > 1, centre = path ? S.route[0] : Math.hypot(sx, sy, sz) > 1e-6 ? norm([sx, sy, sz]) : unit(bird.lon, bird.lat);
-    const [lon, lat] = lonLat(centre);
-    atlas.from = [bird.lon, bird.lat]; atlas.to = [lon, clamp(lat, -45, 60)]; atlas.k = 0; atlas.secs = 0; S.tour = null;
-    atlas.lon = bird.lon; atlas.lat = bird.lat;
-    let turn = 1;
-    if (path) {         // east or west: toward the middle of the stops that follow the first
-      const rest = S.route.slice(1).reduce((a, q) => [a[0] + q[0], a[1] + q[1], a[2] + q[2]], [0, 0, 0]);
-      if (Math.hypot(rest[0], rest[1]) > 1e-6 && wrapLon(lonLat(norm(rest))[0] - lon) < 0) turn = -1;
+    // each delivered capital knows its country (its name and its country's are shown over it: replayStart, pointed)
+    for (const d of S.drops) { const rec = [...S.log.values()].find((r) => r.it.kind === 'k' && r.it.c.cap[0] === d.city); d.c = rec ? rec.it.c : null; }
+    // The end globe replays the flight from where it started (replayStart). With no stop to fly to, it rests on what is named.
+    atlas.lon = bird.lon; atlas.lat = bird.lat; atlas.spin = 0; atlas.idle = 0; atlas.rest = END_REST; S.tour = null;
+    holdOff();
+    if (!replayStart()) {
+      const [lon, lat] = lonLat(Math.hypot(sx, sy, sz) > 1e-6 ? norm([sx, sy, sz]) : unit(bird.lon, bird.lat));
+      atlas.from = [bird.lon, bird.lat]; atlas.to = [lon, clamp(lat, -45, 60)]; atlas.k = 0; atlas.secs = 0; atlas.way = null;
     }
-    atlas.spin = path ? 6 * turn : 0; atlas.idle = 0; atlas.rest = END_REST;
     $('d-score').textContent = S.n;
     $('d-head').textContent = S.n === 1 ? 'postcard delivered' : 'postcards delivered';
     $('d-line').textContent = isBest && S.n > 0 ? 'Your best flight so far.' : save.best ? 'Your best is ' + save.best + '.' : '';
@@ -3904,7 +3908,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     abandon(true);
     const from = S.mode === 'fly' ? [bird.lon, bird.lat] : [atlas.lon, atlas.lat];
     S.mode = 'title'; S.paused = false; S.look = null; atlas.zoom = 1;
-    S.route = null; S.legs = null;           // the flight path ends with its results screen
+    S.route = null; S.legs = null; S.replay = null;           // the flight path ends with its results screen
+    holdOff();
     runKind = 'day';
     S.log = new Map(); S.drops = [];
     fx.length = 0; flashes.length = 0;
@@ -3996,6 +4001,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
     S.gain = S.gain > 0 ? Math.max(0, S.gain - dt / 0.6) : Math.min(0, S.gain + dt / 0.6);
 
     if (!flying) {             // title and results: the globe turns slowly; drag it to turn it yourself
+      if (globeHold.on) {          // an end globe paused by a press: everything holds, and the globe is the player's to turn
+        if (drag.on || (globeHold.still += dt) < HOLD_SECS) return;
+        resumeGlobe();
+      }
+      if (atlas.back) {          // turning back to where a paused turn stopped, then on with it
+        atlas.back.k = Math.min(1, atlas.back.k + dt / atlas.back.secs);
+        [atlas.lon, atlas.lat] = alongWay(atlas.back.way, smooth(atlas.back.k));
+        if (atlas.back.k >= 1) atlas.back = null;
+        return;
+      }
+      if (S.replay && S.mode === 'over' && !atlas.to) { replayStep(dt); return; }
       if (atlas.to) {
         atlas.k = Math.min(1, atlas.k + dt / (atlas.secs || 1.3));
         const way = atlas.way && atlas.way.to === atlas.to ? atlas.way : null;          // a results globe's sideways turn (showLeg); any other turn takes the shortest line
@@ -4240,7 +4256,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
         const pin = S.mode !== 'fly' ? 1 : Math.max(shown, d.left === undefined ? 1 : clamp(1 - (age - d.left) / 0.35, 0, 1));
         if (reveal && S.mode === 'fly') reach(d.p, d.km, shown);
         const s = project(d.p);
-        if (s && pin > 0) {
+        if (s && pin > 0 && !(S.replay && S.mode === 'over' && d.seq > reached())) {          // on Study's end globe: when the line reaches it
           ctx.globalAlpha = pin * rimDot(s, 10 * view.mk);
           starAt(s[0], s[1], 6 * big, view.mk);
           ctx.globalAlpha = 1;
@@ -4365,8 +4381,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const WING = new Path2D('M6,-3.5 C5,-11 1,-19 -7,-24 C-8.5,-18 -8,-10 -4.5,-3.5 Z');
   const TAIL = new Path2D('M-8,-3 L-19,-6.5 L-16.5,0 L-19,6.5 L-8,3 Z');
   const BEAK = new Path2D('M14.6,-1.9 L20.5,0 L14.6,1.9 Z');
-  function birdShape(x, y, size, spread, squash) {
-    const d = view.dpr, c = Math.cos(bird.h) * size, s = Math.sin(bird.h) * size, q = 1 - 0.18 * squash;
+  function birdShape(x, y, size, spread, squash, h = bird.h) {
+    const d = view.dpr, c = Math.cos(h) * size, s = Math.sin(h) * size, q = 1 - 0.18 * squash;
     const pose = (flip) => ctx.setTransform(d * c * q, d * s * q, -d * s * flip, d * c * flip, d * x, d * y);
     const paint = (shape, col) => { ctx.fillStyle = col; ctx.fill(shape); ctx.stroke(shape); };
     ctx.lineJoin = 'round'; ctx.lineWidth = 1.6; ctx.strokeStyle = INK;
@@ -4525,7 +4541,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // generally ... the center of the path is always in view, but it's not like jerking and going up and down to follow the
   // path ... it should be smooth"; picked from a mock 2026-11-16, with the round's whole line on the globe from the start:
   // "line all there".)
-  const TOUR_REST = 1, TOUR_DEG = 15, TOUR_MIN = 1.5;          // seconds on the origin; degrees a second on the way; the shortest the way takes
+  // Seconds on the origin (1 until 2026-11-16, then half, as Study's rest was halved: "apply the same insights to day
+  // trip/ranked"); degrees a second on the way; the shortest the way takes.
+  const TOUR_REST = 0.5, TOUR_DEG = 15, TOUR_MIN = 1.5;
   const globeSpot = (p) => { const [lo, la] = lonLat(p); return [lo, clamp(la, -45, 60)]; };
   // one speed, eased in and out over only the first and last tenth
   const steady = (k) => { const a = 0.1; return k < a ? k * k / (2 * a * (1 - a)) : k > 1 - a ? 1 - (1 - k) * (1 - k) / (2 * a * (1 - a)) : (k - a / 2) / (1 - a); };
@@ -4554,14 +4572,228 @@ button { font: inherit; color: inherit; cursor: pointer; }
     }
     return wayOf(C, to, true);
   }
+  // A quick turn of an end globe to a spot: sideways, the short way round, 1.3 s or longer the farther it goes (up to 2 s).
+  function turnTo(to) {
+    atlas.from = [atlas.lon, atlas.lat]; atlas.to = to; atlas.k = 0;
+    const side = wrapLon(to[0] - atlas.from[0]);
+    atlas.way = wayOf([atlas.from, [atlas.from[0] + side, to[1]]], to, false); atlas.secs = Math.max(1.3, Math.abs(side) / 90);
+  }
   function showLeg(i) {
     const L = S.legs[i];
     S.focus = i; atlas.idle = 0; atlas.zoom = 1;
-    atlas.from = [atlas.lon, atlas.lat]; atlas.to = globeSpot(L.from); atlas.k = 0;
-    const side = wrapLon(atlas.to[0] - atlas.from[0]);
-    atlas.way = wayOf([atlas.from, [atlas.from[0] + side, atlas.to[1]]], atlas.to, false); atlas.secs = Math.max(1.3, Math.abs(side) / 90);
+    holdOff();
+    turnTo(globeSpot(L.from));
     S.tour = { to: globeSpot(L.land), rest: TOUR_REST };
     settleNames(S.tour.to);
+  }
+
+  // ---------- Study's end globe: the flight replayed ----------
+  // The player's idea (2026-11-15, of the end globe after 53 postcards, "a web of tangled lines"): "starting from where you
+  // started and then just like showing your flight path from location to location and just like sort of following it as it
+  // is created ... maybe they disappear while the new one is going, like 5 locations before it disappears ... And when you
+  // get there, it like highlights it and it labels it". Drawn by Fable on a mock page and loved ("wow, it's amazing ... It
+  // follows the line really well"); their notes on it settled by button, 2026-11-16 (PLAN 108):
+  // - the globe turns sideways to where the flight started, the bird standing there from the first frame ("it should
+  //   already be there from the start when it turns to it, then pause for 1-2 secs, then take off. like I said"); it rests
+  //   END_REST seconds, takes off, flies the line flapping, lands at each stop and goes on ("lands, then goes on. but only if
+  //   you can make it look smooth and pretty and laglessly tasteful"); the red line to the postcard not delivered is drawn
+  //   without it;
+  // - the line being drawn is solid, the five before it dotted, older ones go; a ring where the line arrives;
+  // - the globe follows the line's tip, toward the poles too, as far as it turns by hand ("it's way better in study mode to
+  //   just follow the line"), go, stop, label ("Honestly, it's perfect right now");
+  // - on arrival a capital shows its flag, its name and its country's ("it should say like Lisbon, Portugal"), a country its
+  //   flag and its name, until the line reaches the next stop; a sea its name, as always; the finished globe names countries;
+  // - a click pauses it (globeHold); at the end every line goes but the red one ("all or nothing, and nothing looks better").
+  // Until 2026-11-16 the end globe opened on where the flight started with every line and every name at once, held still,
+  // then spun slowly (the player's design of 2026-11-12, before flights were long enough to tangle).
+  // Degrees a second along a hop, its shortest and longest; seconds on each stop; dotted lines kept; seconds the lines take to go.
+  const REPLAY_DEG = 40, REPLAY_MIN = 0.45, REPLAY_MAX = 5, REPLAY_STOP = 0.25, REPLAY_KEEP = 5, REPLAY_FADE = 0.6;
+  // How the globe follows the line's tip: it holds still while the tip is within dz degrees of the middle, then turns at
+  // gain times the distance past that (at most vmax degrees a second, eased in at soft); up and down more gently.
+  const FOLLOW = { dz: 10, gain: 3, vmax: 60, soft: 4, gainY: 2, vmaxY: 30, softY: 2.5 };
+  function replayStart() {
+    const Q = S.began ? [S.began, ...S.route] : S.route.slice(), n = Q.length - 1;
+    S.replay = null;
+    if (n < 1) return false;
+    const D = [], T = [];
+    let t = 0;
+    for (let i = 0; i < n; i++) { D.push(clamp(Math.acos(clamp(dot(Q[i], Q[i + 1]), -1, 1)) / RAD / REPLAY_DEG, REPLAY_MIN, REPLAY_MAX)); T.push(t); t += D[i] + REPLAY_STOP; }
+    // Each name and capital is tied to its stop by the order of the deliveries, not by where it stands: a capital's
+    // country is named at the country's middle, which is no stop of the flight.
+    const recs = [...S.log.values()], off = S.began ? 1 : 0;
+    for (const a of atlasNames) { a.seq = a.lost ? n : -1; a.capSeq = -1; }
+    recs.forEach((rec, i) => { const a = atlasNames.find((x) => x.c === rec.it.c && !x.lost); if (a && a.seq < 0) { a.seq = i + off; if (rec.it.kind === 'k') a.capSeq = i + off; } });
+    for (const a of atlasNames) if (a.seq < 0) a.seq = n;
+    for (const d of S.drops) { const i = recs.findIndex((rec) => rec.it.kind === 'k' && rec.it.c.cap[0] === d.city); d.seq = i < 0 ? n : i + off; }
+    const caps = recs.map((rec, i) => (rec.it.kind === 'k' ? { j: i + off, c: rec.it.c, name: rec.it.c.cap[0], p: pointOf(rec.it) } : null)).filter(Boolean);
+    S.replay = { Q, D, T, n, total: t, t: -END_REST, i: 0, k: 0, done: false, free: false, v: 0, w: 0, off: 0, caps,
+      bird: { at: Q[0], h: 0, beat: 0, spread: 0.42, squash: 0, flying: false, a: 0, landings: 0 } };
+    const [lon, lat] = lonLat(Q[0]);
+    turnTo([lon, clamp(lat, -60, 75)]);
+    return true;
+  }
+  // the last stop the line has reached (every stop once the replay is over; outside a replay, all of them)
+  const reached = () => { const R = S.replay; return !R ? Infinity : R.done ? R.n : R.t < 0 ? 0 : R.k >= 1 ? R.i + 1 : R.i; };
+  function replayStep(dt) {
+    const R = S.replay;
+    R.t += dt;
+    if (R.t >= R.total) { R.done = true; R.i = R.n - 1; R.k = 1; }
+    else if (R.t >= 0) { let i = R.i; while (i + 1 < R.n && R.T[i + 1] <= R.t) i++; R.i = i; R.k = clamp((R.t - R.T[i]) / R.D[i], 0, 1); }
+    const tip = lonLat(slerp(R.Q[R.i], R.Q[R.i + 1], R.t < 0 ? 0 : R.k));
+    if (!R.free && !drag.on) {          // the line's tip kept near the middle, toward the poles too (as far as the globe turns by hand)
+      const P = FOLLOW, cl = Math.max(0.2, Math.cos(atlas.lat * RAD)), dx = wrapLon(tip[0] - atlas.lon) * cl, dy = clamp(tip[1], -60, 75) - atlas.lat;
+      const wx = Math.abs(dx) > P.dz ? (dx - Math.sign(dx) * P.dz) * P.gain : 0, wy = Math.abs(dy) > P.dz ? (dy - Math.sign(dy) * P.dz) * P.gainY : 0;
+      R.v += (clamp(wx, -P.vmax, P.vmax) - R.v) * Math.min(1, dt * P.soft);
+      R.w += (clamp(wy, -P.vmaxY, P.vmaxY) - R.w) * Math.min(1, dt * P.softY);
+      atlas.lon = wrapLon(atlas.lon + (R.v * dt) / cl); atlas.lat = clamp(atlas.lat + R.w * dt, -60, 75);
+    } else { R.v = 0; R.w = 0; }
+    R.off = Math.acos(clamp(dot(unit(tip[0], tip[1]), unit(atlas.lon, atlas.lat)), -1, 1)) / RAD;          // how far the tip is from the middle
+    replayBird(R, dt);
+  }
+  // The bird of the replay: the game's own bird, flapping for the first eight tenths of a hop and gliding in, as high as the
+  // hop is long, squashed a moment as it lands. It stays on the last stop delivered while the red line is drawn.
+  function replayBird(R, dt) {
+    const B = R.bird, lost = S.routeLost && R.i === R.n - 1 && R.t >= 0, k = R.k;
+    const flying = R.t >= 0 && !R.done && !lost && k < 1;
+    B.at = R.t < 0 ? R.Q[0] : R.done || lost ? R.Q[S.routeLost ? R.n - 1 : R.n] : flying ? slerp(R.Q[R.i], R.Q[R.i + 1], k) : R.Q[R.i + 1];
+    if (B.flying && !flying) { B.squash = 1; B.landings++; }
+    B.flying = flying;
+    B.a = flying ? clamp(R.D[R.i] / 4, 0.1, 0.4) * Math.pow(Math.sin(Math.PI * k), 0.7) : 0;
+    if (flying) {          // it turns smoothly to face the way the line goes on the screen
+      const p0 = project(slerp(R.Q[R.i], R.Q[R.i + 1], Math.max(0, k - 0.02))), p1 = project(B.at);
+      if (p0 && p1 && Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) > 0.5) { const to = Math.atan2(p1[1] - p0[1], p1[0] - p0[0]); B.h += Math.atan2(Math.sin(to - B.h), Math.cos(to - B.h)) * Math.min(1, dt * 9); }
+    }
+    const flap = flying && k < 0.8;
+    B.beat += dt * (flap ? 15 : 0);
+    const spread = !flying ? 0.42 : flap ? 0.72 + 0.28 * Math.cos(B.beat) : 1;
+    B.spread += (spread - B.spread) * Math.min(1, dt * (flap ? 30 : 9));
+    B.squash = Math.max(0, B.squash - dt / 0.18);
+  }
+  function drawReplayBird() {
+    const R = S.replay, B = R && R.bird;
+    if (!B) return;
+    const g = project(B.at), seen = clamp((dot(B.at, cam.n) - cam.cos0 - 0.02) / 0.06, 0, 1);          // it fades out near the globe's rim
+    if (!g || seen <= 0) return;
+    if (R.t < 0) { const q = project(slerp(R.Q[0], R.Q[1], 0.02)); if (q) B.h = Math.atan2(q[1] - g[1], q[0] - g[0]); }          // waiting on the start, it faces its first hop
+    const ga = ctx.globalAlpha, size = birdSize(), lift = (4 + 70 * Math.pow(B.a, 0.8)) * view.mk, sh = 1 - 0.5 * B.a;
+    ctx.globalAlpha = ga * seen;
+    ctx.fillStyle = 'rgba(19,38,59,' + (0.34 - 0.14 * B.a).toFixed(3) + ')';
+    ctx.beginPath(); ctx.ellipse(g[0], g[1], 15 * size * sh, 6 * size * sh, 0, 0, 7); ctx.fill();
+    birdShape(g[0], g[1] - lift, size, B.spread, B.squash, B.h);
+    ctx.globalAlpha = ga;
+  }
+  // The line as it is drawn: the hop being flown solid, the five before it dotted (the oldest going while the new one is
+  // drawn), a ring opening out where the line arrives, and every stop reached a plain ink dot, as the dot a name is tied to
+  // (the player, 2026-11-16: "I would much rather have that to be as Portugal is, with just the black dot and black line";
+  // until then each stop had a white dot with an ink ring). The stop of the postcard not delivered is red. A delivered
+  // capital's symbol is its stop, with no dot over it (drawDrops; a dot there read as another icon, the player: "the poke
+  // ball looking icon").
+  function drawReplay() {
+    const R = S.replay, Q = R.Q, u = view.ui, ga = ctx.globalAlpha, at = reached(), cur = R.done ? R.n : R.i, first = cur - REPLAY_KEEP;
+    const red = (j) => S.routeLost && j === R.n - 1;
+    const gone = R.done ? clamp((R.t - R.total) / REPLAY_FADE, 0, 1) : 0;
+    for (let j = Math.max(0, first); j < cur; j++) {
+      if (gone >= 1 && !red(j)) continue;
+      ctx.globalAlpha = ga * (!R.done && j === first ? 1 - R.k : red(j) ? 1 : 1 - gone);
+      arc(Q[j], Q[j + 1], red(j) ? BAD : INK, 2.2 * u, [0.1, 6 * u]);
+    }
+    ctx.globalAlpha = ga;
+    if (!R.done && R.t >= 0) arc(Q[R.i], Q[R.i + 1], red(R.i) ? BAD : INK, 3 * u, null, 0, R.k);
+    Q.forEach((q, j) => {
+      if (j > at) return;
+      const s = project(q);
+      if (!s) return;
+      const since = j === 0 ? 9 : R.t - R.T[j - 1] - R.D[j - 1];          // seconds since the line got here
+      if (since >= 0 && since < 0.6) { ctx.globalAlpha = ga * (1 - since / 0.6); ctx.beginPath(); ctx.arc(s[0], s[1], lerp(8, 22, since / 0.6) * u, 0, 7); ctx.strokeStyle = INK; ctx.lineWidth = 2.5 * u; ctx.stroke(); ctx.globalAlpha = ga; }
+      if (S.drops.some((d) => d.city && dot(d.p, q) > 0.999999)) return;
+      ctx.beginPath(); ctx.arc(s[0], s[1], 2 * u, 0, 7); ctx.fillStyle = S.routeLost && j === R.n ? BAD : INK; ctx.fill();
+    });
+  }
+  // What stands over the stop the line has just reached, from its arrival until the line reaches the next stop: a capital's
+  // flag, its name and its country's under it, over its symbol; a country's flag and its name, over its stop (the player,
+  // 2026-11-16: "I think you should also add the flag to the name of the country when it arrives ... So it mirrors what
+  // happens when you get to a capital"). The country's own name waits meanwhile. At the end it goes with the lines.
+  function arrivalLabel() {
+    const R = S.replay;
+    if (!R || S.mode !== 'over' || R.t < 0) return null;
+    const at = reached();
+    let k = R.caps.find((x) => x.j === at), sub = true;
+    if (!k) {
+      const a = atlasNames.find((x) => x.seq === at && !x.lost && !x.water && x.capSeq < 0 && x.c && x.c.flag);
+      if (a) { k = { j: at, c: a.c, name: a.name || a.c.name, p: R.Q[at] }; sub = false; }
+    }
+    if (!k || dot(k.p, cam.n) < cam.cos0 + 0.08) return null;          // near the rim it goes, as every name does
+    const fade = R.done ? 1 - clamp((R.t - R.total) / REPLAY_FADE, 0, 1) : 1, s = project(k.p);
+    return fade > 0 && s ? Object.assign({ fade, sub }, k, labelOver(k.c, k.name, s, sub)) : null;
+  }
+  // A label over a mark: the flag, the name, and the country's name under it (the label a capital gets when it is
+  // delivered in a flight), at the size of the name by the mouse; and the room it takes, which other names keep off.
+  function labelOver(c, name, s, sub) {
+    const size = Math.round(17 * view.ui), so = subPx({ size });
+    ctx.save();
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '0.05em';
+    ctx.font = '700 ' + size + 'px ' + DISPLAY; const tw = ctx.measureText(name).width;
+    ctx.font = '700 ' + so + 'px ' + DISPLAY; const sw = c && sub ? subWidth(c.name, so) : 0;
+    ctx.restore();
+    const fw = c && c.flag ? (c.flag.width / c.flag.height) * flagH(size) : 0, half = (fw + 8 + Math.max(tw, sw)) / 2 + 4;
+    const y = s[1] - (10 * view.mk + 6 * view.ui + (sub ? so + size : size * 0.6));          // over the mark, or the bird standing on it
+    return { x: s[0], y, size, box: { x: s[0], y: y + size / 2, half, tall: size + 8 } };
+  }
+
+  // A press on an end globe pauses what it is doing (Study's replay, a round's turn on Day Trip's and Ranked's), and the
+  // globe still turns by hand; a click goes on, as does leaving it alone for HOLD_SECS (no click, drag or mouse movement).
+  // Turned by hand meanwhile, a turn first turns back to where it stopped; Study's replay goes back after the line's tip.
+  // The wheel pauses it too. While Study's replay is paused, "Skip to the end" stands over the end card. (The player,
+  // 2026-11-16, of Fable's replay, where a click ended it with every name on: "I think this is a pretty bad decision ...
+  // when you click on it, it should pause the animation ... and you can still rotate the globe ... a little button should
+  // pop up in a tasteful place"; their picks by button: "Over the card", "Skip to the end", "click again. also resume if it
+  // sits idle for 5 seconds", and of Day Trip and Ranked: "apply the same insights to day trip/ranked". Until then turning
+  // a results globe by hand ended its turn for good.)
+  const HOLD_SECS = 5;
+  const globeHold = { on: false, still: 0, down: null, at: null };
+  const turning = () => S.mode === 'over' && (S.replay ? !S.replay.done : !!S.legs && !!(atlas.to || S.tour || atlas.back));
+  function holdGlobe(press) {
+    if (!turning()) return false;
+    globeHold.down = press ? [press[0], press[1], globeHold.on] : null;
+    if (!globeHold.on) {
+      globeHold.on = true;
+      globeHold.at = atlas.back ? atlas.back.to : [atlas.lon, atlas.lat];
+      atlas.back = null;
+      if (S.replay) S.replay.v = S.replay.w = 0;
+      showSkip();
+    }
+    globeHold.still = 0;
+    return true;
+  }
+  function resumeGlobe() {
+    if (!globeHold.on) return;
+    const at = globeHold.at;
+    Object.assign(globeHold, { on: false, still: 0, down: null, at: null });
+    showSkip();
+    if (!at || !(atlas.to || S.tour)) return;
+    const side = wrapLon(at[0] - atlas.lon);
+    if (Math.abs(side) < 0.3 && Math.abs(at[1] - atlas.lat) < 0.3) return;
+    atlas.back = { way: wayOf([[atlas.lon, atlas.lat], [atlas.lon + side, at[1]]], at, false), k: 0, secs: Math.max(1.3, Math.abs(side) / 90), to: at };
+  }
+  function holdOff() {
+    Object.assign(globeHold, { on: false, still: 0, down: null, at: null });
+    atlas.back = null;
+    showSkip();
+  }
+  function skipToEnd() {
+    const R = S.replay;
+    if (!R || R.done) return;
+    R.t = Math.max(R.t, R.total); R.free = true;          // the globe stays where it is
+    holdOff();
+  }
+  // "Skip to the end": centred under the globe, just over the end card (the tutorial's Skip, in the same lettering)
+  function showSkip() {
+    const b = $('skip'), on = globeHold.on && !!S.replay && !S.replay.done && S.mode === 'over';
+    if (b.hidden !== !on) b.hidden = !on;
+    if (!on) return;
+    const st = stage.getBoundingClientRect(), card = $('debrief').getBoundingClientRect(), r = b.getBoundingClientRect(), z = view.ui;
+    b.style.left = (view.ox - r.width / 2) / z + 'px';
+    b.style.top = (card.top - st.top - r.height - 12) / z + 'px';
   }
   // The way the bird went, in plain ink with no edge round it. TWO widths and no more (the player: "a certain thickness
   // when you were flapping and thin when you weren't ... cleaner"): thin the whole way, and over it each stretch of
@@ -4637,7 +4869,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // wears, nor where that round started. (A city's name stands
   // round its dot anyway: when you came down right on the city, that dot is the city's, see placeNames.)
   function nameBoxes() {
-    const boxes = [];
+    const boxes = arrived ? [arrived.box] : [];
     for (const d of S.drops) {
       if (!d.city || S.mode === 'title') continue;
       const s = project(d.p);
@@ -4666,6 +4898,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     for (const a of atlasNames) {
       const s = project(a.p);
       if (paint) a.at = null;          // where the name stands as drawn, and half its width (for the tests)
+      if (S.replay && S.mode === 'over' && (a.seq > reached() || (!a.lost && arrived && arrived.j === a.seq))) { a.spot = undefined; continue; }          // named when the line reaches it; while the label over its stop stands, its name waits
       if (!s || dot(a.p, cam.n) < cam.cos0 + 0.08 || (rounds && a.i !== S.focus)) { a.spot = undefined; continue; }          // round the back, too close to the rim to read, or not the round picked
       const name = a.name || a.c.name, size = Math.round((a.lost ? 17 : 15) * view.ui), q = size / 13;
       ctx.font = (a.water ? 'italic 600 ' : '700 ') + size + 'px ' + DISPLAY;
@@ -4707,24 +4940,30 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const alpha = 1 - S.blend;
     if (alpha <= 0) return;
     ctx.globalAlpha = alpha;
-    if (S.mode === 'over' && S.game === 'study' && S.route) {         // the flight path, dotted, red to the postcard that was not delivered
-      for (let i = 0; i + 1 < S.route.length; i++)
-        arc(S.route[i], S.route[i + 1], S.routeLost && i === S.route.length - 2 ? BAD : INK, 2.2 * view.ui, [0.1, 6 * view.ui]);
-      S.route.forEach((q, i) => {
-        const s = project(q);
-        if (!s || S.drops.some((d) => d.city && dot(d.p, q) > 0.999999)) return;          // a delivered capital's pin is its stop: a dot over it read as another icon (the player: "the poke ball looking icon")
-        ctx.beginPath(); ctx.arc(s[0], s[1], 3.2 * view.ui, 0, 7);
-        ctx.fillStyle = S.routeLost && i === S.route.length - 1 ? BAD : PAPER; ctx.fill();
-        ctx.strokeStyle = INK; ctx.lineWidth = 1.2 * view.ui; ctx.stroke();
-      });
-    }
+    arrived = arrivalLabel();
+    if (S.mode === 'over' && S.game === 'study' && S.replay) drawReplay();
     const legs = S.mode === 'over' && S.trip && S.legs;
     if (legs) drawLegs();
     const boxes = nameBoxes();
     placeNames(boxes, true, !!(legs && (atlas.to || S.tour)));
-    if (hover && !boxes.some((b) => !b.way && Math.abs(b.x - hover.x) < b.half && Math.abs(b.y - hover.y) < 12)) {
-      nameplate(hover.c, hover.name, hover.x, hover.y - 18 * view.ui, hover.sea ? 'sea' : 'name', null, 1, Math.round(17 * view.ui));
-    }
+    // the name under the mouse, drawn last (drawTop); a capital's symbol answers with its own name
+    topHover = hover && (hover.pin || !boxes.some((b) => !b.way && Math.abs(b.x - hover.x) < b.half && Math.abs(b.y - hover.y) < 12)) ? hover : null;
+    ctx.globalAlpha = 1;
+  }
+  // Drawn over every mark of a globe: Study's replayed bird, the label over the stop the line has just reached, and the
+  // name under the mouse. (The player, 2026-11-16, of a capital's name half under the other marks: "it's just like buried
+  // beneath all these other animations and capitals. You need to find a better way to do that". The name under the mouse
+  // was drawn before the capitals' symbols, and a symbol's keep-clear box switched it off.)
+  let topHover = null, arrived = null;
+  function drawTop() {
+    const alpha = 1 - S.blend;
+    if (alpha <= 0 || S.mode === 'fly') return;
+    ctx.globalAlpha = alpha;
+    if (S.replay && S.mode === 'over') drawReplayBird();
+    if (arrived) nameplate(arrived.c, arrived.name, arrived.x, arrived.y, 'name', arrived.sub ? arrived.c.name : null, arrived.fade * alpha, arrived.size);
+    const h = topHover, q = h && h.pin && project(h.p), l = q && labelOver(h.c, h.name, q, !!h.c);
+    if (l) nameplate(h.c, h.name, l.x, l.y, 'name', h.c ? h.c.name : null, alpha, l.size);
+    else if (h && !h.pin) nameplate(h.c, h.name, h.x, h.y - 18 * view.ui, h.sea ? 'sea' : 'name', null, alpha, Math.round(17 * view.ui));
     ctx.globalAlpha = 1;
   }
 
@@ -4746,9 +4985,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     ctx.setTransform(d, 0, 0, d, 0, 0);
     drawZones();
     drawDots();
+    topHover = arrived = null;
     if (S.mode === 'fly') drawDrops();
     if (S.mode !== 'fly' || S.blend < 1) drawAtlas();
     if (S.mode === 'over') drawDrops();          // on Study's end globe a delivered capital's pin stands over the path's dots and over a name's tie, never under them
+    drawTop();
     for (const f of fx) if (!f.top) f.draw(Math.min(1, f.t / f.secs));
     if (S.mode === 'fly') drawRoute();
     if (S.mode === 'fly') drawBird();          // no bird outside a flight (until 2026-11-13 one faded out above the globe for a second after Home or a flight's end: "a bird appears and fades away on top of the globe on the home page")
@@ -4949,7 +5190,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   inkCanvas.addEventListener('pointerdown', (e) => {
     if (S.mode === 'fly') return;
     drag.on = true; drag.x = e.clientX; drag.y = e.clientY;
-    atlas.to = null; atlas.secs = 0; S.tour = null; atlas.idle = 0;         // turning the globe by hand ends a turn it was making
+    if (!holdGlobe([e.clientX, e.clientY])) { atlas.to = null; atlas.secs = 0; S.tour = null; atlas.back = null; if (S.replay) S.replay.free = true; }          // turning a globe by hand ends a turn it was making, unless it is an end globe's (it pauses)
+    atlas.idle = 0;
     stage.classList.add('dragging');
     inkCanvas.setPointerCapture(e.pointerId);
   });
@@ -4970,6 +5212,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
   });
   // What the mouse is on: its name (nameOf) for the plate by the pointer, and its area, which is lit.
   function pointed(x, y) {
+    if (S.mode === 'over' && S.game === 'study') {          // a delivered capital's symbol: its name and its country's (the player, 2026-11-16: "if I hover over the capital, it should say the name of the capital and which country it's in. If possible, the flag")
+      for (const d of S.drops) {
+        const q = d.city && !(S.replay && d.seq > reached()) && project(d.p);
+        if (q && Math.hypot(q[0] - x, q[1] - y) < 11 * view.mk) return { x: q[0], y: q[1], name: d.city, c: d.c || null, p: d.p, pin: true };
+      }
+    }
     const ll = unproject(x, y), r = ll && locationAt(ll[0], ll[1]);
     return r && r.name ? { x, y, name: nameOf(r), c: r.c, sea: r.sea, w: r.w, s: r.s } : null;
   }
@@ -4983,7 +5231,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const box = stage.getBoundingClientRect(), x = e.clientX - box.left, y = e.clientY - box.top, at = unproject(x, y);
     const whole = S.mode === 'title' || !S.log.size ? view.Htitle : view.H1;
     atlas.zoom = clamp((atlas.zoom || 1) * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), 1, whole / view.H0);
-    atlas.to = null; atlas.secs = 0; S.tour = null; atlas.idle = 0; hover = null;
+    if (!holdGlobe(null)) { atlas.to = null; atlas.secs = 0; S.tour = null; atlas.back = null; if (S.replay) S.replay.free = true; }
+    atlas.idle = 0; hover = null;
     for (let i = 0; i < 3 && at; i++) {          // turn the globe so that place is under the pointer again
       placeCamera();
       const s = projectLL(at[0], at[1]), k = cam.H / view.F / RAD;
@@ -4992,7 +5241,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
       atlas.lon = wrapLon(atlas.lon - ((x - s[0]) * k) / Math.max(0.2, Math.cos(atlas.lat * RAD)));
     }
   }, { passive: false });
-  inkCanvas.addEventListener('pointerup', endDrag);
+  inkCanvas.addEventListener('pointerup', (e) => {
+    endDrag();
+    const h = globeHold.down;
+    globeHold.down = null;
+    if (h && h[2] && Math.hypot(e.clientX - h[0], e.clientY - h[1]) < 5) resumeGlobe();          // a click on a paused end globe: it goes on
+  });
+  stage.addEventListener('pointermove', () => { globeHold.still = 0; });          // a mouse moving keeps it paused
+  $('skip').addEventListener('click', skipToEnd);
   inkCanvas.addEventListener('pointercancel', endDrag);
   inkCanvas.addEventListener('pointerleave', () => { hover = mouse = null; });
 
@@ -5026,7 +5282,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // Ground speed in km a second at a height, flying flat out.
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   const setBird = (lon, lat, a, down) => Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down });
-  window.birdsEye = { showLeg, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, flagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
+  window.birdsEye = { showLeg, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, flagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     project: projectLL, unproject, speedAt, FLY_TOP, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
@@ -5034,7 +5290,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     try { setupGL(); } catch (e) { console.error(e); }
   } else $('nogl').hidden = false;
   measure();
-  new ResizeObserver(measure).observe(stage);
+  new ResizeObserver(() => { measure(); showSkip(); }).observe(stage);          // "Skip to the end" stays over the card
   recolour();
   showKnown();
   if (document.fonts) document.fonts.ready.then(measure);
