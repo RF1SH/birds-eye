@@ -2850,7 +2850,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const roundWorth = (T, R) => (T.endless ? 10 * hardRow(R)[1] : DAY_WORTH[DAY_KINDS.indexOf(R.kind)]);
   const accMax = (T, R) => roundWorth(T, R) * 8 / 10, partMax = (T, R) => roundWorth(T, R) / 10;
   const num = (n) => n.toLocaleString('en');          // 1,250
-  const TRIP_K = 150, IN_COUNTRY = 0.25, IN_REGION = 0.1, LIFT_CAP = 0.8, SPOT_KM = 15, COUNT = 3, ENERGY_FLOOR = 2, ENERGY_ROOM = 1, ENERGY_WASTE = 21;
+  const TRIP_K = 150, IN_COUNTRY = 0.25, IN_REGION = 0.1, LIFT_CAP = 0.8, SPOT_KM = 15, COUNT = 3, ENERGY_FLOOR = 2, ENERGY_ROOM = 0.5, ENERGY_WASTE = 21.5, ENERGY_BACK = 1;
   const ADDRESS = 'https://rf1sh.github.io/birds-eye/';       // where the game lives: the last line of a shared result
   // Every trip and run starts here (the player, 2026-11-11: "start at the same place every time, so people arent
   // confused"): in the Gulf of Guinea, 260 km off Ghana, so the coast of West Africa is on the screen when the view
@@ -3022,8 +3022,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // (for two hours on 2026-11-17 it was 15, my reading of their "energy ... too generous"; wrong: "I don't want more
   // birds coming down. I want more birds being harshly judged". The spare stays; the judging near perfect is theirs to set)
   // (the player: the drops near perfect are bigger than the drops far out, and 0 is for plain wrong). The same on
-  // every leg. A Day Trip's ring draws this in its lower half, and Ranked gives back energy by the same measure.
-  const spareLeft = (spent, cheap) => { const x = clamp(1 - Math.max(0, spent - cheap - ENERGY_ROOM) / ENERGY_WASTE, 0, 1); return x * x; };
+  // every leg. A Day Trip's ring draws this in its lower half.
+  // Since 2026-11-17, the player's picks by two buttons, asked after their words "I wanted that small room for error
+  // to be changed and the spare energy kind of like unchanged ... I want more birds being harshly judged, because the
+  // difference between like a perfect flight and other things is just, there's too much forgiveness": the room is
+  // half of what it was ("Half: a hair late still gets all": 0.5, a fourteenth of a second of flapping; 1 until
+  // then) and the points fall as the third power, not the second ("Harsh": half a second of flapping nobody needed
+  // gets 13 of 20, 16 until then; a whole second 7, 10 until then). What a round's ring holds is unchanged: the
+  // cheapest flight and 22 more (the room and ENERGY_WASTE together), so no bird comes down sooner than before.
+  // Ranked's energy given back keeps the old room of 1 (ENERGY_BACK), for the same reason: their words, the same day.
+  const spareLeft = (spent, cheap) => { const x = clamp(1 - Math.max(0, spent - cheap - ENERGY_ROOM) / ENERGY_WASTE, 0, 1); return x * x * x; };
   // ---------- the tutorial ----------
   // A first visit opens on the title and two buttons, Start tutorial and Skip (the player's pick, 2026-11-13: "Two
   // buttons"); the tutorial can be flown later from the Challenge tab's How to play card. It is a Day Trip round that
@@ -3308,7 +3316,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const took = S.t - T.t0, part = partMax(T, R);          // speed and energy use: a tenth of the round each
     const speed = right ? Math.round(part * clamp(1 - Math.max(0, took - T.fair) / T.fair, 0, 1)) : 0;
     // energy use, when right: every point for the cheapest flight for the leg (cheapFor; for a country to its nearest
-    // point) or a tap of Space more, then fewer by the curve of spareLeft
+    // point) or half a tap of Space more (ENERGY_ROOM), then fewer by the curve of spareLeft
     const used = T.e0 - S.energy, cheap = T.cheap;
     const energy = right ? Math.round(part * spareLeft(used, cheap)) : 0;
     const pts = closeness + speed + energy;
@@ -3317,12 +3325,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
     Object.assign(T, { wait: true, ready: false, reveal: { from: p, to: R.p, km: countryRound ? 0 : ringKm(R), right, area: countryRound, cap: R.kind === 'capital' || R.kind === 'capflag' } });
     T.results[T.results.length - 1].at = here.name || 'Open ocean';
     Object.assign(T.results[T.results.length - 1], { path: (T.trk || []).concat([[lon, lat, 0]]), from: T.from.slice(), goal: T.goal.slice(), land: [lon, lat] }); T.trk = null;
-    // Ranked: a correct landing gives back what the flight cost, up to the cheapest flight and its room for error, and a
+    // Ranked: a correct landing gives back what the flight cost, up to the cheapest flight and 1 more (ENERGY_BACK: the
+    // room for error as it was until 2026-11-17; the points' room is half of it now, the energy given back is not), and a
     // wrong one gives back nothing. So a flight that scores every energy use point costs nothing, a wasteful one costs
     // its waste, and a wrong answer costs the flight (the player, 2026-11-12: "if someone plays actually perfectly with
     // no error, then a round of ranked should theoretically be endless.. it's the error that drains the energy").
     // Until then every correct landing gave back three quarters of par, so a perfect flyer ran down too.
-    if (T.endless && right) S.energy = Math.min(S.cap, S.energy + Math.min(used, cheap + ENERGY_ROOM));
+    if (T.endless && right) S.energy = Math.min(S.cap, S.energy + Math.min(used, cheap + ENERGY_BACK));
     if (T.endless) rankedKeep(); else tripSave();
     $('count').textContent = num(T.score);
     $('trip-clock').hidden = true;
