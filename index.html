@@ -4670,7 +4670,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
     R.t += dt;
     if (R.t >= R.total) { R.done = true; R.i = R.n - 1; R.k = 1; }
     else if (R.t >= 0) { let i = R.i; while (i + 1 < R.n && R.T[i + 1] <= R.t) i++; R.i = i; R.k = clamp((R.t - R.T[i]) / R.D[i], 0, 1); }
-    const tip = lonLat(slerp(R.Q[R.i], R.Q[R.i + 1], R.t < 0 ? 0 : R.k));
+    // What the globe keeps near the middle: the line's tip. On the red line the bird stays behind on the last stop
+    // delivered, so the globe goes with the tip only as far as the bird stays in full view (20 degrees inside where it is
+    // seen whole: the follow rests up to 14 from what it looks at), and goes on to the red line's end once the bird has
+    // flown off. Until 2026-11-17 it went to the end at once, and behind a long red line (6 endings of 16 on a World
+    // flight, and after "Skip to the end") the bird waited out of sight for good: nobody saw it fly off (the player:
+    // "The bird was nowhere in sight, so there was no bird flying away. Only when I rotated the globe around ...").
+    let look = slerp(R.Q[R.i], R.Q[R.i + 1], R.t < 0 ? 0 : R.k);
+    if (S.routeLost && !R.bird.gone && R.t >= 0 && R.i === R.n - 1) {
+      const stand = R.Q[R.n - 1], far = Math.acos(clamp(dot(stand, look), -1, 1)) / RAD, sight = Math.acos(Math.min(1, cam.cos0 + 0.08)) / RAD - 20;
+      if (far > sight) look = slerp(stand, look, sight / far);
+    }
+    const tip = lonLat(look);
     if (!R.free && !drag.on) {          // the line's tip kept near the middle, toward the poles too (as far as the globe turns by hand)
       const P = FOLLOW, cl = Math.max(0.2, Math.cos(atlas.lat * RAD)), dx = wrapLon(tip[0] - atlas.lon) * cl, dy = clamp(tip[1], -60, 75) - atlas.lat;
       const wx = Math.abs(dx) > P.dz ? (dx - Math.sign(dx) * P.dz) * P.gain : 0, wy = Math.abs(dy) > P.dz ? (dy - Math.sign(dy) * P.dz) * P.gainY : 0;
@@ -4678,7 +4689,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       R.w += (clamp(wy, -P.vmaxY, P.vmaxY) - R.w) * Math.min(1, dt * P.softY);
       atlas.lon = wrapLon(atlas.lon + (R.v * dt) / cl); atlas.lat = clamp(atlas.lat + R.w * dt, -60, 75);
     } else { R.v = 0; R.w = 0; }
-    R.off = Math.acos(clamp(dot(unit(tip[0], tip[1]), unit(atlas.lon, atlas.lat)), -1, 1)) / RAD;          // how far the tip is from the middle
+    R.off = Math.acos(clamp(dot(unit(tip[0], tip[1]), unit(atlas.lon, atlas.lat)), -1, 1)) / RAD;          // how far what it looks at is from the middle
     replayBird(R, dt);
   }
   // The bird of the replay: the game's own bird, flapping for the first eight tenths of a hop and gliding in, as high as the
