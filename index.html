@@ -2850,7 +2850,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const roundWorth = (T, R) => (T.endless ? 10 * hardRow(R)[1] : DAY_WORTH[DAY_KINDS.indexOf(R.kind)]);
   const accMax = (T, R) => roundWorth(T, R) * 8 / 10, partMax = (T, R) => roundWorth(T, R) / 10;
   const num = (n) => n.toLocaleString('en');          // 1,250
-  const TRIP_K = 150, IN_COUNTRY = 0.25, IN_REGION = 0.1, LIFT_CAP = 0.8, SPOT_KM = 15, COUNT = 3, ENERGY_FLOOR = 2, ENERGY_ROOM = 1, ENERGY_WASTE = 21;
+  const TRIP_K = 150, IN_COUNTRY = 0.25, IN_REGION = 0.1, LIFT_CAP = 0.8, SPOT_KM = 15, COUNT = 3, ENERGY_FLOOR = 2, ENERGY_ROOM = 1, ENERGY_WASTE = 15;
   const ADDRESS = 'https://rf1sh.github.io/birds-eye/';       // where the game lives: the last line of a shared result
   // Every trip and run starts here (the player, 2026-11-11: "start at the same place every time, so people arent
   // confused"): in the Gulf of Guinea, 260 km off Ghana, so the coast of West Africa is on the screen when the view
@@ -3005,13 +3005,22 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // are guesses.) Their pick from picture SPEED-question: both games.
   // (Until 2026-11-13 the flight was a rule of thumb, min(3.4, 1 + km / 3500) s and 1.6 s more past 14,000 km, from
   // a pilot that climbed until it saw the location: up to 1.6 s too long on a far leg.)
-  const THINK = { country: 1.5, flag: 2, capital: 1.6, capflag: 2.1, city: 1.6 }, FLIGHT_X = 1.15;
+  // Since 2026-11-17: 1.2 s for a country's name, 1.3 for a capital or a city, a flag 0.3 s more (until then 1.5, 1.6
+  // and half a second more). The player, 2026-11-15: "i feel like the speed (specifically, time for thinking) and
+  // energy (slightly, but noticeable) allotted for each postcard in Day trip/ranked are too generous". Looked at
+  // first (`audit/fair1.py` to `fair3.py`): the count before the clue gives no time away and the page gave what
+  // this rule says; their own five correct rounds in the game's save had 73 of 85 speed points. The new times take
+  // the tight end of the guess above (1 s of pointing, not 0.75): their five rounds get 67 of 85. Their pick, by
+  // button, from a table of those rounds under both rules: "Tighter: 67 of 85". Both games.
+  const THINK = { country: 1.2, flag: 1.5, capital: 1.3, capflag: 1.6, city: 1.3 }, FLIGHT_X = 1.15;
   const flightSecs = (km) => cheapRow(km)[2];
   const fairSecs = (km, kind) => (THINK[kind] || THINK.country) + FLIGHT_X * flightSecs(km);
   // Energy use: the share of its 20 points left after spending `spent` on a round whose cheapest flight costs `cheap`.
   // All of them up to ENERGY_ROOM over the cheapest flight (a seventh of a second of flapping: a hand lets go of Space
   // about that late; the player: "there should be a little room for error"). Past that they fall on a curve, fast at
-  // first and slowly at the end, and none is left after ENERGY_WASTE more, three seconds of flapping nobody needed
+  // first and slowly at the end, and none is left after ENERGY_WASTE more, about two seconds of flapping nobody needed
+  // (15 since 2026-11-17, their pick by button from their own five rounds, 70 of 85 points becoming 65; 21 and three
+  // seconds until then, my number; the room is theirs and stays)
   // (the player: the drops near perfect are bigger than the drops far out, and 0 is for plain wrong). The same on
   // every leg. A Day Trip's ring draws this in its lower half, and Ranked gives back energy by the same measure.
   const spareLeft = (spent, cheap) => { const x = clamp(1 - Math.max(0, spent - cheap - ENERGY_ROOM) / ENERGY_WASTE, 0, 1); return x * x; };
