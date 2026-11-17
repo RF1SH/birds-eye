@@ -1580,6 +1580,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // countries, capitals and flags, 6 of the 46 seas (the same share of the list; with 25 for the seas too the first sea
   // asked was an ocean 19 times in 100, and the Pacific came as the 17th sea).
   const NEXT = 25, NEXT_SEA = 6;
+  // A country landed on by mistake comes sooner as a new one (the player's idea, asked three times: "Those countries
+  // should be introduced a little bit earlier because that means they've seen them on their screen before ... and then
+  // you can just keep them in the rotation", 2026-11-15). A wrong landing names the country under the bird. When that
+  // country has never been asked and is one of the next SAW_REACH of the line (their pick, 2026-11-17: "Next 45"), it
+  // comes as one of the next SAW_WITHIN new countries, each as likely, ahead of the draw (theirs the same day: "does it
+  // have to be the next new country? Maybe just one of the following 3-5?"); when several have come to their turn, the
+  // one whose turn came first. Remembered for the flight (kept with a kept flight). Measured on real players
+  // (STUDY-PLAN 5d): such a country is found more often on its first ask, as much 2 to 30 minutes later as at once.
+  const SAW_REACH = 45, SAW_WITHIN = 3;
   const pick = (list, w) => {
     const odds = list.map(w), total = odds.reduce((a, b) => a + b, 0);
     let at = Math.random() * total;
@@ -1610,7 +1619,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const hold = due.length && S.sinceNew < (struggling ? 2 : 1);
     if (unmet.length && !hold) {
       const next = (kind, n) => { const list = unmet.filter(kind).slice(0, n); return list.length ? list[Math.floor(Math.random() * list.length)] : null; };
-      const place = next((it) => it.kind === 'c', NEXT), more = next((it) => it.kind === 'k' || it.kind === 'f', NEXT),
+      // S.saw: country -> its turn (the count of new countries handed out by which it may come) * 1e4 + the order it was named in
+      const saw = unmet.filter((it) => it.kind === 'c').slice(0, SAW_REACH).filter((it) => S.saw.has(it.c.id) && Math.floor(S.saw.get(it.c.id) / 1e4) <= S.newC);
+      const place = (saw.length ? saw.reduce((a, b) => (S.saw.get(a.c.id) <= S.saw.get(b.c.id) ? a : b)) : null) || next((it) => it.kind === 'c', NEXT), more = next((it) => it.kind === 'k' || it.kind === 'f', NEXT),
         water = next((it) => it.kind === 's', NEXT_SEA);
       S.turn = (S.turn + 1) % 4;
       return (S.turn === 1 ? more : S.turn === 3 ? water : place) || place || more || water;
@@ -1692,7 +1703,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     paused: false,
     t: 0, energy: TANK, n: 0, streak: 0, bestStreak: 0, firstTry: 0, fresh: 0, blend: 0, idle: 0, lastGain: 0,
     tickets: [], last: null, history: [], spawnAt: 0, sinceNew: 2, recent: [], turn: 0, endAt: 0,
-    log: new Map(), drops: [], look: null, gain: 0, fails: new Map(),
+    log: new Map(), drops: [], look: null, gain: 0, fails: new Map(), saw: new Map(), newC: 0, sawN: 0,
   };
   // Seconds a globe holds still before it starts to turn: the title's; and Study's end globe on where the flight started,
   // its bird standing there, before the replay begins (4 s, the player's of 2026-11-12, then half that: "I think it pauses
@@ -2069,8 +2080,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     ticketsEl.appendChild(node);
     S.history.push(it.c.id);
     const isNew = memOf(it).box === 0;
+    const saw = isNew && it.kind === 'c' && S.saw.has(it.c.id);          // named under the bird earlier in this flight
+    if (it.kind === 'c') S.saw.delete(it.c.id);
+    if (isNew && it.kind === 'c') S.newC++;
     S.sinceNew = isNew ? 0 : S.sinceNew + 1;
-    S.tickets.push({ it, node, age: 0, isNew, misses: 0, shown: false, warm: false, from: [bird.lon, bird.lat] });
+    S.tickets.push({ it, node, age: 0, isNew, saw, misses: 0, shown: false, warm: false, from: [bird.lon, bird.lat] });
     sfx.call();
     measure();
   }
@@ -2219,7 +2233,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (tab === 'challenge' && runKind === 'day' && tripDone()) return;          // one trip a day (one begun is carried on)
     S.game = tab === 'challenge' ? 'trip' : tab;
     Object.assign(S, { mode: 'fly', paused: false, t: 0, energy: TANK, n: 0, streak: 0, bestStreak: 0, firstTry: 0, fresh: 0, route: null, legs: null, tickets: [], last: null,
-      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, gain: 0, idle: 0, fails: new Map(), intro: null, began: null, replay: null });
+      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), newC: 0, sawN: 0, intro: null, began: null, replay: null });
     S.log = new Map();
     S.drops = [];
     fx.length = 0; flashes.length = 0;
@@ -2289,10 +2303,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const ll = (p) => lonLat(p).map((v) => +v.toFixed(3)), t = S.tickets[0];
     save.flight = { n: S.n, energy: +S.energy.toFixed(3), streak: S.streak, best: S.bestStreak, first: S.firstTry, fresh: S.fresh,
       bird: [+bird.lon.toFixed(3), +bird.lat.toFixed(3), +bird.a.toFixed(3), bird.down ? 1 : 0, bird.at],
-      fails: [...S.fails], recent: S.recent.slice(), history: S.history.slice(-12), sinceNew: S.sinceNew, last: S.last,
+      fails: [...S.fails], saw: [...S.saw], newC: S.newC, sawN: S.sawN, recent: S.recent.slice(), history: S.history.slice(-12), sinceNew: S.sinceNew, last: S.last,
       log: [...S.log.values()].map((r) => [r.it.key, r.shown ? 1 : 0, r.isNew ? 1 : 0].concat(r.p ? ll(r.p) : [])),
       drops: S.drops.filter((d) => d.from).map((d) => ll(d.p).concat(ll(d.from), [d.km, d.city])), began: S.began ? ll(S.began) : null,
-      card: t ? [t.it.key, t.misses, t.shown ? 1 : 0, t.warm ? 1 : 0, t.isNew ? 1 : 0, t.from[0], t.from[1]] : null,
+      card: t ? [t.it.key, t.misses, t.shown ? 1 : 0, t.warm ? 1 : 0, t.isNew ? 1 : 0, t.from[0], t.from[1], t.saw ? 1 : 0] : null,
       cols: PLAY.map((c) => c.col).join('') };
     persist();
   }
@@ -2301,6 +2315,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     try {
       Object.assign(S, { n: f.n, energy: clamp(f.energy, 0, TANK), streak: f.streak | 0, bestStreak: f.best | 0, firstTry: f.first | 0, fresh: f.fresh | 0, last: f.last || null });
       S.fails = new Map(f.fails || []);
+      S.saw = new Map(f.saw || []); S.sawN = f.sawN | 0;
       for (const [key, shown, isNew, lon, lat] of f.log) { const it = item(key); if (it) S.log.set(key, { it, shown: !!shown, isNew: !!isNew, p: lon === undefined ? null : unit(lon, lat) }); }
       // delivered capitals: their pins come back on the end globe (in the flight they left long ago)
       for (const [lon, lat, flon, flat, km, city] of f.drops || []) S.drops.push({ p: unit(lon, lat), from: unit(flon, flat), t: -1e6, left: 0, km, city });
@@ -2311,12 +2326,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
       const card = f.card && item(f.card[0]);
       if (card) {
         addTicket(card);
-        const t = S.tickets[0], [, misses, shown, warm, isNew, flon, flat] = f.card;
-        Object.assign(t, { misses: misses | 0, shown: !!shown, warm: !!warm, isNew: !!isNew, from: [flon, flat] });
+        const t = S.tickets[0], [, misses, shown, warm, isNew, flon, flat, saw] = f.card;
+        Object.assign(t, { misses: misses | 0, shown: !!shown, warm: !!warm, isNew: !!isNew, saw: !!saw, from: [flon, flat] });
         if (t.misses) setStrikes(t);
         if (t.shown) shownName(t);
       }
-      Object.assign(S, { recent: (f.recent || []).slice(), history: (f.history || []).slice(), sinceNew: f.sinceNew | 0 });      // after the postcard is back aboard: putting it there counts as asking
+      Object.assign(S, { recent: (f.recent || []).slice(), history: (f.history || []).slice(), sinceNew: f.sinceNew | 0, newC: f.newC | 0 });      // after the postcard is back aboard: putting it there counts as asking
       $('count').textContent = S.n;
     } catch (e) { delete save.flight; persist(); }          // a kept flight that cannot be read: a new one
   }
@@ -3750,8 +3765,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // in its border zone, is Hard; any wrong
     // landing, or being shown the way, is Again, and it comes back later this flight.
     const edge = it.kind === 's' && seaEdge(it, lon, lat) === 1;      // in the border zone between two waters
-    if (t.isNew) learnSkill(it, t.shown || t.misses ? 0 : t.warm || edge ? 0.5 : 1);
-    const grade = t.shown || t.misses ? AGAIN : t.warm || edge ? HARD : t.isNew ? EASY : OK;
+    // A new one found straight away that the game had named under the bird minutes before: Good, not Easy (Easy means
+    // "known already" and sends it away for two weeks; this one was only just seen), and no word on what the player
+    // knew beforehand.
+    if (t.isNew && !(t.saw && clean)) learnSkill(it, t.shown || t.misses ? 0 : t.warm || edge ? 0.5 : 1);
+    const grade = t.shown || t.misses ? AGAIN : t.warm || edge ? HARD : t.isNew && !t.saw ? EASY : OK;
     review(m, grade, now);
     if (grade === AGAIN) {                 // missed again in the same flight: wait three times as long each time
       const n = (S.fails.get(it.key) || 0) + 1;
@@ -3836,6 +3854,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     S.gain = -1;
     ring(p, 6, 30, BAD, 2.5, 0.5);
     const lit = here.c || (here.sea && here.w >= 0 ? WATERS[here.w] : null);
+    // a country never asked, named here: it comes sooner as a new one (SAW_REACH), at a turn drawn now; named again, it keeps its turn
+    if (here.c && !here.sea && here.c.where && memOf(here.c.where).box === 0 && !S.saw.has(here.c.id)) S.saw.set(here.c.id, (S.newC + Math.floor(Math.random() * SAW_WITHIN)) * 1e4 + S.sawN++);
     if (here.name) label(here.sea ? null : here.c, here.name, p, here.sea ? 'wrongsea' : 'wrong', GROUND, here.sea ? null : underName(here), UNDER);
     sfx.miss();
     if (t) countAgainst(t);
