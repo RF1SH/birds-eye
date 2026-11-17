@@ -4613,6 +4613,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // then spun slowly (the player's design of 2026-11-12, before flights were long enough to tangle).
   // Degrees a second along a hop, its shortest and longest; seconds on each stop; dotted lines kept; seconds the lines take to go.
   const REPLAY_DEG = 40, REPLAY_MIN = 0.45, REPLAY_MAX = 5, REPLAY_STOP = 0.25, REPLAY_KEEP = 5, REPLAY_FADE = 0.6;
+  // Seconds the label over a stop is up at the least. It stands from its arrival until the line reaches the next stop: with
+  // stops close together that was 0.7 s each (a hop of 0.45 s and a stop of 0.25 s), three capitals in a row too quick to
+  // read. The bird now waits on a stop as long as its label still needs, so only stops close together take longer (the
+  // player, 2026-11-17, from a video of Bucharest, Zagreb and Budapest, today beside proposed: "1.2 s, as shown").
+  const REPLAY_READ = 1.2;
   // Once the lines have gone, the bird stands OFF_REST seconds in full view, then flies off the screen in OFF_SECS (flyOff).
   const OFF_REST = 0.5, OFF_SECS = 3;
   // How the globe follows the line's tip: it holds still while the tip is within dz degrees of the middle, then turns at
@@ -4624,7 +4629,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (n < 1) return false;
     const D = [], T = [];
     let t = 0;
-    for (let i = 0; i < n; i++) { D.push(clamp(Math.acos(clamp(dot(Q[i], Q[i + 1]), -1, 1)) / RAD / REPLAY_DEG, REPLAY_MIN, REPLAY_MAX)); T.push(t); t += D[i] + REPLAY_STOP; }
+    for (let i = 0; i < n; i++) D.push(clamp(Math.acos(clamp(dot(Q[i], Q[i + 1]), -1, 1)) / RAD / REPLAY_DEG, REPLAY_MIN, REPLAY_MAX));
+    for (let i = 0; i < n; i++) { T.push(t); t += D[i] + (i + 1 < n ? Math.max(REPLAY_STOP, REPLAY_READ - D[i + 1]) : REPLAY_STOP); }          // the stop after hop i: long enough for the label it brought up
     // Each name and capital is tied to its stop by the order of the deliveries, not by where it stands: a capital's
     // country is named at the country's middle, which is no stop of the flight.
     const recs = [...S.log.values()], off = S.began ? 1 : 0;
@@ -4730,7 +4736,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // The line as it is drawn: the hop being flown solid, the five before it dotted (the oldest going while the new one is
   // drawn), a ring opening out where the line arrives, and every stop reached a plain ink dot, as the dot a name is tied to
   // (the player, 2026-11-16: "I would much rather have that to be as Portugal is, with just the black dot and black line";
-  // until then each stop had a white dot with an ink ring). The stop of the postcard not delivered is red. A delivered
+  // until then each stop had a white dot with an ink ring). The stop of the postcard not delivered is red. On the finished
+  // globe the red line stays solid, as it was drawn, and the dot on the start goes with the other lines (until 2026-11-17
+  // the red line turned into dots once it was done, faint over red and orange countries, and a dot with no name stayed on
+  // the start; the player had asked that "all the lines should disappear besides the red line"; picked from a picture,
+  // today beside proposed: "Solid, no start dot"). A delivered
   // capital's symbol is its stop, with no dot over it (drawDrops; a dot there read as another icon, the player: "the poke
   // ball looking icon").
   function drawReplay() {
@@ -4740,7 +4750,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     for (let j = Math.max(0, first); j < cur; j++) {
       if (gone >= 1 && !red(j)) continue;
       ctx.globalAlpha = ga * (!R.done && j === first ? 1 - R.k : red(j) ? 1 : 1 - gone);
-      arc(Q[j], Q[j + 1], red(j) ? BAD : INK, 2.2 * u, [0.1, 6 * u]);
+      if (red(j)) arc(Q[j], Q[j + 1], BAD, 3 * u, null);          // the red line stays as it was drawn (it comes here only once the replay is done)
+      else arc(Q[j], Q[j + 1], INK, 2.2 * u, [0.1, 6 * u]);
     }
     ctx.globalAlpha = ga;
     if (!R.done && R.t >= 0) arc(Q[R.i], Q[R.i + 1], red(R.i) ? BAD : INK, 3 * u, null, 0, R.k);
@@ -4751,24 +4762,30 @@ button { font: inherit; color: inherit; cursor: pointer; }
       const since = j === 0 ? 9 : R.t - R.T[j - 1] - R.D[j - 1];          // seconds since the line got here
       if (since >= 0 && since < 0.6) { ctx.globalAlpha = ga * (1 - since / 0.6); ctx.beginPath(); ctx.arc(s[0], s[1], lerp(8, 22, since / 0.6) * u, 0, 7); ctx.strokeStyle = INK; ctx.lineWidth = 2.5 * u; ctx.stroke(); ctx.globalAlpha = ga; }
       if (S.drops.some((d) => d.city && dot(d.p, q) > 0.999999)) return;
+      const stays = j === 0 && S.began ? 1 - gone : 1;          // the dot on where the flight started is no delivery: it goes with the lines
+      if (stays <= 0) return;
+      ctx.globalAlpha = ga * stays;
       ctx.beginPath(); ctx.arc(s[0], s[1], 2 * u, 0, 7); ctx.fillStyle = S.routeLost && j === R.n ? BAD : INK; ctx.fill();
+      ctx.globalAlpha = ga;
     });
   }
   // What stands over the stop the line has just reached, from its arrival until the line reaches the next stop: a capital's
   // flag, its name and its country's under it, over its symbol; a country's flag and its name, over its stop (the player,
   // 2026-11-16: "I think you should also add the flag to the name of the country when it arrives ... So it mirrors what
-  // happens when you get to a capital"). The country's own name waits meanwhile. At the end it goes with the lines.
+  // happens when you get to a capital"). The country's own name waits meanwhile. At the end the last stop delivered keeps it
+  // until the bird has flown off: until 2026-11-17 it went with the lines, the country's own name came back at the stop, and
+  // the bird stood on that name for a second (picked from a picture, today beside proposed: "Build it").
   function arrivalLabel() {
     const R = S.replay;
     if (!R || S.mode !== 'over' || R.t < 0) return null;
-    const at = reached();
+    const at = R.done ? (S.routeLost ? R.n - 1 : R.n) : reached();
     let k = R.caps.find((x) => x.j === at), sub = true;
     if (!k) {
       const a = atlasNames.find((x) => x.seq === at && !x.lost && !x.water && x.capSeq < 0 && x.c && x.c.flag);
       if (a) { k = { j: at, c: a.c, name: a.name || a.c.name, p: R.Q[at] }; sub = false; }
     }
     if (!k || dot(k.p, cam.n) < cam.cos0 + 0.08) return null;          // near the rim it goes, as every name does
-    const fade = R.done ? 1 - clamp((R.t - R.total) / REPLAY_FADE, 0, 1) : 1, s = project(k.p);
+    const B = R.bird, fade = B.gone ? 0 : B.off ? 1 - clamp(B.off.t / REPLAY_FADE, 0, 1) : 1, s = project(k.p);          // it goes as the bird leaves
     return fade > 0 && s ? Object.assign({ fade, sub }, k, labelOver(k.c, k.name, s, sub)) : null;
   }
   // A label over a mark: the flag, the name, and the country's name under it (the label a capital gets when it is
@@ -4781,7 +4798,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     ctx.font = '700 ' + so + 'px ' + DISPLAY; const sw = c && sub ? subWidth(c.name, so) : 0;
     ctx.restore();
     const fw = c && c.flag ? (c.flag.width / c.flag.height) * flagH(size) : 0, half = (fw + 8 + Math.max(tw, sw)) / 2 + 4;
-    const y = s[1] - (10 * view.mk + 6 * view.ui + (sub ? so + size : size * 0.6));          // over the mark, or the bird standing on it
+    const y = s[1] - (10 * view.mk + 6 * view.ui + (sub ? so + size : size * 1.3));          // over the mark, or the bird standing on it (a country's one line was at 0.6 until 2026-11-17: its flag's corner touched the bird's wing)
     return { x: s[0], y, size, box: { x: s[0], y: y + size / 2, half, tall: size + 8 } };
   }
 
@@ -4953,6 +4970,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // is left out for a moment if that spot is not free on the way, so no name hops from side to side of its place.
   function placeNames(boxes, paint, held) {
     const rounds = S.mode === 'over' && S.trip && S.legs ? heldRounds() : null;
+    // The label of a capital's symbol under the mouse stands on clear ground: a name it would cover is left out while it is
+    // up, and is back when the mouse leaves; it keeps its spot meanwhile, so no other name moves. (The player, 2026-11-16:
+    // "it's just like buried beneath all these other animations and capitals. You need to find a better way to do that,
+    // much better way." The label was then drawn over the other MARKS, but over the names too: on Zagreb's symbol
+    // "Croatia" stood printed over "Romania". Picked from a picture, today beside proposed, 2026-11-17: "Build it".)
+    const hq = paint && hover && hover.pin ? project(hover.p) : null;
+    hoverBox = hq ? labelOver(hover.c, hover.name, hq, !!hover.c).box : null;
     for (const a of atlasNames) {
       const s = project(a.p);
       if (paint) a.at = null;          // where the name stands as drawn, and half its width (for the tests)
@@ -4971,6 +4995,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       if (!at) { if (!held) a.spot = undefined; continue; }
       boxes.push({ x: at[0], y: at[1], half });
       if (!paint) continue;
+      if (hoverBox && Math.abs(hoverBox.x - at[0]) < hoverBox.half + half && Math.abs(hoverBox.y - at[1]) < hoverBox.tall + 9 * q) continue;
       a.at = at; a.half = half;
       // A city's own dot: a trip's answer paper-white, Study's capital not delivered red. Where a round came down right on
       // the city, the dot of that landing stands for both, so the verdict it wears is not hidden under the city's dot
@@ -5012,7 +5037,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // name under the mouse. (The player, 2026-11-16, of a capital's name half under the other marks: "it's just like buried
   // beneath all these other animations and capitals. You need to find a better way to do that". The name under the mouse
   // was drawn before the capitals' symbols, and a symbol's keep-clear box switched it off.)
-  let topHover = null, arrived = null;
+  let topHover = null, arrived = null, hoverBox = null;
   function drawTop() {
     const alpha = 1 - S.blend;
     if (alpha <= 0 || S.mode === 'fly') return;
@@ -5341,7 +5366,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // Ground speed in km a second at a height, flying flat out.
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   const setBird = (lon, lat, a, down) => Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down });
-  window.birdsEye = { showLeg, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, flagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
+  window.birdsEye = { hoverBox: () => hoverBox, slerp, showLeg, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, flagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     project: projectLL, unproject, speedAt, FLY_TOP, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
