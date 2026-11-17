@@ -2850,7 +2850,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const roundWorth = (T, R) => (T.endless ? 10 * hardRow(R)[1] : DAY_WORTH[DAY_KINDS.indexOf(R.kind)]);
   const accMax = (T, R) => roundWorth(T, R) * 8 / 10, partMax = (T, R) => roundWorth(T, R) / 10;
   const num = (n) => n.toLocaleString('en');          // 1,250
-  const TRIP_K = 150, IN_COUNTRY = 0.25, IN_REGION = 0.1, LIFT_CAP = 0.8, SPOT_KM = 15, COUNT = 3, ENERGY_FLOOR = 2, ENERGY_ROOM = 1, ENERGY_WASTE = 15;
+  const TRIP_K = 150, IN_COUNTRY = 0.25, IN_REGION = 0.1, LIFT_CAP = 0.8, SPOT_KM = 15, COUNT = 3, ENERGY_FLOOR = 2, ENERGY_ROOM = 1, ENERGY_WASTE = 21;
   const ADDRESS = 'https://rf1sh.github.io/birds-eye/';       // where the game lives: the last line of a shared result
   // Every trip and run starts here (the player, 2026-11-11: "start at the same place every time, so people arent
   // confused"): in the Gulf of Guinea, 260 km off Ghana, so the coast of West Africa is on the screen when the view
@@ -3018,9 +3018,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // Energy use: the share of its 20 points left after spending `spent` on a round whose cheapest flight costs `cheap`.
   // All of them up to ENERGY_ROOM over the cheapest flight (a seventh of a second of flapping: a hand lets go of Space
   // about that late; the player: "there should be a little room for error"). Past that they fall on a curve, fast at
-  // first and slowly at the end, and none is left after ENERGY_WASTE more, about two seconds of flapping nobody needed
-  // (15 since 2026-11-17, their pick by button from their own five rounds, 70 of 85 points becoming 65; 21 and three
-  // seconds until then, my number; the room is theirs and stays)
+  // first and slowly at the end, and none is left after ENERGY_WASTE more, three seconds of flapping nobody needed
+  // (for two hours on 2026-11-17 it was 15, my reading of their "energy ... too generous"; wrong: "I don't want more
+  // birds coming down. I want more birds being harshly judged". The spare stays; the judging near perfect is theirs to set)
   // (the player: the drops near perfect are bigger than the drops far out, and 0 is for plain wrong). The same on
   // every leg. A Day Trip's ring draws this in its lower half, and Ranked gives back energy by the same measure.
   const spareLeft = (spent, cheap) => { const x = clamp(1 - Math.max(0, spent - cheap - ENERGY_ROOM) / ENERGY_WASTE, 0, 1); return x * x; };
