@@ -325,6 +325,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #daycard tr.on td { background: var(--paper-shade); }
 #daycard [data-i] { cursor: pointer; }
 .squares i.on { outline: 2px solid var(--ink); outline-offset: 2px; }
+/* Under the mouse, a round that can be picked wears the picked look at half strength: a row the shade halfway from the
+   paper to the picked row's, a square the picked square's outline in gray. Pointing picks nothing (a click does); the
+   picked round and a round with no flight kept give no signal. (The player, 2026-11-17: "when you hover over something,
+   it should like, give you a signal that it can be clicked ... maybe it changes color"; their pick from picture
+   HOVER-question. The full shade, which every light button wears under the mouse, would show two rows alike.) */
+@media (hover: hover) {
+  #daycard tr[data-i]:not(.on):hover td { background: color-mix(in srgb, var(--paper-shade) 50%, var(--paper)); }
+  .squares i[data-i]:not(.on):hover { outline: 2px solid color-mix(in srgb, var(--ink) 45%, var(--paper)); outline-offset: 2px; }
+}
 #daycard.wide { width: min(780px, 100%); }
 #stage.side #daycard:not(.wide) { width: min(660px, calc(52vw / var(--ui, 1))); }
 #daycard { padding: 20px 22px 18px; background: var(--paper); border: var(--b2z) solid var(--ink); border-radius: 3px; pointer-events: auto; }
