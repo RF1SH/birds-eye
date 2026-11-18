@@ -5647,7 +5647,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       G.dot(right.d, most * right.share, exactKm(right.d) + ' away (' + right.closeness + ' points)', right.right, 9, -6);          // as every other landing's: over its dot, on the right. It stands over the graph's top line, so this graph keeps FAQ_OVER_TOP more room there
       return faqCap('A capital or a city', 'in this example ' + R.name + ', maximum ' + most + ' accuracy points') + G.svg('Accuracy points by the distance from ' + R.name) +
         faqKey([['line', 'in ' + the(R.c.name)], ['line dash', 'elsewhere in ' + R.c.rg[0]], ['line dots', 'at sea or on another continent']]) +
-        '<p>For a capital or a city, land within ' + CIRCLE_KM + ' km.<br>For a country, land anywhere inside it.</p>';
+        '<p>For a capital or a city, land within ' + CIRCLE_KM + ' km of that location.<br>For a country, land anywhere inside that country.</p>';          // every noun said (the player's pick by button, 2026-11-18)
     }],
     // Speed by the timer: all the points up to the halfway mark, none at the timer's end (speedLeft); under the graph the timer's own line
     ['fast', 'How fast do I have to be?', ({ T, R, right }) => {
@@ -5657,7 +5657,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       G.o.push('<g class="watch">' + box(x0, xm - x0, 'good') + box(xm, third, 'yellow') + box(xm + third, third, 'orange') + box(xm + 2 * third, third, 'bad') + '<rect x="' + (xm - 1).toFixed(1) + '" y="' + (y - 3).toFixed(1) + '" width="2" height="14" fill="var(--ink)"/></g>');
       for (const [x, t, anchor] of [[x0, 0, 'start'], [xm, T.fair.toFixed(1), 'middle'], [G.X(end), end.toFixed(1), 'end']]) G.o.push('<text x="' + x.toFixed(1) + '" y="' + (y + 27).toFixed(1) + '" text-anchor="' + anchor + '">' + t + ' sec</text>');
       return faqCap('Speed points by the timer', 'in this example ' + R.name + ', maximum ' + most) + G.svg('Speed points by the seconds on the timer') +
-        '<p>The halfway mark stands where the fastest 5 in 100 real players were.</p>';
+        '<p>The timer\'s halfway mark is the time that the fastest 5% of real players needed.</p>';          // the player's pick by button, 2026-11-18 (until then "The halfway mark stands where the fastest 5 in 100 real players were.")
     }],
     // Energy use by the seconds of flapping the flight did not need (spareLeft; a second of flapping costs BURN)
     ['energy', 'How much energy can I use?', ({ T, R, right }) => {
@@ -5687,7 +5687,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
         '<tr class="head"><td></td>' + head + head + '</tr>' +
         '<tr><td>Every round starts at</td>' + two.map(() => '<td></td><td class="num add">100</td>').join('') + '</tr>' +
         steps.map((step, i) => '<tr><td>' + step + '</td>' + shares.map((of) => '<td class="num">' + of[i] + '%</td><td class="num add">+' + adds(of[i]) + '</td>').join('') + '</tr>').join('') +
-        '<tr class="sum"><td>It\'s worth</td>' + two.map((R) => '<td class="pts" colspan="2">' + num(roundWorth({ endless: true }, R)) + '</td>').join('') + '</tr></table>' +
+        '<tr class="sum"><td>That round is worth</td>' + two.map((R) => '<td class="pts" colspan="2">' + num(roundWorth({ endless: true }, R)) + '</td>').join('') + '</tr></table>' +
         '<div class="ruler"><span class="h">Players who can do it</span><span class="h h2">Points</span>' +
         [0, 1, 2, 3, 4, 5].map((i) => '<div><b>' + (i ? '+' : '') + 100 * i + '</b><span>' + Math.floor(100 / 2 ** i) + '%</span></div>').join('') + '</div>';
     }],
