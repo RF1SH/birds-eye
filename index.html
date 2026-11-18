@@ -534,12 +534,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
    are examples, so they are three, each with its name BESIDE it, off the five's columns (the player, 2026-11-17, of five
    under both: "almost like that's also 5 rounds ... Find a way to make that more clear"). */
 #faq h4 { margin: 18px 0 8px; font: 700 20px/1 var(--display); letter-spacing: .02em; }
-#faq .stamps { display: grid; grid-template-columns: repeat(5, 1fr) 94px; align-items: start; gap: 0 6px; }
+#faq .stamps { display: grid; grid-template-columns: repeat(4, 1fr auto) 1fr auto; align-items: start; gap: 0 6px; }          /* a sum: a plus sign between two stamps, then the total with its unit */
 #faq .stamps div { display: grid; justify-items: center; align-content: start; gap: 9px; }
 #faq .stamps .big, #faq .eg .big { white-space: nowrap; }
 #faq .st { display: block; height: 40px; width: auto; }
 #faq .stamps .rd { font-size: 13px; line-height: 1; color: var(--ink-soft); }
-#faq .stamps .sum { align-self: start; padding: 30px 0 0 8px; font: 700 24px/1 var(--display); white-space: nowrap; }
+#faq .stamps .op { padding-top: 30px; font: 700 24px/1 var(--display); white-space: nowrap; }          /* on the middle of the stamps */
 @media (max-width: 560px) { #faq .stamps { display: flex; flex-wrap: wrap; gap: 14px 16px; } }          /* a phone's width: the five and their sum take two lines, nothing runs out of the sheet */
 #faq .eg { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 30px; }
 #faq .eg .lbl { font-size: 13px; color: var(--ink-soft); }
@@ -5584,9 +5584,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const percent = (share) => Math.round(100 * share) + '%';
   // A graph of the sheet, w by h, from 0 to x1 and 0 to y1: hairlines with their numbers, the points of a rule as a line,
   // and landings as dots (green correct, red wrong) with a label beside each.
-  function faqPlot(w, h, x1, y1, mb) {
-    const ml = 44, mr = 14, mt = 12, o = [], n1 = (v) => v.toFixed(1);
-    mb = mb || 44;
+  function faqPlot(w, h, x1, y1, mb, mt) {
+    const ml = 44, mr = 14, o = [], n1 = (v) => v.toFixed(1);
+    mb = mb || 44; mt = mt || 12;
     const X = (x) => ml + x / x1 * (w - ml - mr), Y = (y) => h - mb - y / y1 * (h - mt - mb);
     const P = {
       X, Y, o,
@@ -5607,9 +5607,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     return P;
   }
   const faqKey = (rows) => '<div class="key">' + rows.map(([cls, t]) => '<span><svg class="g" width="30" height="8" viewBox="0 0 30 8" aria-hidden="true"><path d="M1 4 H29" class="' + cls + '"/></svg>' + esc(t) + '</span>').join('') + '</div>';
-  const faqCap = (bold, rest) => '<div class="cap">' + esc(bold) + ' <small>(' + esc(rest) + ')</small></div>';
+  const faqCap = (bold, rest) => '<div class="cap">' + esc(bold) + (rest ? ' <small>(' + esc(rest) + ')</small>' : '') + '</div>';
   const quarters = (most) => [0, 1, 2, 3, 4].map((k) => most * k / 4);
   // answer 3's other landings, each wrong: two in the answer's country, one elsewhere in its region, one at sea
+  const FAQ_OVER_TOP = 14;
   const FAQ_ELSE = [['Hamburg', 9.99, 53.55, 9, -6], ['Munich', 11.58, 48.14, 9, -6], ['Paris', 2.35, 48.86, 6, -6], ['North Sea', 4.0, 55.5, -9, 17, 'end']];
   // Answer 8: three Ranked flights over the same fifty legs, by Ranked's own rules. The legs are those of one Ranked game, in
   // km (flown once on the built page with a set seed, `audit/fq16.py`: Saudi Arabia, Chile, Nottingham, Tokyo ...). A flight
@@ -5640,10 +5641,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
       '<p>Otherwise, a quick but incorrect landing would receive unearned bonus points.</p>'],          // the player's own line, 2026-11-18
     // Accuracy by the distance: three lines by where the bird came down (pointShare, liftBy), the circle's 150 on the km axis
     ['close', 'How close do I have to land?', ({ T, R, right }) => {
-      const most = accMax(T, R), ring = ringKm(R), G = faqPlot(600, 258, 1000, most).grid(quarters(most), [0, ring, 250, 500, 750, 1000]).xtitle('km from ' + R.name);
+      const most = accMax(T, R), ring = ringKm(R), G = faqPlot(600, 258 + FAQ_OVER_TOP, 1000, most, 0, 12 + FAQ_OVER_TOP).grid(quarters(most), [0, ring, 250, 500, 750, 1000]).xtitle('km from ' + R.name);
       for (const [cls, floor] of [['line dots', 0], ['line dash', IN_REGION], ['line', IN_COUNTRY]]) G.curve((d) => most * liftBy(pointShare(R, d), floor), cls);
       for (const [name, lon, lat, dx, dy, anchor] of FAQ_ELSE) { const j = judge(R, lon, lat); G.dot(j.d, most * j.share, name + ' (' + Math.round(most * j.share) + ')', j.right, dx, dy, anchor); }
-      G.dot(right.d, most * right.share, exactKm(right.d) + ' away (' + right.closeness + ' points)', right.right, 23, 10);
+      G.dot(right.d, most * right.share, exactKm(right.d) + ' away (' + right.closeness + ' points)', right.right, 9, -6);          // as every other landing's: over its dot, on the right. It stands over the graph's top line, so this graph keeps FAQ_OVER_TOP more room there
       return faqCap('A capital or a city', 'in this example ' + R.name + ', maximum ' + most + ' accuracy points') + G.svg('Accuracy points by the distance from ' + R.name) +
         faqKey([['line', 'in ' + the(R.c.name)], ['line dash', 'elsewhere in ' + R.c.rg[0]], ['line dots', 'at sea or on another continent']]) +
         '<p>For a capital or a city, land within ' + CIRCLE_KM + ' km.<br>For a country, land anywhere inside it.</p>';
@@ -5663,17 +5664,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
       const most = partMax(T, R), points = (secs) => most * spareLeft(T.cheap + secs * BURN, T.cheap);
       const G = faqPlot(600, 212, 3.2, most).grid(quarters(most), [0, 0.5, 1, 1.5, 2, 2.5, 3], (x) => x + ' sec').xtitle('using energy longer than the flight needs').curve(points, 'line');
       G.dot(FAQ_OVER, points(FAQ_OVER), FAQ_OVER + ' sec too long (' + right.energy + ' points)', right.right, 10, -4);
-      return faqCap('Energy use points', 'in this example ' + R.name + ', maximum ' + most) + G.svg('Energy use points by the seconds of flapping the flight did not need') +
+      return faqCap('Energy use points') + G.svg('Energy use points by the seconds of flapping the flight did not need') +
         '<p>Flying halfway around the world only requires under 1 sec of flapping.</p>';          // the player's own line, 2026-11-18; true while cheapFor(20,000 km) is under BURN (smoke holds it)
     }],
     // What a round is worth, on the game's own stamps (stampSvg, roundWorth) with the clues as the day card shows them (clueOf)
     ['worth', 'How many points is a round worth?', () => {
       const day = faqDay(), stamp = (T, R) => stampSvg(num(roundWorth(T, R)), 'st'), ranked = { endless: true };
       const eg = [areaAsk('country', faqLand('Australia')), pointAsk('capital', faqLand('Germany')), pointAsk('capital', faqLand('Kazakhstan'))];
-      return '<h4>Day Trip</h4><div class="stamps">' + day.map((R, i) => '<div><span class="rd">Round ' + (i + 1) + '</span>' + stamp({}, R) + '<span class="big">' + clueOf(R) + '</span></div>').join('') +
-        '<div class="sum">= ' + num(day.reduce((sum, R) => sum + roundWorth({}, R), 0)) + '</div></div><p>Each round is harder than the one before.</p>' +
-        '<h4>Ranked</h4><div class="eg"><span class="lbl">For example</span>' + eg.map((R) => '<span class="one">' + stamp(ranked, R) + '<span class="big">' + clueOf(R) + '</span></span>').join('') + '</div>' +
-        '<p>The harder the location, the more it\'s worth.</p>';          // the player's own line, 2026-11-17
+      // the five as a sum, a plus sign between two stamps and the unit after the total; the lines and both labels are the player's own, 2026-11-18
+      return '<h4>Day Trip</h4><div class="stamps">' + day.map((R, i) => '<div><span class="rd">Round ' + (i + 1) + '</span>' + stamp({}, R) + '<span class="big">' + clueOf(R) + '</span></div>').join('<div class="op">+</div>') +
+        '<div class="op">= ' + num(day.reduce((sum, R) => sum + roundWorth({}, R), 0)) + ' points</div></div><p>Each round is more difficult than the round before.</p>' +
+        '<h4>Ranked mode</h4><div class="eg"><span class="lbl">Example rounds:</span>' + eg.map((R) => '<span class="one">' + stamp(ranked, R) + '<span class="big">' + clueOf(R) + '</span></span>').join('') + '</div>' +
+        '<p>The more difficult the location, the more that round is worth.</p>';
     }],
     // Why one capital is worth more than another: every round starts at 100, and each step fewer players can do adds points:
     // 100 for each halving of the players (how hardRow's x is made, tools/build_hard.py). The shares of each step are D.steps.
@@ -5695,13 +5697,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
       const full = ENDLESS_TANK, G = faqPlot(600, 212, FAQ_LEGS.length, full).grid(quarters(full), [0, 10, 20, 30, 40, 50], null, (y) => ({ 0: 'empty', [full / 2]: 'half', [full]: 'full' })[y] || '').xtitle('landings');
       G.poly(faqFlight(0, 10), 'line dots').poly(faqFlight(FAQ_OVER * BURN, 0), 'line dash').poly(faqFlight(0, 0), 'line');
       return faqCap('Energy left', '3 flights over the same locations') + G.svg('The energy left after every landing of three Ranked flights') +
-        faqKey([['line', 'no energy wasted, every landing correct'], ['line dash', 'using energy for ' + FAQ_OVER + ' sec too long every round'], ['line dots', 'no energy wasted, every 10th landing wrong']]) +
-        '<p>A correct landing gives back the energy the flight needed.<br>A wrong one gives back nothing.<br>The game ends when your energy runs out.</p>';          // the last line is the player's own, 2026-11-18, and stands last
+        faqKey([['line', 'no energy wasted, every landing correct'], ['line dash', 'using energy for ' + FAQ_OVER + ' sec too long every round'], ['line dots', 'no energy wasted, every 10th landing incorrect']]) +
+        // The player's own three lines, 2026-11-18. "minimum" holds: rankedBack gives back what the flight spent, up to the least it needed and ENERGY_BACK more (a hand that lets go a seventh of a second late)
+        '<p>A correct landing replenishes the minimum energy that flight needed.<br>An incorrect landing does not replenish any energy you used that round.<br>The game ends when your energy runs out.</p>';
     }],
     // Where the rules' numbers come from (the player, 2026-11-13: "How did you decide this?"; last on the sheet by their pick), and
     // under it the credits the data's licenses ask for, where a player can see them (LICENSE has each in full)
     ['decided', 'How did you decide this?', () => '<table>' + [
-      ['How hard a location is', 'How often real players name it or find it: slepemapy.cz, JetPunk, MapTap\'s Atlas, cityquiz.io, Wikipedia page views'],
+      ['How difficult a location is', 'How often real players name it or find it: slepemapy.cz, JetPunk, MapTap\'s Atlas, cityquiz.io, Wikipedia page views'],
       ['The timer\'s halfway mark', '54,775 timed answers on slepemapy.cz'],
       ['Points by distance', 'MapTap\'s formula, sized for a map that shows borders'],
       ['The energy a flight needs', 'Flown by the game\'s own rules'],
