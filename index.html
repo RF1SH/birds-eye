@@ -1408,8 +1408,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const DOT_KM = 22;            // a landing this close to a tiny country's dot is in it...
   // ...and this close counts when the letter is for that tiny country. 45 km (35 until 2026-11-15; the player, of a
   // capital 100 km from its dot: "Should we make the error margin wider?", and in the first notes: "Vatican City and
-  // places like it should have wider error margin"). One ordinary tap of an arrow key moves the bird 50 km just above
-  // the ground, and the line was 70 km across. 45 is the widest that keeps every two dots' lines apart (Saint Kitts
+  // places like it should have wider error margin"). One ordinary tap of an arrow key moved the bird 50 km just above
+  // the ground then (22 km since 2026-11-18, FINE_FROM), and the line was 70 km across. 45 is the widest that keeps every two dots' lines apart (Saint Kitts
   // and Antigua lie 94 km from each other); at 75 three pairs' lines cross. Their pick from a picture.
   const TINY_KM = 45;
   // A country that is nothing but small islands is hard to land on, so its own waters are the country: 22 km out from
@@ -3175,6 +3175,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // whole climb. (Until 2026-11-12 this was par, and 10 for the far side.) The keys steer in eight directions, so the
   // way flown is a little longer than the straight one (STEER), and a hop still needs a take-off (ENERGY_FLOOR).
   const STEER = 1.06, STEER_KM = 30;
+  // A tap of an arrow key moves the bird a little and a held key flies flat out: a pressed key steers at FINE_FROM of
+  // the full speed and reaches all of it after FINE_SECS of holding (steerHeld: how long a key has steered the bird in
+  // the air). Near the ground a tap of 0.1 s moves the bird 22 km where it moved 50, and a key held one second 442 km
+  // where it moved 491; Spot on is within 15 km. (The player, 2026-11-13: "when you press an arrow key, you do move like
+  // kind of a lot ... you can really land where you want to land if you do the right inputs"; flown by them on a trial
+  // page beside the keys as they were and three ways by mouse, 2026-11-18: best "arrow keys with finer taps", and by
+  // button "Yes, as on the page". PLAN 62.)
+  const FINE_FROM = 0.3, FINE_SECS = 0.3;
+  const fineK = (held) => FINE_FROM + (1 - FINE_FROM) * Math.min(1, held / FINE_SECS);
+  let steerHeld = 0;
   let carryRows = null, carryKey = '';
   function carryTable() {
     const key = view.ref + ':' + view.H1;
@@ -4396,6 +4406,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
       let ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0), iy = (keys.up ? 1 : 0) - (keys.down ? 1 : 0);
       const mag = Math.hypot(ix, iy);
       if (mag > 1) { ix /= mag; iy /= mag; }
+      steerHeld = mag > 0 ? steerHeld + dt : 0;          // a tap is fine, a hold is fast (FINE_FROM)
+      const fine = fineK(steerHeld);
+      ix *= fine; iy *= fine;
       // The same speed on screen at every height (a little more at the top), which is a great
       // deal faster over the ground from high up. Slower for the last of the descent, to place a landing.
       const pace = paceAt(bird.a);
@@ -4410,6 +4423,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       }
       if (bird.a <= 0 && bird.va <= 0) touchDown();
     }
+    if (bird.down) steerHeld = 0;          // a key still held from the last flight starts fine again
     bird.beat += dt * (flap ? 15 : 0);
     const spread = bird.down ? 0.42 : flap ? 0.72 + 0.28 * Math.cos(bird.beat) : bird.va < -0.45 ? 0.8 : 1;
     bird.spread += (spread - bird.spread) * Math.min(1, dt * (flap ? 30 : 9));
@@ -5936,7 +5950,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // for the tests: the bird put somewhere by hand. That is no flight, so the view is the bird's own at once (no rest on the last landing's country still being handed back)
   const setBird = (lon, lat, a, down) => { Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down }); S.capFit = null; Object.assign(fitv, { on: false, k: 0, lh: null, s0: 1 }); };
   window.birdsEye = { hoverBox: () => hoverBox, slerp, showLeg, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, flagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
-    project: projectLL, unproject, speedAt, FLY_TOP, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
+    project: projectLL, unproject, speedAt, FLY_TOP, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
   if (gl) {
