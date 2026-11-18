@@ -2365,10 +2365,21 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // And if you press space it returns to you much faster (animation is much faster so you can press space 2x then you're
   // flying again)". Until then Space took off at once, under a view that was elsewhere, and only cut the rest short.)
   let flapWas = false, flapSpent = false;
+  // Study and Free flight, the view rested on the country landed in (S.capFit, S.around.fit): a press of Space brings
+  // the view back to the bird in half of FIT_BACK and, still held when that time is up, the bird takes off: one held
+  // press. (The player, 2026-11-18: "the first space press, if you are zoomed out, should return to the normal thing,
+  // because then the bird isn't centered"; of two presses, as for a view away showing a missed location: "i don't mind
+  // the two presses but maybe one held press would feel better?", flown both ways on a trial page, by button "One held
+  // press". PLAN 121. Until then the bird took off at once under a view still on the country.) Told by the game's
+  // clock, never by the camera, which only a drawn frame moves. Let go before the time is up: the view stays on the
+  // bird and the next press flies.
+  const rested = () => { const A = S.game === 'free' ? S.around : S.game === 'study' ? S.capFit : null; return bird.down && A && A.fit ? A : null; };
   function stepLook(dt) {
     const press = keys.flap && !flapWas;
     flapWas = keys.flap;
     if (!keys.flap) flapSpent = false;
+    const A = press && !S.look && rested();
+    if (A && !A.free) { A.free = true; A.takeAt = S.t + FIT_BACK / 2; }
     const L = S.look;
     if (!L) return;
     const back = L.go + L.hold;
@@ -4389,7 +4400,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
     // Flapping is the only thing that costs energy. With none left, you can only glide down.
     // No flying until the view has come down on the bird (S.blend), in any mode.
-    const flap = keys.flap && !flapSpent && !S.look && S.energy > 0 && S.blend >= 1 && !(S.trip && S.trip.wait && !lessonFlies(S.trip));
+    const held = rested();          // one held press: no take-off until the view is back on the bird
+    const flap = keys.flap && !flapSpent && !S.look && S.energy > 0 && S.blend >= 1 && !(S.trip && S.trip.wait && !lessonFlies(S.trip)) && !(held && S.t < held.takeAt);
     if (flap) {
       S.energy = Math.max(0, S.energy - BURN * dt);
       if (bird.down) { bird.down = false; bird.va = CLIMB * 0.45; }
@@ -4467,10 +4479,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     let cy = lerp(S.mode === 'title' ? view.ty : (view.h - view.deck - view.keyRoom) / 2, view.gy, k);
     let rest = false;          // the view rests on a place: Free flight's landing, and Study's landing in a country (restOn)
     if (S.mode === 'fly' && (S.game === 'free' || S.game === 'study')) {
-      const A = S.game === 'free' ? S.around : S.capFit, F = fitv, on = bird.down && !!(A && A.fit), dt = clamp(S.t - F.tp, 0, 0.1), own = logH;
+      const A = S.game === 'free' ? S.around : S.capFit, F = fitv, on = bird.down && !!(A && A.fit) && !A.free, dt = clamp(S.t - F.tp, 0, 0.1), own = logH;
       F.tp = S.t;
       if (on) F.fit = A.fit;
-      if (on !== F.on) { if (on) F.h0 = F.lh !== null ? F.lh : own; else F.s0 = groundScale(); F.k0 = F.k; F.t0 = on ? A.t : S.t; F.T = on ? A.T : FIT_BACK; F.on = on; }
+      if (on !== F.on) { if (on) F.h0 = F.lh !== null ? F.lh : own; else F.s0 = groundScale(); F.k0 = F.k; F.t0 = on ? A.t : S.t; F.T = on ? A.T : A && A.free ? FIT_BACK / 2 : FIT_BACK; F.on = on; }          // a press of Space sent the view back (rested): twice as fast
       const p = arrive((S.t - F.t0) / F.T);
       F.k = on ? F.k0 + (1 - F.k0) * p : F.k0 * (1 - p);
       if (F.k > 0 && F.fit) { n = slerp(n, F.fit.c, F.k); cx = lerp(cx, F.fit.rx, F.k); cy = lerp(cy, F.fit.ry, F.k); rest = true; }
@@ -5950,7 +5962,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // for the tests: the bird put somewhere by hand. That is no flight, so the view is the bird's own at once (no rest on the last landing's country still being handed back)
   const setBird = (lon, lat, a, down) => { Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down }); S.capFit = null; Object.assign(fitv, { on: false, k: 0, lh: null, s0: 1 }); };
   window.birdsEye = { hoverBox: () => hoverBox, slerp, showLeg, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, flagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
-    project: projectLL, unproject, speedAt, FLY_TOP, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
+    project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
   if (gl) {
