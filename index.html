@@ -1816,6 +1816,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // is CAP_MARK; where the line is drawn, that is the star in its circle (PIN_ART's shapes), as tall as the letters.
   const CAP_MARK = '\u272A ';
   const capLine = (c) => (c && c.cap ? CAP_MARK + c.cap[0] : null);
+  // The population in gray under a country's name when a landing in Study names it: in the spot the capital's line
+  // left when the capital moved to its place on the map (the player, 2026-11-17: "now that the capital is out from
+  // underneath the country's name, when you land in the country, I think that now there's space for including the
+  // population in gray underneath the country's name"; their words of 2026-11-15: the population is "the least
+  // important value", worth it abbreviated as "pop." or in "a more muted color"; their pick from picture
+  // POPULATION-question: "Yes, build it"). On a delivery and on a wrong landing alike. Only where nothing else stands
+  // under the name: a country drawn as a dot keeps its capital there, a land that is never asked its note, and
+  // Afghanistan its flag's note. Study only: Day Trip and Ranked keep the capital's line under a country's name.
+  const POP_MARK = 'pop. ';
+  const popLine = (c) => (c && c.pop && !c.flagNote ? POP_MARK + '~' + people(c.pop) : null);
   // A land that is never asked has no capital in the game. The line under its name says which country it belongs to:
   // "part of France" (French Guiana), "territory of the United States" (Puerto Rico). In the capital's spot and
   // lettering, under the bird after a landing and on Free flight's card; by the mouse a name stands alone, as a
@@ -1828,6 +1838,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // a line under a name: how wide it is (the font is set by the caller), and the line drawn with its middle at x
   const subWidth = (line, size) => (line.startsWith(CAP_MARK) ? markW(size) + markGap(size) + ctx.measureText(line.slice(CAP_MARK.length)).width : ctx.measureText(line).width);
   function subText(line, x, y, so) {
+    if (line.startsWith(POP_MARK)) so = Object.assign({}, so, { fill: INK_SOFT });          // the population: the least important line, in gray
     if (!line.startsWith(CAP_MARK)) { text(line, x, y, so); return; }
     const rest = line.slice(CAP_MARK.length), d = markW(so.size);
     ctx.font = '700 ' + so.size + 'px ' + DISPLAY;
@@ -2487,8 +2498,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   const PIN = '<svg viewBox="-11.5 -11.5 23 23" aria-hidden="true">' + PIN_ART + '</svg>';
   const esc = (t) => String(t).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
-  // A population, rounded for reading at a glance: 212 M, 5.6 M, 450 K, 38 K, 458.
-  const people = (n) => (n >= 1e7 ? Math.round(n / 1e6) + ' M' : n >= 1e6 ? (Math.round(n / 1e5) / 10) + ' M' : n >= 1e4 ? Math.round(n / 1e3) + ' K' : n >= 1e3 ? (Math.round(n / 100) / 10) + ' K' : String(n));
+  // A population, rounded for reading at a glance: 1.4 B, 212 M, 5.6 M, 450 K, 38 K, 458. (Until 2026-11-17 a billion
+  // was written in millions: Free flight's card read "~1409 M" for China.)
+  const people = (n) => (n >= 1e9 ? (Math.round(n / 1e8) / 10) + ' B' : n >= 1e7 ? Math.round(n / 1e6) + ' M' : n >= 1e6 ? (Math.round(n / 1e5) / 10) + ' M' : n >= 1e4 ? Math.round(n / 1e3) + ' K' : n >= 1e3 ? (Math.round(n / 100) / 10) + ' K' : String(n));
   function showPlace(here) {
     const box = $('place'), water = here.sea ? (here.w >= 0 ? WATERS[here.w] : null) : null, c = here.c;
     if (!here.name) { box.hidden = true; return; }
@@ -3858,7 +3870,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       flash(c, 1, FLASH);
       S.drops.push({ p, t: S.t });
       // where its capital is (capShown): the view rests on the whole country, and where the name stands is worked out for that rest
-      const fact = showLandFact(c), cap = capShown(c), sub = cap ? null : capLine(c), saved = Object.assign({}, cam), F = cap ? restOn(c, fact) : null;
+      const fact = showLandFact(c), cap = capShown(c), sub = (cap ? null : capLine(c)) || popLine(c), saved = Object.assign({}, cam), F = cap ? restOn(c, fact) : null;
       if (F) aim(F.c, F.H, F.rx, F.ry);
       const there = !c.tiny && project(c.u), on = there && there[0] > 50 && there[0] < view.w - 50 && there[1] > 50 && there[1] < view.h - view.deck - 30;
       // at its middle when that is in sight and the name and flag stand clear of the bird there; else under the bird
@@ -3880,7 +3892,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     S.said = 'correct country';
     flash(c, 1, FLASH);
     ring(p, 6, 30, PAPER, 2.5, 0.5);
-    label(t.shown ? null : c, c.name, p, 'name', GROUND, null, UNDER);      // shown the way: the capital's name is still up, with the flag. No capital line here: the postcard itself names it
+    label(t.shown ? null : c, c.name, p, 'name', GROUND, popLine(c), UNDER);      // shown the way: the capital's name is still up, with the flag. No capital line here: the postcard itself names it. The population, as under any country a landing names
     if (!t.warm) {
       t.warm = true;
       sfx.thud();
@@ -3935,7 +3947,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // a country never asked, named here: it comes sooner as a new one (SAW_REACH), at a turn drawn now; named again, it keeps its turn
     if (here.c && !here.sea && here.c.where && memOf(here.c.where).box === 0 && !S.saw.has(here.c.id)) S.saw.set(here.c.id, (S.newC + Math.floor(Math.random() * SAW_WITHIN)) * 1e4 + S.sawN++);
     const cap = !here.sea && capShown(here.c);
-    if (here.name) label(here.sea ? null : here.c, here.name, p, here.sea ? 'wrongsea' : 'wrong', GROUND, here.sea || cap ? null : underName(here), UNDER);
+    if (here.name) label(here.sea ? null : here.c, here.name, p, here.sea ? 'wrongsea' : 'wrong', GROUND, here.sea ? null : (cap ? null : underName(here)) || popLine(here.c), UNDER);
     if (cap) { markCapital(here.c); restOn(here.c); }
     sfx.miss();
     if (t) countAgainst(t);
