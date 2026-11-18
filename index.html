@@ -1822,6 +1822,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
   const bird = { lon: -20, lat: 20, a: 1, va: 0, vx: 0, vy: 0, h: -0.3, down: false, at: '*', beat: 0, spread: 1, squash: 0 };
   const keys = { left: false, right: false, up: false, down: false, flap: false };
+  // Press and pull: the mouse steers beside the arrow keys, at any moment, with nothing to set (the player's pick,
+  // 2026-11-18: "Both always on"). The button down on the map in a flight plants a ring there; the pull away from the
+  // ring is the bird's direction, at any angle, and its speed: all of it at a pull of PULL_FULL of view.ref (121 px on
+  // a big screen), none inside the ring (PULL_RING, in the marks' px); the button up and the pull is over. Space still
+  // flies up. Their own idea, flown by them on a trial page, their second favorite after the keys with finer taps:
+  // "anywhere on the screen, you can click, and when that click is held ... You can move the arrow away from the point
+  // where you started clicking, and that can become the magnitude and direction of the vector that the bird moves ...
+  // where you click can become a little ring ... when you let go of the mouse, then it stops becoming the point and you
+  // can just re-click anywhere you want". A finger is left out until the game is made for a phone (PLAN 110), where
+  // Space has no thumb yet. PLAN 113, 125.
+  const pull = { at: null, x: 0, y: 0 };          // at: where the button went down, on the stage; x, y: the pointer now
+  const PULL_FULL = 0.08, PULL_RING = 6;
   const S = {
     mode: 'title',             // title | fly | over
     paused: false,
@@ -3228,6 +3240,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // most ground, with a tap of Space each time it starts to sink: the far side of the world costs 6.8, less than one
   // whole climb. (Until 2026-11-12 this was par, and 10 for the far side.) The keys steer in eight directions, so the
   // way flown is a little longer than the straight one (STEER), and a hop still needs a take-off (ENERGY_FLOOR).
+  // Press and pull steers at any angle and is judged against the same table: both ways reach every point, and a
+  // straight flight has at most 0.12 of energy more room than the keys' (a quarter of ENERGY_ROOM), 0 to 0.13 s.
   const STEER = 1.06, STEER_KM = 30;
   // A tap of an arrow key moves the bird a little and a held key flies flat out: a pressed key steers at FINE_FROM of
   // the full speed and reaches all of it after FINE_SECS of holding (steerHeld: how long a key has steered the bird in
@@ -3239,6 +3253,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const FINE_FROM = 0.3, FINE_SECS = 0.3;
   const fineK = (held) => FINE_FROM + (1 - FINE_FROM) * Math.min(1, held / FINE_SECS);
   let steerHeld = 0;
+  // Press and pull steers when a flight can go on: not while the view is away from the bird, not between two rounds
+  // (what gates the flap, less the energy). Then the ring is drawn too; a ring that steers nothing is not shown. A
+  // pause ends a pull (setPaused), and on a pause a press plants no ring.
+  const steerable = () => S.mode === 'fly' && !S.look && S.blend >= 1 && !(S.trip && S.trip.wait && !lessonFlies(S.trip));
+  // The pull as the keys' steering is: [east, north], up to 1 long. It has no slow start, as a tap of a key has: the
+  // pull is as long as the hand makes it (flown so by the player on the trial page).
+  function pullBy() {
+    if (!pull.at || !steerable()) return [0, 0];
+    const dx = pull.x - pull.at[0], dy = pull.y - pull.at[1], d = Math.hypot(dx, dy), r0 = PULL_RING * view.mk;
+    const k = clamp((d - r0) / Math.max(1, PULL_FULL * view.ref - r0), 0, 1);
+    return d > 0 && k > 0 ? [(dx / d) * k, (-dy / d) * k] : [0, 0];
+  }
+  const pulling = () => { const by = pullBy(); return by[0] !== 0 || by[1] !== 0; };
   let carryRows = null, carryKey = '';
   function carryTable() {
     const key = view.ref + ':' + view.H1;
@@ -3361,7 +3388,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (bird.down) return;
     if (T.lesson === 'space' && bird.a >= 0.3) lesson('arrows');          // held, not tapped: the map has begun to widen
     else if (T.lesson === 'arrows') {
-      if (keys.left || keys.right || keys.up || keys.down) T.nav += dt;
+      if (keys.left || keys.right || keys.up || keys.down || pulling()) T.nav += dt;
       if (T.nav >= 0.4) lesson('letgo');                                 // long enough to have seen the bird go that way
     }
     // Space let go and the bird still in the air once the third line has stood a while: the next line does not wait
@@ -3959,7 +3986,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     S.route = null; S.replay = null;           // Study's path of deliveries; a trip's flights are in S.legs
     holdOff();
     stage.classList.remove('flying'); stage.classList.add('atlas');
-    keys.left = keys.right = keys.up = keys.down = keys.flap = false;
+    keys.left = keys.right = keys.up = keys.down = keys.flap = false; pull.at = null;
     fx.length = 0;
     // the answers, named in ink: an answer is never red, the dot where you came down wears the verdict
     atlasNames = T.results.map((r, i) => ({ c: T.rounds[i].c, p: r.p, name: r.name, city: r.kind !== 'country' && r.kind !== 'flag', i }));
@@ -4210,7 +4237,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     S.look = null; S.capAt = null; S.capFit = null;
     stage.classList.remove('flying');
     stage.classList.add('atlas');
-    keys.left = keys.right = keys.up = keys.down = keys.flap = false;
+    keys.left = keys.right = keys.up = keys.down = keys.flap = false; pull.at = null;
     const isBest = S.n > save.best;
     if (isBest) save.best = S.n;
     persist();
@@ -4306,7 +4333,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     runKind = 'day';
     S.log = new Map(); S.drops = [];
     fx.length = 0; flashes.length = 0;
-    keys.left = keys.right = keys.up = keys.down = keys.flap = false;
+    keys.left = keys.right = keys.up = keys.down = keys.flap = false; pull.at = null;
     atlas.from = from; atlas.to = [from[0], clamp(from[1], -45, 60)]; atlas.k = 0; atlas.secs = 0; S.tour = null; atlas.spin = 6; atlas.idle = 0; atlas.rest = REST;
     stage.classList.remove('flying'); stage.classList.add('atlas');
     $('console').hidden = true; $('debrief').hidden = true; $('place').hidden = true; $('daycard').hidden = true; hideFunFact();
@@ -4329,7 +4356,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function hold() {
     if (heldAt || !inRound()) return;
     heldAt = performance.now();
-    keys.left = keys.right = keys.up = keys.down = keys.flap = false;
+    keys.left = keys.right = keys.up = keys.down = keys.flap = false; pull.at = null;
     stage.classList.add('held'); $('held').hidden = false;
   }
   function release() {
@@ -4358,7 +4385,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // delivery, a Ranked flight from its first landing, a Day Trip from its start. Free flight and the tutorial keep
     // nothing, and there it reads "Home". (Until then a small line under the buttons: "Progress is saved.")
     $('home').firstChild.textContent = keptOnHome() ? 'Save and go home ' : 'Home ';
-    keys.left = keys.right = keys.up = keys.down = keys.flap = false;
+    keys.left = keys.right = keys.up = keys.down = keys.flap = false; pull.at = null;
     $('card-title').hidden = on;
     $('card-pause').hidden = !on;
     $('card').hidden = !on;
@@ -4437,7 +4464,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
     // A bird left alone on the ground dozes off, and after a few minutes the game pauses itself.
     S.idle += dt;
-    if (keys.left || keys.right || keys.up || keys.down || keys.flap) S.idle = 0;
+    if (keys.left || keys.right || keys.up || keys.down || keys.flap || pull.at) S.idle = 0;
     // not in Free flight (its card already has the facts) or Challenge (a clock is running)
     if (landFact && !bird.down) hideFunFact();          // a landing's fact goes at take-off
     if (bird.down && S.idle > IDLE_SLEEP + 1 && S.game === 'study') { if (!sleepFact && !landFact) showSleepFact(); } else hideSleepFact();
@@ -4466,6 +4493,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
       steerHeld = mag > 0 ? steerHeld + dt : 0;          // a tap is fine, a hold is fast (FINE_FROM)
       const fine = fineK(steerHeld);
       ix *= fine; iy *= fine;
+      const by = pullBy(), both = Math.max(1, Math.hypot(ix + by[0], iy + by[1]));          // press and pull beside the keys: the two together, never faster than either flat out
+      ix = (ix + by[0]) / both; iy = (iy + by[1]) / both;
       // The same speed on screen at every height (a little more at the top), which is a great
       // deal faster over the ground from high up. Slower for the last of the descent, to place a landing.
       const pace = paceAt(bird.a);
@@ -5498,6 +5527,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (S.mode === 'fly') drawRoute();
     if (S.mode === 'fly') drawBird();          // no bird outside a flight (until 2026-11-13 one faded out above the globe for a second after Home or a flight's end: "a bird appears and fades away on top of the globe on the home page")
     if (S.mode === 'fly' && S.game === 'free') { drawBelow(); if (S.around && bird.down) drawAround(); }
+    if (S.mode === 'fly') drawPull();
     if (S.trip && S.trip.reveal && S.mode === 'fly') drawReveal();
     placed.length = 0;
     if (S.mode === 'fly') { const g = project(unit(bird.lon, bird.lat)); if (g) placed.push(birdBox(g)); }
@@ -5516,6 +5546,31 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   // Free flight: the name (and flag) of what is under the bird's shadow, just below it.
   let below = null;
+  // Press and pull, drawn: a ring where the button went down, and from its rim an arrow the way of the pull, as long as
+  // the pull, up to the pull that flies flat out (the player, 2026-11-18: "a small little arrow showing like which
+  // direction you're going ... longer / more prominent the faster you're going", at "a little ring ... to make clear,
+  // like this is the point of reference"; flown so on the trial page). Paper with an ink edge, as the bird is: it reads
+  // on every country color and over a name. Drawn over everything round the bird. The eye under the bird is the
+  // game's own and is not touched ("I want the shadow underneath the birds to still look like an eye").
+  function drawPull() {
+    if (!pull.at || !steerable()) return;
+    const u = view.mk, c = pull.at, ring = PULL_RING * u, dx = pull.x - c[0], dy = pull.y - c[1], d = Math.hypot(dx, dy) || 1;
+    const ax = dx / d, ay = dy / d, len = Math.min(d, PULL_FULL * view.ref) - ring - 3 * u;
+    ctx.save();
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (const [ink, wd] of [[INK, 1.5 * u + 2], [PAPER, 1.5 * u]]) { ctx.strokeStyle = ink; ctx.lineWidth = wd; ctx.beginPath(); ctx.arc(c[0], c[1], ring, 0, 7); ctx.stroke(); }
+    if (len > 5 * u) {
+      const from = ring + 3 * u, tx = c[0] + ax * (from + len), ty = c[1] + ay * (from + len), hd = 6 * u;
+      for (const [ink, wd] of [[INK, 2 * u + 3], [PAPER, 2 * u]]) {
+        ctx.strokeStyle = ink; ctx.lineWidth = wd;
+        ctx.beginPath();
+        ctx.moveTo(c[0] + ax * from, c[1] + ay * from); ctx.lineTo(tx, ty);
+        ctx.moveTo(tx - hd * (ax * 0.82 - ay * 0.57), ty - hd * (ay * 0.82 + ax * 0.57)); ctx.lineTo(tx, ty); ctx.lineTo(tx - hd * (ax * 0.82 + ay * 0.57), ty - hd * (ay * 0.82 - ax * 0.57));
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
   function drawBelow() {
     if (bird.down || S.look) return;
     if (frameNo % 6 === 0 || !below) below = locationAt(bird.lon, bird.lat);
@@ -5587,7 +5642,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (k === 'ArrowDown' || k === 's') keys.down = false;
     if (k === ' ') keys.flap = false;
   });
-  const away = () => { if (inRound()) hold(); else setPaused(true); };
+  const away = () => { pull.at = null; if (inRound()) hold(); else setPaused(true); };
   window.addEventListener('blur', away);
   document.addEventListener('visibilitychange', () => { if (document.hidden) away(); else if (document.hasFocus()) release(); });
   window.addEventListener('focus', release);
@@ -5905,7 +5960,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // On the title and results screens: drag to turn the globe, and point at a place for its name.
   const drag = { on: false, x: 0, y: 0 };
   inkCanvas.addEventListener('pointerdown', (e) => {
-    if (S.mode === 'fly') return;
+    if (S.mode === 'fly') {          // press and pull: the ring stands where the button went down
+      if (e.button !== 0 || e.pointerType === 'touch' || S.paused || !steerable()) return;
+      const box = stage.getBoundingClientRect();
+      pull.at = [e.clientX - box.left, e.clientY - box.top]; pull.x = pull.at[0]; pull.y = pull.at[1];
+      S.idle = 0;
+      try { inkCanvas.setPointerCapture(e.pointerId); } catch (err) { /* the pull still works inside the page */ }
+      e.preventDefault();
+      return;
+    }
     drag.on = true; drag.x = e.clientX; drag.y = e.clientY;
     if (!holdGlobe([e.clientX, e.clientY])) { atlas.to = null; atlas.secs = 0; S.tour = null; atlas.back = null; if (S.replay) S.replay.free = true; }          // turning a globe by hand ends a turn it was making, unless it is an end globe's (it pauses)
     atlas.idle = 0;
@@ -5914,7 +5977,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   });
   inkCanvas.addEventListener('pointermove', (e) => {
     const box = stage.getBoundingClientRect(), x = e.clientX - box.left, y = e.clientY - box.top;
-    if (S.mode === 'fly') { hover = mouse = null; return; }
+    if (S.mode === 'fly') { hover = mouse = null; if (pull.at) { pull.x = x; pull.y = y; S.idle = 0; } return; }
     if (drag.on) {
       const k = cam.H / view.F / RAD;
       atlas.lat = clamp(atlas.lat + (e.clientY - drag.y) * k, -60, 75);
@@ -5938,7 +6001,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const ll = unproject(x, y), r = ll && locationAt(ll[0], ll[1]);
     return r && r.name ? { x, y, name: nameOf(r), c: r.c, sea: r.sea, w: r.w, s: r.s } : null;
   }
-  const endDrag = () => { drag.on = false; stage.classList.remove('dragging'); };
+  const endDrag = () => { drag.on = false; pull.at = null; stage.classList.remove('dragging'); };          // the button up: a pull is over too
   // The wheel, or a pinch on a trackpad, zooms the title globe and a results globe toward the pointer, as on any map:
   // the place under the pointer stays under it. As near as the lowest view of a flight, as far as the whole globe.
   // (The player: "Should be able to zoom in on the Home Screen?")
@@ -6007,7 +6070,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // for the tests: the bird put somewhere by hand. That is no flight, so the view is the bird's own at once (no rest on the last landing's country still being handed back)
   const setBird = (lon, lat, a, down) => { Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down }); S.capFit = null; Object.assign(fitv, { on: false, k: 0, lh: null, s0: 1 }); };
   window.birdsEye = { hoverBox: () => hoverBox, slerp, showLeg, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, flagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
-    project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
+    pull, pullBy, steerable, PULL_FULL, PULL_RING, project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
   if (gl) {
