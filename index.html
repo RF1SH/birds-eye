@@ -1703,7 +1703,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     paused: false,
     t: 0, energy: TANK, n: 0, streak: 0, bestStreak: 0, firstTry: 0, fresh: 0, blend: 0, idle: 0, lastGain: 0,
     tickets: [], last: null, history: [], spawnAt: 0, sinceNew: 2, recent: [], turn: 0, endAt: 0,
-    log: new Map(), drops: [], look: null, gain: 0, fails: new Map(), saw: new Map(), newC: 0, sawN: 0,
+    log: new Map(), drops: [], look: null, gain: 0, fails: new Map(), saw: new Map(), sawCap: new Set(), newC: 0, sawN: 0,
   };
   // Seconds a globe holds still before it starts to turn: the title's; and Study's end globe on where the flight started,
   // its bird standing there, before the replay begins (4 s, the player's of 2026-11-12, then half that: "I think it pauses
@@ -2083,7 +2083,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     ticketsEl.appendChild(node);
     S.history.push(it.c.id);
     const isNew = memOf(it).box === 0;
-    const saw = isNew && it.kind === 'c' && S.saw.has(it.c.id);          // named under the bird earlier in this flight
+    // named under the bird earlier in this flight; a capital: shown where it is at a landing in its country (S.sawCap,
+    // markCapital). Found on its first ask it is then Good, not Easy (deliver). A capital the same as a country: the
+    // player's pick of 2026-11-17 ("Yes, about 3 days").
+    const saw = isNew && (it.kind === 'c' ? S.saw.has(it.c.id) : it.kind === 'k' && S.sawCap.has(it.c.id));
     if (it.kind === 'c') S.saw.delete(it.c.id);
     if (isNew && it.kind === 'c') S.newC++;
     S.sinceNew = isNew ? 0 : S.sinceNew + 1;
@@ -2236,7 +2239,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (tab === 'challenge' && runKind === 'day' && tripDone()) return;          // one trip a day (one begun is carried on)
     S.game = tab === 'challenge' ? 'trip' : tab;
     Object.assign(S, { mode: 'fly', paused: false, t: 0, energy: TANK, n: 0, streak: 0, bestStreak: 0, firstTry: 0, fresh: 0, route: null, legs: null, tickets: [], last: null,
-      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, capAt: null, capFit: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), newC: 0, sawN: 0, intro: null, began: null, replay: null });
+      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, capAt: null, capFit: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), sawCap: new Set(), newC: 0, sawN: 0, intro: null, began: null, replay: null });
     S.log = new Map();
     S.drops = [];
     Object.assign(fitv, { on: false, k: 0, lh: null, s0: 1 });          // no rest of the view left over from the flight before (it is cleared on the title, but only once a frame is drawn there)
@@ -2307,7 +2310,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const ll = (p) => lonLat(p).map((v) => +v.toFixed(3)), t = S.tickets[0];
     save.flight = { n: S.n, energy: +S.energy.toFixed(3), streak: S.streak, best: S.bestStreak, first: S.firstTry, fresh: S.fresh,
       bird: [+bird.lon.toFixed(3), +bird.lat.toFixed(3), +bird.a.toFixed(3), bird.down ? 1 : 0, bird.at],
-      fails: [...S.fails], saw: [...S.saw], newC: S.newC, sawN: S.sawN, recent: S.recent.slice(), history: S.history.slice(-12), sinceNew: S.sinceNew, last: S.last,
+      fails: [...S.fails], saw: [...S.saw], sawCap: [...S.sawCap], newC: S.newC, sawN: S.sawN, recent: S.recent.slice(), history: S.history.slice(-12), sinceNew: S.sinceNew, last: S.last,
       log: [...S.log.values()].map((r) => [r.it.key, r.shown ? 1 : 0, r.isNew ? 1 : 0].concat(r.p ? ll(r.p) : [])),
       drops: S.drops.filter((d) => d.from).map((d) => ll(d.p).concat(ll(d.from), [d.km, d.city])), began: S.began ? ll(S.began) : null,
       card: t ? [t.it.key, t.misses, t.shown ? 1 : 0, t.warm ? 1 : 0, t.isNew ? 1 : 0, t.from[0], t.from[1], t.saw ? 1 : 0] : null,
@@ -2319,7 +2322,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     try {
       Object.assign(S, { n: f.n, energy: clamp(f.energy, 0, TANK), streak: f.streak | 0, bestStreak: f.best | 0, firstTry: f.first | 0, fresh: f.fresh | 0, last: f.last || null });
       S.fails = new Map(f.fails || []);
-      S.saw = new Map(f.saw || []); S.sawN = f.sawN | 0;
+      S.saw = new Map(f.saw || []); S.sawCap = new Set(f.sawCap || []); S.sawN = f.sawN | 0;
       for (const [key, shown, isNew, lon, lat] of f.log) { const it = item(key); if (it) S.log.set(key, { it, shown: !!shown, isNew: !!isNew, p: lon === undefined ? null : unit(lon, lat) }); }
       // delivered capitals: their pins come back on the end globe (in the flight they left long ago)
       for (const [lon, lat, flon, flat, km, city] of f.drops || []) S.drops.push({ p: unit(lon, lat), from: unit(flon, flat), t: -1e6, left: 0, km, city });
@@ -3872,6 +3875,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function markCapital(c) {
     const city = unit(c.cap[1], c.cap[2]);
     S.capAt = { p: city, t: S.t };
+    S.sawCap.add(c.id);          // its capital has been shown in this flight (addTicket)
     label(null, c.cap[0], city, 'cap', GROUND, null, OVER);
   }
   function restOn(c) {
