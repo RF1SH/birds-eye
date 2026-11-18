@@ -2098,8 +2098,24 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // name): when the line runs through that spot the name stands above the bird instead, clear of the bird and of the
   // Zs it breathes out when it dozes off.
   const ZZZ_TOP = 62;
-  function underY(s, x, box) {
+  function underY(s, x, box, own) {
     const y = s[1] + UNDER_GAP * view.mk + box.up, L = lineFromBird();
+    const above = () => { const bb = birdBox(s); return Math.min(bb.y - bb.up, s[1] - birdLift() - ZZZ_TOP) - box.down - 1; };
+    // Study's landing in a country shows its capital (markCapital): the name does not sit on that symbol either (the
+    // player, 2026-11-18, of a landing in North Korea: "the flag of North Korea covering up Pyongyang, the capital symbol
+    // of it. I don't think that should happen"). Judged by where the symbol will stand once the view has come to rest on
+    // the country (the view is still on its way out for a second after the landing), so the name takes its side at once.
+    // Above the bird only when that spot is clear of the symbol and of every other named place's own mark (shown the
+    // way to San Marino, then a landing north of Rome: above the bird Italy's flag would stand on San Marino's dot);
+    // otherwise the name stays under the bird and moves off the symbol as names move off one another (settle).
+    if (S.capAt && S.mode === 'fly' && bird.down) {
+      const q = project(S.capAt.p);
+      if (q) {
+        const k = S.capFit ? cam.H / S.capFit.fit.H : 1, at = [s[0] + (q[0] - s[0]) * k, s[1] + (q[1] - s[1]) * k], pad = 14 * view.mk;
+        const covers = (yy, m) => Math.abs(m[0] - x) < box.half + pad && m[1] > yy - box.up - pad && m[1] < yy + box.down + pad;
+        if (covers(y, at)) { const up = above(); if (!covers(up, at) && !fx.some((f) => { const m = f.at && f.name !== own ? project(f.at) : null; return !!m && covers(up, m); })) return up; }
+      }
+    }
     if (!L) return y;
     const len = Math.acos(clamp(dot(L[0], L[1]), -1, 1)) * cam.pxRad, far = Math.hypot(box.half, y + box.down - s[1]) + 12 * view.mk;
     let crossed = false;
@@ -2107,9 +2123,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       const q = project(slerp(L[0], L[1], d / len)), pad = (d > len - 6 ? 12 : 6) * view.mk;         // more room round the city itself
       crossed = !!q && Math.abs(q[0] - x) < box.half + pad && q[1] > y - box.up - pad && q[1] < y + box.down + pad;
     }
-    if (!crossed) return y;
-    const bb = birdBox(s);
-    return Math.min(bb.y - bb.up, s[1] - birdLift() - ZZZ_TOP) - box.down - 1;
+    return crossed ? above() : y;
   }
   // A name pinned to a place on the globe; it follows the globe as it turns and hides round the back.
   // With secs = GROUND it stays while the bird is on the ground, and fades once it takes off.
@@ -2128,7 +2142,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       if (!s) return;
       const box = plateBox(c, str, cls, sub), spot = dy === AREA ? areaSpot(f, c, s, box) : null, sx = s[0] + (spot ? spot[0] : 0), x = sx + clamp(clamp(sx, box.half + 4, view.w - box.half - 4) - sx, -box.half, box.half);
       if (dy === OVER && bird.down) { const me = project(unit(bird.lon, bird.lat)); below = !!me && me[1] < s[1]; }
-      const want = spot ? s[1] + spot[1] : dy === UNDER ? underY(s, x, box)
+      const want = spot ? s[1] + spot[1] : dy === UNDER ? underY(s, x, box, str)
         : dy === OVER ? (below ? s[1] + NEAR * view.mk + box.up : s[1] - NEAR * view.mk - box.down)
         : s[1] + (typeof dy === 'function' ? dy() : dy || 0);
       // never out over space, and never without what it names: under the bird it goes when the bird does
@@ -2145,6 +2159,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       Object.assign(placed[placed.length - 1], { name: str, sub: disputed(c, str, sub)[1] || '', ink: (STYLE[cls] || {}).sub === INK, flag: !!(c && c.flag), ax: s[0], ay: s[1], rise: box.rise, drop: box.drop, px: box.px });      // for the tests: the lines under the name as drawn
       nameplate(c, str, x, y, cls, sub, alpha);
     }, true);
+    f.at = p; f.name = str;          // what it names and where: another name's spot above the bird is judged against it (underY)
     return f;
   }
   function ring(p, from, to, col, width, secs) {
@@ -5414,6 +5429,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
       for (let i = 0; i < 24; i++) { const s = project(slerp(v.from, v.to, i / 24)); if (s) placed.push({ x: s[0], y: s[1], half: 8, up: 6, down: 6 }); }
       const s = project(v.to); if (s) placed.push({ x: s[0], y: s[1], half: m, up: m, down: m });
     }
+    // Study's landing in a country shows its capital (markCapital): every name keeps off that symbol as names keep off
+    // Day Trip's answer. The name under the bird has already taken the bird's other side for it (underY).
+    if (S.capAt && S.mode === 'fly') { const s = project(S.capAt.p), m = 11.5 * view.mk; if (s) placed.push({ x: s[0], y: s[1], half: m, up: m, down: m, cap: true }); }
     for (const f of fx) if (f.top) f.draw(Math.min(1, f.t / f.secs));
     if (S.mode === 'fly') { drawRouteKm(); drawHud(); }
   }
