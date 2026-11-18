@@ -5654,7 +5654,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       G.dot(right.d, most * right.share, exactKm(right.d) + ' away (' + right.closeness + ' points)', right.right, 9, -6);          // as every other landing's: over its dot, on the right. It stands over the graph's top line, so this graph keeps FAQ_OVER_TOP more room there
       return faqCap('A capital or a city', 'in this example ' + R.name + ', maximum ' + most + ' accuracy points') + G.svg('Accuracy points by the distance from ' + R.name) +
         faqKey([['line', 'in ' + the(R.c.name)], ['line dash', 'elsewhere in ' + R.c.rg[0]], ['line dots', 'at sea or on another continent']]) +
-        '<p>For a capital or a city, land within ' + CIRCLE_KM + ' km of that location.<br>For a country, land anywhere inside that country.</p>';          // every noun said (the player's pick by button, 2026-11-18)
+        '<p>For a capital or a city, land within ' + CIRCLE_KM + ' km of that location for it to be correct (so you could also potentially receive additional speed and energy use points).<br>For a country, landing anywhere inside that country gives maximum accuracy points.</p>';          // the player's own two lines, 2026-11-18 ("as it's written right now, it's a little bit unclear"); until then "... land within 150 km of that location." and "For a country, land anywhere inside that country."
     }],
     // Speed by the timer: all the points up to the halfway mark, none at the timer's end (speedLeft); under the graph the timer's own line
     ['fast', 'How fast do I have to be?', ({ T, R, right }) => {
