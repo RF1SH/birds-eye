@@ -325,6 +325,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ticket.result .plus.wrong { color: var(--bad); }
 .ticket.result .parts b { color: var(--ink); }
 .ticket.result .parts b.miss { color: var(--bad); }
+/* why the two X's, under them (ONLY_RIGHT): the card's third line, the number and the button in the middle of all three */
+.ticket.result .why { grid-column: 1; grid-row: 3; margin-top: -.7px; font-size: 13px; line-height: 1.2; color: var(--ink); text-wrap: pretty; }          /* the parts' line stands midway between the title and this one: the same gap over its letters as under them (the player, 2026-11-17: "not correctly vertically centered between the two other lines") */
+.ticket.result:has(.why) .plus, .ticket.result:has(.why) .next, .ticket.result:has(.why) .two { grid-row: 1 / span 3; }
 #daycard { width: min(660px, 100%); }
 #daycard tr.on td { background: var(--paper-shade); }
 #daycard [data-i] { cursor: pointer; }
@@ -1470,7 +1473,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const KEY = 'birds-eye-world-1';
   const KINDS = ['c', 'k', 'f', 's'], REGIONS = ['World', 'Africa', 'Americas', 'Asia', 'Europe', 'Oceania'];
   // asked, games: Ranked's turns. games counts the Ranked games begun; asked holds, for a country, the game it was last asked in
-  const save = { mem: {}, best: 0, sound: true, study: { kinds: KINDS.slice(), where: ['World'] }, trips: {}, endless: 0, skill: null, visited: false, asked: {}, games: 0 };
+  // told: the games (day, ranked) whose first wrong landing has said why speed and energy use have an X
+  const save = { mem: {}, best: 0, sound: true, study: { kinds: KINDS.slice(), where: ['World'] }, trips: {}, endless: 0, skill: null, visited: false, asked: {}, games: 0, told: {} };
   const wholeWorld = (w) => !w.length || w.includes('World') || REGIONS.every((r) => r === 'World' || w.includes(r));      // no region, World itself, or all five
   try {
     const got = JSON.parse(localStorage.getItem(KEY)) || {};
@@ -1502,6 +1506,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const w = st && (Array.isArray(st.where) ? st.where : [st.where]).filter((x) => REGIONS.includes(x));
     if (w && w.length) save.study.where = wholeWorld(w) ? ['World'] : w;
     if (got.visited === true) save.visited = true;
+    if (got.told && typeof got.told === 'object') for (const k of ['day', 'ranked']) if (got.told[k] === true) save.told[k] = true;
     if (got.scale === 2) save.scale = 2;          // saved since a round is worth what it is today
   } catch (e) { /* private window, or nothing saved yet */ }
   // A first visit: the first card's choice (Start tutorial or Skip) has not been made in this browser, and nothing has
@@ -2956,6 +2961,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
   if (save.scale !== 2) { save.endless = 0; delete save.ranked; delete save.trips[today()]; save.scale = 2; }
   const TICK = { spot: '✓', right: '✓', miss: '✗' };          // two marks: you got it or you did not
   const NOT_EARNED = '<b class="tick miss">' + TICK.miss + '</b>';          // where speed or energy use points would stand after a wrong landing
+  // Why the two X's, in one sentence under them (the player's sentence, 2026-11-13: "speed and energy points only
+  // activate if your answer is correct", tidied). On every wrong landing in the tutorial and in practice, which keep
+  // nothing, and in a real game once: on a Day Trip's first wrong landing and on Ranked's first (the player,
+  // 2026-11-14: "any first time that they get a question wrong in ranked or day trip, it should say, you know, like the
+  // message that we already drafted ... just so it's at least explained to everybody once"; their picks from picture
+  // WRONG-NOTE-question, 2026-11-17: under the X's, there in the tutorial too, "Once in each game"). Until then the
+  // tutorial had it in the bar beside the card and a real game had none.
+  const ONLY_RIGHT = 'Speed and energy points only count on a correct landing.';
   // A round as the game holds it: a country (asked by its name or by its flag), a capital (by its name or by its
   // country's flag), a city.
   const areaAsk = (kind, c) => ({ kind, c, p: c.u, lon: c.lx, lat: c.ly, name: c.name });
@@ -3117,7 +3130,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // use the arrows, let go. (The arrows come before letting go because they do nothing on the ground.) Down again, the
   // rule of a round and a button to go on; then one location, Australia, the country real players find most often,
   // counted in from the tutorial's start and scored as any round is. Its card has two buttons: the real game, and Keep practicing, which asks
-  // more locations one after another under the label Practice. A wrong landing there has one sentence beside its card.
+  // more locations one after another under the label Practice. A wrong landing there has one sentence on its card (ONLY_RIGHT).
   // The words are the player's or the How to play card's own ("I don't want to over explain things").
   const TUTOR_START = [110, -11];         // in the water 300 km south of Java, its coast on the screen: flying up brings Australia into view (until 2026-11-13 open water west of Australia, 2,400 km from any land)
   const LESSON_TANK = 28;                 // four seconds of flying up, about a Day Trip round's ring
@@ -3128,8 +3141,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     letgo: '<span>Flying up uses energy. Let go to glide down.</span>',
     land: '<span>Find somewhere nice to land.</span>',
     rule: '<span>A postcard will name a location.<br>You have one attempt to land there.</span>',
-    clock: '<span>Land before the timer\'s halfway mark for full speed points.</span>',
-    wrong: '<span>Speed and energy points only&nbsp;count<br>on a correct landing.</span>' };
+    clock: '<span>Land before the timer\'s halfway mark for full speed points.</span>' };
   // a step of the lesson: space | arrows | letgo | land (the bird flies, nothing is asked) | rule (down again: the bar waits for Continue)
   const LETGO_SECS = 3;                   // seconds the third line stands before the line about landing may follow it
   function lesson(step) {
@@ -3213,8 +3225,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // What the bar holds at each moment of the tutorial (and that it holds none of it in any other flight).
   function tutorBar() {
     const T = S.trip, on = S.mode === 'fly' && S.game === 'trip' && !!T && !!T.tutor;
-    const result = on && T.wait && !T.count && !T.lesson, last = on ? T.results[T.results.length - 1] : null;
-    const say = !on ? '' : T.lesson ? SAY[T.lesson] : result ? (last && !last.right ? SAY.wrong : '') : !T.wait && !T.practice ? SAY.clock : '';
+    const result = on && T.wait && !T.count && !T.lesson;
+    const say = !on ? '' : T.lesson ? SAY[T.lesson] : !T.wait && !T.practice ? SAY.clock : '';
     $('tutor-label').hidden = !on || result;
     $('tutor-label').textContent = on && T.practice ? 'Practice' : 'Tutorial';
     $('tutor-say').hidden = !say;
@@ -3222,7 +3234,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     $('tutor-go').hidden = !(on && T.lesson === 'rule');
     $('tutor-skip').hidden = !on || result || !!T.practice;
     $('tally').hidden = on;
-    $('status').hidden = on && result && !say;          // a correct landing: the card alone
+    $('status').hidden = on && result;          // a landing: the card alone
     $('console').classList.toggle('tutor', on);
     $('console').classList.toggle('lesson', on && !!T.lesson);
   }
@@ -3410,6 +3422,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // no error, then a round of ranked should theoretically be endless.. it's the error that drains the energy").
     // Until then every correct landing gave back three quarters of par, so a perfect flyer ran down too.
     if (T.endless && right) S.energy = Math.min(S.cap, S.energy + Math.min(used, cheap + ENERGY_BACK));
+    const game = T.endless ? 'ranked' : 'day', why = !right && (T.tutor || !save.told[game]);          // the sentence under the two X's (ONLY_RIGHT)
+    if (why && !T.tutor) save.told[game] = true;          // written with the landing, by the line below
     if (T.endless) rankedKeep(); else tripSave();
     $('count').textContent = num(T.score);
     $('trip-clock').hidden = true;
@@ -3430,7 +3444,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (tier === 'spot') spotOn();
     node.innerHTML = '<div class="where"><span class="tick ' + tier + '">' + TICK[tier] + '</span> ' + esc(where) + '</div><div class="plus ' + (right ? 'right' : 'wrong') + '">' + num(pts) + '<small>/' + num(roundWorth(T, R)) + '</small></div>' +
       '<div class="parts"><span>Accuracy <b>' + num(closeness) + '</b>/' + num(accMax(T, R)) + '</span>' +
-      '<span>Speed ' + (right ? '<b>' + speed + '</b>' : NOT_EARNED) + '/' + part + '</span><span>Energy use ' + (right ? '<b>' + energy + '</b>' : NOT_EARNED) + '/' + part + '</span></div>' +      // always listed, so the card adds up to its total; a wrong landing shows its X where a number was not earned (the player's idea, 2026-11-13: "X out of 20"; 0/20 had read as slow and wasteful, and leaving them off as 74/160 beside 74/200)
+      '<span>Speed ' + (right ? '<b>' + speed + '</b>' : NOT_EARNED) + '/' + part + '</span><span>Energy use ' + (right ? '<b>' + energy + '</b>' : NOT_EARNED) + '/' + part + '</span></div>' + (why ? '<div class="why">' + ONLY_RIGHT + '</div>' : '') +      // always listed, so the card adds up to its total; a wrong landing shows its X where a number was not earned (the player's idea, 2026-11-13: "X out of 20"; 0/20 had read as slow and wasteful, and leaving them off as 74/160 beside 74/200)
       (T.tutor ? '<div class="two"><button class="go next" type="button">Home</button><button class="alt next" type="button">Keep practicing</button></div>' : '<button class="go next" type="button">Next location</button>');
     node.querySelector('.next').addEventListener('click', () => { tripNext(); stage.focus({ preventScroll: true }); });
     if (T.tutor) node.querySelector('.alt').addEventListener('click', () => { tutorMore(); stage.focus({ preventScroll: true }); });
