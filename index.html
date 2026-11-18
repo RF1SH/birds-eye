@@ -2044,10 +2044,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // of 24, 9 and 6 px, by button: "9 px". PLAN 126.)
   const CAP_RIM = 10.4, CAP_GAP = 6;
   // A country's own name. Inside the country when it has room there: the name and flag take less than a third of the
-  // country as drawn and lie in it. Else beside it, clear of its shape and tied to it with a line: above it, below it or
-  // at a side, whichever covers least of it, then least of other land (over the sea, as an atlas does), clear of the
-  // bird, the side away from the bird first. So a small country is never hidden under its own name. Found again when
-  // the map's scale changes.
+  // country as drawn and lie in it. Else beside it, clear of its shape, with no line to it (PLAN 127): above it, below
+  // it or at a side, whichever covers least of it, then least of other land (over the sea, as an atlas does), clear of
+  // the bird, the side away from the bird first. So a small country is never hidden under its own name. Found again
+  // when the map's scale changes.
   const AREA = 'area';
   function areaSpot(f, c, s, box) {
     const key = Math.round(Math.log(cam.pxRad) * 6) + (bird.down ? 'd' : 'a');
@@ -2217,13 +2217,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
       const dot = 10 * view.mk;
       alpha *= Math.min(rimIn({ x, y: want, half: box.half, up: box.rise, down: box.drop }), rimIn(dy === UNDER ? birdBox(s) : { x: s[0], y: s[1], half: dot, up: dot, down: dot }));
       if (alpha <= 0) return;
-      const moved = spot && (spot[0] || spot[1]), out = moved && !f.inside, y = settle(x, want, box, s[0], s[1], alpha, moved);          // moved inside its country: no line, the name lies in what it names
-      if (out) {         // beside its country: a line from the country to the nearer edge of the name
-        const ex = spot[0] ? x - Math.sign(spot[0]) * (box.half - 4) : x, ey = spot[0] ? y : y < s[1] ? y + box.drop + 3 : y - box.rise - 3;
-        ctx.globalAlpha = alpha; ctx.strokeStyle = INK; ctx.lineWidth = 1.2 * view.mk;
-        ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(ex, ey); ctx.stroke();
-        ctx.beginPath(); ctx.arc(s[0], s[1], 2.2 * view.mk, 0, 7); ctx.fillStyle = INK; ctx.fill(); ctx.globalAlpha = 1;
-      }
+      const moved = spot && (spot[0] || spot[1]), y = settle(x, want, box, s[0], s[1], alpha, moved);          // moved inside its country or beside it: no line either way
+      // (Until 2026-11-18 a name beside its country was tied to the country's middle by a line with a dot. The player, of
+      // Panama and Nicaragua in Study: "for some reason it draws a line to the country ... it just didn't seem like it
+      // should be drawing a line, and it should just like display the flag without having to draw a line"; from a picture
+      // of the same landing with and without it, by button: "No line". The name and flag stand right beside the country,
+      // on a view that holds that one country. PLAN 127.)
       Object.assign(placed[placed.length - 1], { name: str, sub: disputed(c, str, sub)[1] || '', ink: (STYLE[cls] || {}).sub === INK, flag: !!(c && c.flag), ax: s[0], ay: s[1], rise: box.rise, drop: box.drop, px: box.px });      // for the tests: the lines under the name as drawn
       nameplate(c, str, x, y, cls, sub, alpha);
     }
