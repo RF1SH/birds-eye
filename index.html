@@ -125,6 +125,11 @@ kbd.space { min-width: 88px; }
 .keys { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; align-items: center; margin: 0 0 18px; }
 .keys dt { display: flex; gap: 4px; }
 .keys dd { margin: 0; }
+/* The first row, the player's own arrangement (2026-11-18): the arrow keys, "or", the mouse with what the hand does
+   under it in the key caps' lettering, then what the two do, once. Each part a gap of the list's own apart. PLAN 125 */
+.keys dd.either { display: flex; align-items: center; gap: 14px; }
+.keys .mouse { display: flex; flex-direction: column; align-items: center; gap: 2px; font: 700 13px/1.1 var(--text); white-space: nowrap; }          /* 2: with its words the mouse is never taller than the arrow keys, so the card is as tall as it was */
+.keys .mouse svg { flex: none; width: 26px; height: 38px; stroke: var(--ink); stroke-width: var(--b2z); }          /* the outline of the card's heavier border, whole screen pixels in every window (as in the picture the player picked) */
 /* How to play must fit a window 600 px high. The Challenge card has one row more than Study's (619 tall), so in a
    window under 650 px high every How to play card is set a little closer: the same words at the same size. */
 @media (max-height: 650px) { .how { row-gap: 7px; margin-bottom: 10px; } .keys { margin-bottom: 10px; } }
@@ -627,8 +632,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
       <div id="card-howto" hidden>
         <h2>How to play</h2>
         <dl class="keys">
-          <dt><span class="arrows"><kbd class="up">&uarr;</kbd><kbd>&larr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd></span></dt><dd>navigate</dd>
-          <dt><kbd class="space">Space</kbd></dt><dd>fly up</dd>
+          <dt><span class="arrows"><kbd class="up">&uarr;</kbd><kbd>&larr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd></span></dt><dd class="either"><span>or</span><span class="mouse"><svg viewBox="0 0 26 38" role="img" aria-label="the mouse:"><rect x="1.5" y="1.5" width="23" height="35" rx="11.5" fill="var(--paper)"/><path d="M1.5 15 V13 A11.5 11.5 0 0 1 13 1.5 V15 Z" fill="var(--ink)"/><path d="M1.5 15 H24.5 M13 1.5 V15" fill="none"/></svg><span>press and pull</span></span><span>to navigate</span></dd>
+          <dt><kbd class="space">Space</kbd></dt><dd>to fly up</dd>
         </dl>
         <div class="how" data-for="study">
           <div class="ill"><span class="mini">Brazil<svg viewBox="0 0 30 36" aria-hidden="true"><use href="#i-stamp"/></svg></span></div>
