@@ -510,6 +510,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #faq h3 button:hover i { color: var(--ink); background: var(--paper-shade); }          /* under the mouse a step darker, as the marks of the title card's row */
 #faq .ans { padding-top: 14px; }
 #faq p { margin: 12px 0 0; text-wrap: pretty; }
+#faq p.near { margin-top: 7px; }          /* a second sentence of one answer: a little apart from the first (the player, 2026-11-18: "it just looks like one big paragraph") */
 #faq .ticket { display: inline-grid; animation: none; }          /* a landing's own card, standing still */
 #faq .cards { display: grid; justify-items: start; }
 #faq .meter { display: grid; grid-template-columns: auto 1fr; gap: 9px 10px; align-items: center; margin-top: 16px; font-size: 13px; }
@@ -530,6 +531,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #faq .g .line { stroke: var(--ink); stroke-width: 2.2; fill: none; stroke-linejoin: round; stroke-linecap: round; }
 #faq .g .dash { stroke-dasharray: 7 5; stroke-linecap: butt; }
 #faq .g .dots { stroke-dasharray: .1 5.5; }
+#faq .g .edge { stroke: var(--ink-soft); stroke-width: 1.2; fill: none; }
+#faq .g .ok { fill: var(--good); font-weight: 700; font-size: 16px; }
+#faq .g .no { fill: var(--bad); font-weight: 700; font-size: 16px; }
 #faq .g .d-ok { fill: var(--good); stroke: var(--ink); stroke-width: 1.8; }
 #faq .g .d-no { fill: var(--bad); stroke: var(--ink); stroke-width: 1.8; }
 #faq .key { display: flex; flex-wrap: wrap; gap: 5px 22px; margin: 6px 0 0 44px; font-size: 13px; color: var(--ink-soft); }
@@ -3022,10 +3026,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const ringKm = (R) => (R.kind === 'city' ? CIRCLE_KM : capKm(R.c));
   // The distance over which accuracy falls to about a third. From a country's nearest edge TRIP_K, for every country,
   // whatever the clue (until 2026-11-15 up to three times as far for a lesser known country, and half again for a flag:
-  // 150 to 675 km. The player's pick: one fall). From a capital or a city: such that the circle is where accuracy is
-  // LIFT_CAP, which is more than being in the correct country alone can ever give: 605 km for the 150 km circle (the
-  // map shows borders, not cities), 134 km for a dot's 45 km.
-  const fallKm = (R) => (areaRound(R) ? TRIP_K : (ringKm(R) - SPOT_KM) / Math.log(1 / LIFT_CAP));
+  // 150 to 675 km. The player's pick: one fall). From a capital or a city, inside its circle: such that the circle's edge
+  // is where accuracy is AT_EDGE: 831 km for the 150 km circle, 185 km for a dot's 45 km. Past the circle it falls faster,
+  // over pastKm: 302 km for the 150 km circle, 67 km for a dot's (pointShare).
+  const fallKm = (R) => (areaRound(R) ? TRIP_K : (ringKm(R) - SPOT_KM) / Math.log(1 / AT_EDGE));
+  const pastKm = (R) => (ringKm(R) - SPOT_KM) * PAST_X;
   // What a round is worth, whole. A Day Trip's five: 100, 150, 200, 250, 300 (the player's pick, 2026-11-14: "Climb,
   // worth more each round"; until 2026-11-15 every round 200). The tutorial's rounds: as that kind of round in a Day
   // Trip. Ranked: 100 times the location's multiplier (the player's picks: x1 when everyone lands it, x2 when half do,
@@ -3036,7 +3041,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const roundWorth = (T, R) => (T.endless ? 10 * hardRow(R)[1] : DAY_WORTH[DAY_KINDS.indexOf(R.kind)]);
   const accMax = (T, R) => roundWorth(T, R) * 8 / 10, partMax = (T, R) => roundWorth(T, R) / 10;
   const num = (n) => n.toLocaleString('en');          // 1,250
-  const TRIP_K = 150, IN_COUNTRY = 0.25, IN_REGION = 0.1, LIFT_CAP = 0.8, SPOT_KM = 15, COUNT = 3, ENERGY_FLOOR = 2, ENERGY_ROOM = 0.5, ENERGY_WASTE = 21.5, ENERGY_BACK = 1;
+  const TRIP_K = 150, IN_COUNTRY = 0.25, IN_REGION = 0.1, LIFT_CAP = 0.8, AT_EDGE = 0.85, PAST_X = 2.24, SPOT_KM = 15, COUNT = 3, ENERGY_FLOOR = 2, ENERGY_ROOM = 0.5, ENERGY_WASTE = 21.5, ENERGY_BACK = 1;
   const ADDRESS = 'https://rf1sh.github.io/birds-eye/';       // where the game lives: the last line of a shared result
   // Every trip and run starts here (the player, 2026-11-11: "start at the same place every time, so people arent
   // confused"): in the Gulf of Guinea, 260 km off Ghana, so the coast of West Africa is on the screen when the view
@@ -3498,18 +3503,30 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // border runs. And its accuracy, as a share of the round's accuracy points, modeled on MapTap's scoring (the player's
   // pick): a country, all of it inside, then falling with the distance to its nearest edge; a capital or a city, all of
   // it on the SPOT_KM dot, then falling with the distance. A landing in the correct country never gets under a
-  // quarter, one in another country of the same region never under a tenth, and neither lift goes past LIFT_CAP.
-  // pointShare: a capital's or a city's share by the distance alone. liftBy: the same share for a landing with a floor under
-  // it (IN_COUNTRY, IN_REGION, or none). judge puts them together for one landing; the FAQ draws its three lines with them.
-  const pointShare = (R, d) => Math.exp(-Math.max(0, d - SPOT_KM) / fallKm(R));
+  // quarter, one in another country of the same region never under a tenth (the floors: IN_COUNTRY, IN_REGION).
+  // pointShare, a capital's or a city's share by the distance and the floor under the landing: inside the circle it falls
+  // gently, from all of it on the dot to AT_EDGE at the circle's edge; past the circle it falls faster, from AT_EDGE toward the
+  // floor, so the three lines (in the country, in its region, elsewhere) part at the circle's edge and closer is always
+  // worth more. liftBy: a country round's lift, MapTap's: onto the floor, never past LIFT_CAP. judge puts them together for
+  // one landing; the FAQ draws its three lines with pointShare.
+  // (Until 2026-11-18 a capital's share was one fall of 605 km lifted by liftBy: the lift stood at its ceiling from the
+  // circle's edge on, so a landing in the correct country got the same from 150 to 203 km, and no line bent at the
+  // circle. The player, of the FAQ's graph: "why is there that horizontal part of the line where you're still in Germany,
+  // but a little bit further out than 150 kilometers? ... why are you rewarding being just outside of the correct zone?
+  // ... it should be like less of a steep slope while you're inside the correct zone, and then, you know, a change in the
+  // slope when you're less correct. And, you know, the slopes are steeper when you're outside of Germany." Picked from
+  // picture FAQ-close-bend: "I like B much more ... maybe the slope of the line before 150 should be a little bit, just a
+  // little bit less steep, and keep the rest of the lines where they are". B: past the circle a fall of half the 605 km.
+  // "A little bit less steep": 85 in 100 at the circle's edge where it was 80, my number, shown to them built.)
+  const pointShare = (R, d, floor) => (d <= ringKm(R) ? Math.exp(-Math.max(0, d - SPOT_KM) / fallKm(R)) : (floor || 0) + (AT_EDGE - (floor || 0)) * Math.exp(-(d - ringKm(R)) / pastKm(R)));
   const liftBy = (raw, floor) => (floor ? Math.max(raw, Math.min(floor + (1 - floor) * raw, LIFT_CAP)) : raw);
   function judge(R, lon, lat) {
     const inC = reaches(R.c.where, lon, lat), at = locationAt(lon, lat);
     const same = !inC && !!at.c && at.c !== R.c && (at.c.rg || []).some((r) => (R.c.rg || []).includes(r));
-    const lift = (raw) => liftBy(raw, inC ? IN_COUNTRY : same ? IN_REGION : 0);
+    const floor = inC ? IN_COUNTRY : same ? IN_REGION : 0, lift = (raw) => liftBy(raw, floor);
     if (areaRound(R)) { const d = inC ? 0 : kmToCountry(R.c, lon, lat); return { right: inC, d, share: inC ? 1 : lift(Math.exp(-Math.max(0, d - 1) / fallKm(R))) }; }
     const d = kmBetween(lon, lat, R.lon, R.lat);
-    return { right: d <= ringKm(R), d, share: lift(pointShare(R, d)) };
+    return { right: d <= ringKm(R), d, share: pointShare(R, d, floor) };
   }
   // The points of a landing at (lon, lat) that took `took` seconds and spent `used` energy, in a round whose fair time
   // is T.fair and whose cheapest flight costs T.cheap. The FAQ's example landings are scored by this too.
@@ -5579,7 +5596,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // than the flight needs.
   // The example day: five locations that never run together (the player's pick, 2026-11-18: a real day's five on the sheet
   // would give that day away; no day of the list has more than one of them in its round, and smoke holds it).
-  const FAQ_AT = { right: [13.08, 52.52], wrong: [9.99, 53.55] }, FAQ_SECS = 5.9, FAQ_OVER = 0.5;
+  const FAQ_AT = { right: [11.918, 52.52], wrong: [9.99, 53.55] }, FAQ_SECS = 5.9, FAQ_OVER = 0.5;
   const faqLand = (name) => PLAY.find((c) => c.name === name);
   const faqDay = () => [areaAsk('country', faqLand('Mexico')), areaAsk('flag', faqLand('Japan')), pointAsk('capital', faqLand('Germany')), pointAsk('capflag', faqLand('Egypt')), cityAsk(FIVE.find((x) => x.name === 'Auckland'))];
   function faqExample() {
@@ -5617,7 +5634,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const faqCap = (bold, rest) => '<div class="cap">' + esc(bold) + (rest ? ' <small>(' + esc(rest) + ')</small>' : '') + '</div>';
   const quarters = (most) => [0, 1, 2, 3, 4].map((k) => most * k / 4);
   // answer 3's other landings, each wrong: two in the answer's country, one elsewhere in its region, one at sea
-  const FAQ_OVER_TOP = 14;
   const FAQ_ELSE = [['Hamburg', 9.99, 53.55, 9, -6], ['Munich', 11.58, 48.14, 9, -6], ['Paris', 2.35, 48.86, 6, -6], ['North Sea', 4.0, 55.5, -9, 17, 'end']];
   // Answer 8: three Ranked flights over the same fifty legs, by Ranked's own rules. The legs are those of one Ranked game, in
   // km (flown once on the built page with a set seed, `audit/fq16.py`: Saudi Arabia, Chile, Nottingham, Tokyo ...). A flight
@@ -5646,15 +5662,23 @@ button { font: inherit; color: inherit; cursor: pointer; }
     ['x', 'Why did I get an X for speed and energy use?', ({ T, R, wrong }) =>
       '<div class="cards"><div class="ticket result">' + resultHtml(T, R, wrong, true) + '</div></div>' +
       '<p>Otherwise, a quick but incorrect landing would receive unearned bonus points.</p>'],          // the player's own line, 2026-11-18
-    // Accuracy by the distance: three lines by where the bird came down (pointShare, liftBy), the circle's 150 on the km axis
+    // Accuracy by the distance: three lines by where the bird came down (pointShare), the circle's 150 on the km axis. A
+    // thin gray line stands on the 150, from the axis up to where the three lines part, a green check on its left and a
+    // red X on its right (the player, 2026-11-18: "a line from 150 kilometers up ... vertically to show ... what's
+    // considered correct versus incorrect ... distinct, but not exactly like any of the other dotted lines, and just have
+    // like a green check on one side and a red X on another"; picked from picture FAQ-close-bend: "I also like the line
+    // that you drew", "At the line's foot, as drawn"). It ends where the lines part and not at the graph's top: the
+    // correct landing's label stands under the top line there (theirs: "the entire label is underneath that top line").
     ['close', 'How close do I have to land?', ({ T, R, right }) => {
-      const most = accMax(T, R), ring = ringKm(R), G = faqPlot(600, 258 + FAQ_OVER_TOP, 1000, most, 0, 12 + FAQ_OVER_TOP).grid(quarters(most), [0, ring, 250, 500, 750, 1000]).xtitle('km from ' + R.name);
-      for (const [cls, floor] of [['line dots', 0], ['line dash', IN_REGION], ['line', IN_COUNTRY]]) G.curve((d) => most * liftBy(pointShare(R, d), floor), cls);
+      const most = accMax(T, R), ring = ringKm(R), G = faqPlot(600, 258, 1000, most).grid(quarters(most), [0, ring, 250, 500, 750, 1000]).xtitle('km from ' + R.name);
+      const n1 = (v) => v.toFixed(1);
+      G.o.push('<path d="M' + n1(G.X(ring)) + ' ' + n1(G.Y(0)) + ' V' + n1(G.Y(most * AT_EDGE)) + '" class="edge"/><text x="' + n1(G.X(ring) - 8) + '" y="' + n1(G.Y(0) - 8) + '" text-anchor="end" class="ok">' + TICK.right + '</text><text x="' + n1(G.X(ring) + 8) + '" y="' + n1(G.Y(0) - 8) + '" text-anchor="start" class="no">' + TICK.miss + '</text>');
+      for (const [cls, floor] of [['line dots', 0], ['line dash', IN_REGION], ['line', IN_COUNTRY]]) G.curve((d) => most * pointShare(R, d, floor), cls);
       for (const [name, lon, lat, dx, dy, anchor] of FAQ_ELSE) { const j = judge(R, lon, lat); G.dot(j.d, most * j.share, name + ' (' + Math.round(most * j.share) + ')', j.right, dx, dy, anchor); }
-      G.dot(right.d, most * right.share, exactKm(right.d) + ' away (' + right.closeness + ' points)', right.right, 9, -6);          // as every other landing's: over its dot, on the right. It stands over the graph's top line, so this graph keeps FAQ_OVER_TOP more room there
+      G.dot(right.d, most * right.share, exactKm(right.d) + ' away (' + right.closeness + ' points)', right.right, 9, -6);          // as every other landing's: over its dot, on the right, and whole under the graph's top line (the player, 2026-11-18)
       return faqCap('A capital or a city', 'in this example ' + R.name + ', maximum ' + most + ' accuracy points') + G.svg('Accuracy points by the distance from ' + R.name) +
         faqKey([['line', 'in ' + the(R.c.name)], ['line dash', 'elsewhere in ' + R.c.rg[0]], ['line dots', 'at sea or on another continent']]) +
-        '<p>For a capital or a city, land within ' + CIRCLE_KM + ' km of that location for it to be correct (so you could also potentially receive additional speed and energy use points).<br>For a country, landing anywhere inside that country gives maximum accuracy points.</p>';          // the player's own two lines, 2026-11-18 ("as it's written right now, it's a little bit unclear"); until then "... land within 150 km of that location." and "For a country, land anywhere inside that country."
+        '<p>For a capital or a city, land within ' + CIRCLE_KM + ' km of that location for it to be correct (so you could also potentially receive additional speed and energy use points).</p><p class="near">For a country, landing anywhere inside that country gives maximum accuracy points.</p>';          // the player's own two lines, 2026-11-18 ("as it's written right now, it's a little bit unclear"); until then "... land within 150 km of that location." and "For a country, land anywhere inside that country."
     }],
     // Speed by the timer: all the points up to the halfway mark, none at the timer's end (speedLeft); under the graph the timer's own line
     ['fast', 'How fast do I have to be?', ({ T, R, right }) => {
