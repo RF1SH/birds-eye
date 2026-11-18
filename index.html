@@ -191,7 +191,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .arrows kbd { min-width: 26px; }
 .arrows .up { grid-column: 2; }
 .arrows kbd:not(.up) { grid-row: 2; }
-.star { display: inline-block; width: .92em; height: .92em; margin-right: .24em; vertical-align: -.11em; }
+/* overflow: visible: the ring reaches to a tenth of a unit from the symbol's box, and a box that begins on a part of a pixel was cut
+   by the browser at the whole pixel before its end: the ring lost half a pixel of its line on the right and at its foot (the
+   player, 2026-11-18, of the FAQ's Berlin and Astana: "cut off at the bottom and on the right side ... almost like in a box that
+   got cut off"; measured: 1.3 px of line there against 1.9 on the left and on top) */
+.star { display: inline-block; width: .92em; height: .92em; margin-right: .24em; vertical-align: -.11em; overflow: visible; }
 
 #bottom { grid-row: 2; display: grid; justify-items: center; min-width: 0; }
 /* Study's results: a fun fact about a location from the flight, on a postcard beside the globe */
@@ -4830,8 +4834,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // only shows a portion"). The globe turns to where the round began, rests there a moment, then turns slowly and
   // steadily to where the bird came down, and stays there. (Until 2026-11-13 it turned to the middle of the flight and held
   // still: of a flight half-way round the world both ends were at the rim or behind it.)
-  // It turns SIDEWAYS only: its middle goes along the longitudes the bird flew (east or west, all the way round if the bird
-  // went so), smoothed so it never follows a bend, at one speed; the latitude moves once, from the start's to the landing's.
+  // It turns SIDEWAYS only, never over a pole: its middle goes along one straight line from the start to the landing (flownWay),
+  // east or west as the bird flew (all the way round if the bird went so), at one speed.
   // The quick turn to a round's start goes sideways too, the short way round. (Until 2026-11-16 both turns took the one
   // shortest line between their two ends: from Uruguay to the Sulu Sea that line runs over the South Pole, and the flown line
   // stayed at the rim. The player, 2026-11-15: "it should be much more clear and sort of stick to the middle latitudes
@@ -4857,17 +4861,20 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const f = clamp((want - w.at[j]) / Math.max(1e-9, w.at[j + 1] - w.at[j]), 0, 1);
     return [wrapLon(lerp(C[j][0], C[j + 1][0], f)), lerp(C[j][1], C[j + 1][1], f)];
   }
+  // The slow turn's way: ONE straight line from the round's start to its landing, the longitude and the latitude moving
+  // together the whole time. Its far end is the longitude the bird ended on, counted on from the start's along the flight:
+  // east or west as the bird flew, all the way round if it went so.
+  // (Until 2026-11-18 the middle's longitude at each moment was the average of the flown longitudes round that moment of the
+  // FLIGHT, while the latitude moved evenly. A bird is slow while it climbs and while it comes down, so the middle went
+  // up, then sideways, then up again, and back and forth over a landing the bird had circled: on the built page, Chile to
+  // Saudi Arabia, it moved at 63 degrees from sideways in the first tenth, 13 in the middle and 90 in the last. The player,
+  // with a recording of that round: "It's supposed to be really smooth, but instead it's like kind of jerky. It does still
+  // look like it's like following the path when it should be like very smooth, like one line. Not like going up and down
+  // and like jerking and weirdly at the end".)
   function flownWay(L, from, to) {
-    const n = L.pts.length, U = [from[0]];
-    for (let i = 1; i < n; i++) U.push(U[i - 1] + wrapLon(lonLat(L.pts[i][0])[0] - lonLat(L.pts[i - 1][0])[0]));
-    const end = U[n - 1] + wrapLon(to[0] - U[n - 1]), N = 60, C = [];
-    for (let j = 0; j <= N; j++) {          // each longitude the average of the flown ones round it, over a fifth of the flight each way (less near the ends)
-      const c = (j / N) * (n - 1), h = Math.min(0.2 * (n - 1), c, n - 1 - c);
-      let sum = 0, m = 0;
-      for (let i = Math.ceil(c - h); i <= Math.floor(c + h); i++) { sum += U[i]; m++; }
-      C.push([j === N ? end : m ? sum / m : U[Math.round(c)], lerp(from[1], to[1], j / N)]);
-    }
-    return wayOf(C, to, true);
+    let end = from[0];
+    for (let i = 1; i < L.pts.length; i++) end += wrapLon(lonLat(L.pts[i][0])[0] - lonLat(L.pts[i - 1][0])[0]);
+    return wayOf([from, [end + wrapLon(to[0] - end), to[1]]], to, true);
   }
   // A quick turn of an end globe to a spot: sideways, the short way round, 1.3 s or longer the farther it goes (up to 2 s).
   function turnTo(to) {
@@ -5696,7 +5703,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     ['ends', 'When does a Ranked game end?', () => {
       const full = ENDLESS_TANK, G = faqPlot(600, 212, FAQ_LEGS.length, full).grid(quarters(full), [0, 10, 20, 30, 40, 50], null, (y) => ({ 0: 'empty', [full / 2]: 'half', [full]: 'full' })[y] || '').xtitle('landings');
       G.poly(faqFlight(0, 10), 'line dots').poly(faqFlight(FAQ_OVER * BURN, 0), 'line dash').poly(faqFlight(0, 0), 'line');
-      return faqCap('Energy left', '3 flights over the same locations') + G.svg('The energy left after every landing of three Ranked flights') +
+      return faqCap('Energy left', '3 different flight styles over the same locations') + G.svg('The energy left after every landing of three Ranked flights') +
         faqKey([['line', 'no energy wasted, every landing correct'], ['line dash', 'using energy for ' + FAQ_OVER + ' sec too long every round'], ['line dots', 'no energy wasted, every 10th landing incorrect']]) +
         // The player's own three lines, 2026-11-18. "minimum" holds: rankedBack gives back what the flight spent, up to the least it needed and ENERGY_BACK more (a hand that lets go a seventh of a second late)
         '<p>A correct landing replenishes the minimum energy that flight needed.<br>An incorrect landing does not replenish any energy you used that round.<br>The game ends when your energy runs out.</p>';
