@@ -88,8 +88,7 @@ body {
   pointer-events: auto;
 }
 #card h1 {
-  margin: 0 0 12px;
-  padding-right: 76px;          /* clear of the two marks at the card's top right: How to play and sound */
+  margin: 0;          /* the white under it is the row's (#aids) */
   font: italic 800 clamp(50px, 6.5vh, 64px)/.86 var(--display);
   text-transform: uppercase;
   letter-spacing: -.005em;
@@ -165,8 +164,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .aside { color: var(--ink-soft); font-size: 13px; }
 .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 #card { position: relative; }
-#sound, #howto-open { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; padding: 4px; border: 0; border-radius: 3px; background: none; color: var(--ink-soft); }
-#howto-open { right: 46px; }          /* How to play, beside the sound mark: the one spot that holds still on every tab */
+/* The title stands on one line in every window, and under it on the left a row of small marks: How to play (the ?), then
+   the sound mark (the player's own layout and final pick, 2026-11-18: "i don't see why title can't always be one line",
+   "what about under title on the left?", "replace the words 'How to play' back with the (?) symbol"; pictures
+   HOWTO-word-question and HOWTO-row-question, PLAN 35c). Until then the title took two lines in a tall window and one
+   in a short one, with the marks at the card's top right. The row is above the tabs, so it holds still on every tab.
+   The ? starts on the card's left edge (its ring is 5 px inside its box). Between two marks stand 20 px, ink to ink;
+   over the row and under it 13 px, the white that stood between the title and the tabs. The row is 32 px tall
+   whatever is in it: on a first visit it holds the sound mark alone. */
+#aids { display: flex; align-items: center; height: 32px; margin: 7px 0 8px -5px; }
+#sound, #howto-open { flex: none; width: 32px; height: 32px; padding: 4px; border: 0; border-radius: 3px; background: none; color: var(--ink-soft); }
+#aids #sound { margin-left: 8px; }
+#card.first #aids #sound { margin-left: -2px; }          /* alone in the row: its own ink on the card's left edge */
+#card > #sound { position: absolute; top: 10px; right: 10px; }          /* a card with no title (How to play, the pause card): at its top right, where it has always been */
 #sound:hover, #howto-open:hover { color: var(--ink); background: var(--paper-shade); }
 #sound svg, #howto-open svg { display: block; width: 24px; height: 24px; }
 #sound .wave { display: var(--waves, inline); }
@@ -496,7 +506,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     <div id="card">
       <div id="card-title">
         <h1>Bird's <span class="eye">Eye<svg class="logo" viewBox="-27 -27 54 54" aria-hidden="true"><use href="#i-bird" transform="rotate(-18)"/></svg></span></h1>
-        <button id="howto-open" type="button" aria-label="How to play" title="How to play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></button>
+        <div id="aids"><button id="howto-open" type="button" aria-label="How to play" title="How to play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></button><button id="sound" type="button" aria-label="Sound on (M)" title="Sound (M)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path class="wave" d="M15.5 9a4.2 4.2 0 0 1 0 6"/><path class="wave" d="M18 6.5a7.7 7.7 0 0 1 0 11"/><path class="cross" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button></div>
         <div class="row" id="first-row" hidden><button class="go" id="go-tutor" type="button">Start tutorial</button><button class="alt" id="first-skip" type="button">Skip</button></div>
         <div class="seg" role="tablist" aria-label="Mode">
           <button type="button" role="tab" data-mode="challenge" aria-selected="true">Challenge</button><button type="button" role="tab" data-mode="study" aria-selected="false">Study</button><button type="button" role="tab" data-mode="free" aria-selected="false">Free flight</button>
@@ -565,7 +575,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
         <div class="row"><button class="go" id="resume" type="button">Carry on</button><button class="alt" id="end" type="button" hidden>End flight <kbd>E</kbd></button></div>
         <div class="row" style="margin-top: 12px"><button class="alt" id="restart" type="button">Restart <kbd>R</kbd></button><button class="alt" id="home" type="button">Home <kbd>H</kbd></button></div>
       </div>
-      <button id="sound" type="button" aria-label="Sound on (M)" title="Sound (M)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path class="wave" d="M15.5 9a4.2 4.2 0 0 1 0 6"/><path class="wave" d="M18 6.5a7.7 7.7 0 0 1 0 11"/><path class="cross" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
     </div>
 
     <div id="place" hidden aria-live="polite"></div>
@@ -5531,6 +5540,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function showSound() { soundBtn.classList.toggle('off', !save.sound); soundBtn.setAttribute('aria-label', (save.sound ? 'Sound on' : 'Sound off') + ' (M)'); }
   showSound();
   soundBtn.addEventListener('click', toggleSound);
+  // The sound mark's seat: in the title card's row; on a card with no title (How to play, the pause card) at the
+  // card's top right. One mark, moved when the title card comes or goes, whoever shows or hides it.
+  function seatSound() { const seat = $('card-title').hidden ? $('card') : $('aids'); if (soundBtn.parentNode !== seat) seat.appendChild(soundBtn); }
+  new MutationObserver(seatSound).observe($('card-title'), { attributes: true, attributeFilter: ['hidden'] });
+  seatSound();
 
   // The title globe carries the names of the countries you already know cold: those in Study's pick of where,
   // since a name on a country drawn as sand would read as one in play.
