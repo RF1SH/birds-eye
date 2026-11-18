@@ -718,8 +718,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // Flat vector flags (flagcdn.com, public domain) sit beside the page in flags/. Each is drawn once
   // into a small bitmap, so a detailed coat of arms costs nothing per frame.
   const flagUrl = (a2) => 'flags/' + a2.toLowerCase() + '.svg';
-  const FLAG_PX = 144;           // tall enough to stay sharp beside a name
-  const FLAG_BIG = 320;          // ...and for a flag drawn taller than that (a landing's, on a sharp screen): made when first needed
+  const FLAG_PX = 144;           // the first bitmap, made when the file has loaded: it says a flag is there and what shape it has
+  const FLAG_BIG = 320;          // the tallest bitmap made (a landing's flag on a sharp screen)
   function flagBitmap(img, px) {
     const w = img.naturalWidth || 3, h = img.naturalHeight || 2, cv = document.createElement('canvas');
     cv.height = px; cv.width = Math.max(1, Math.round((px * w) / h));
@@ -734,10 +734,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   // a flag's picture for a card; `cut` marks one that is not a rectangle (data/corrections.json), which gets no box
   const flagImg = (c, alt, cls) => '<img' + (cls || c.flagCut ? ' class="' + [cls, c.flagCut && 'cut'].filter(Boolean).join(' ') + '"' : '') + ' src="' + flagUrl(c.a2) + '" alt="' + alt + '">';
+  // A flag on the map comes from a bitmap made at about the size it shows at: in steps of FLAG_STEP px, each made once
+  // from the vector file when first needed. Until 2026-11-18 every flag up to 144 px tall came from the one 144 px
+  // bitmap scaled down, and at a third of that size fine detail broke up (the player, of Saudi Arabia's flag beside
+  // its name: "the flag just looks so pixely").
+  const FLAG_STEP = 8;
   function flagFor(c, h) {
-    if (h * view.dpr <= FLAG_PX || !c.flagImg) return c.flag;
-    if (!c.flagBig) { try { c.flagBig = flagBitmap(c.flagImg, FLAG_BIG); } catch (e) { c.flagBig = c.flag; } }
-    return c.flagBig;
+    if (!c.flagImg) return c.flag;
+    const px = Math.min(FLAG_BIG, Math.ceil((h * view.dpr) / FLAG_STEP) * FLAG_STEP);
+    if (px === FLAG_PX) return c.flag;
+    if (!c.flagAt) c.flagAt = {};
+    if (!c.flagAt[px]) { try { c.flagAt[px] = flagBitmap(c.flagImg, px); } catch (e) { c.flagAt[px] = c.flag; } }
+    return c.flagAt[px];
   }
   const stage = $('stage'), glCanvas = $('globe'), inkCanvas = $('ink'), ctx = inkCanvas.getContext('2d');
   const css = getComputedStyle(document.documentElement);
