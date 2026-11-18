@@ -495,7 +495,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
    first stands open, a click opens another (their pick from picture FAQ-question: "A: click to open"). One picture for
    each answer and one to three lines. A closed row's capitals stand midway between its two hairlines. */
 #faq-page { position: fixed; inset: 0; z-index: 20; overflow: auto; display: flex; justify-content: center; align-items: flex-start; padding: 14px 16px; background: var(--space); }
-#faq { zoom: var(--ui, 1); flex: none; width: min(660px, 100%); padding: 20px 30px 26px; background: var(--paper); border: var(--b2z) solid var(--ink); border-radius: 3px; }
+#faq { zoom: var(--ui, 1); flex: none; width: min(660px, 100%); padding: 20px 30px 22px; background: var(--paper); border: var(--b2z) solid var(--ink); border-radius: 3px; }          /* 22 under the last row: with the first answer open the nine rows end 14 px over the foot of a 1913 x 1073 window, the page's own margin */
+#faq, #faq section { scroll-margin-top: calc(14px / var(--ui, 1)); }          /* a page opened at #faq or at an answer's address: the browser brings that element to the top, under the page's margin, never against the window's edge */
 #faq .top { display: flex; justify-content: space-between; align-items: center; }
 #faq h2 { margin: 0; font: 700 34px/1 var(--display); }
 #faq section { margin-top: 10.22px; padding-top: 9.42px; border-top: 1px solid var(--paper-shade); }
@@ -562,6 +563,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #faq .ruler span { grid-row: 1; text-align: center; color: var(--ink); font-variant-numeric: tabular-nums; }
 #faq .ruler .h { grid-column: 1; justify-self: start; padding-right: 14px; text-align: left; color: var(--ink-soft); }
 #faq .ruler .h2 { grid-row: 2; }
+#faq td.what { width: 38%; padding-right: 14px; }
+#faq p.credits { margin-top: 16px; font-size: 13px; color: var(--ink-soft); }
 </style>
 
 </head>
@@ -5695,6 +5698,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
         faqKey([['line', 'no energy wasted, every landing correct'], ['line dash', 'using energy for ' + FAQ_OVER + ' sec too long every round'], ['line dots', 'no energy wasted, every 10th landing wrong']]) +
         '<p>A correct landing gives back the energy the flight needed.<br>A wrong one gives back nothing.<br>The game ends when your energy runs out.</p>';          // the last line is the player's own, 2026-11-18, and stands last
     }],
+    // Where the rules' numbers come from (the player, 2026-11-13: "How did you decide this?"; last on the sheet by their pick), and
+    // under it the credits the data's licenses ask for, where a player can see them (LICENSE has each in full)
+    ['decided', 'How did you decide this?', () => '<table>' + [
+      ['How hard a location is', 'How often real players name it or find it: slepemapy.cz, JetPunk, MapTap\'s Atlas, cityquiz.io, Wikipedia page views'],
+      ['The timer\'s halfway mark', '54,775 timed answers on slepemapy.cz'],
+      ['Points by distance', 'MapTap\'s formula, sized for a map that shows borders'],
+      ['The energy a flight needs', 'Flown by the game\'s own rules'],
+    ].map(([what, from]) => '<tr><td class="what">' + what + '</td><td>' + from + '</td></tr>').join('') + '</table>' +
+      '<p class="credits">Map outlines: Natural Earth. Flags: flagcdn.com. City populations: United Nations, World Urbanization Prospects: The 2025 Revision (CC BY 3.0 IGO). ' +
+      'Country populations: World Bank (CC BY 4.0). slepemapy.cz data sets: Papoušek, Pelánek and Stanislav, Masaryk University (ODbL 1.0).</p>'],
   ];
   let faqOn = false, faqBuilt = false, faqPushed = false;
   function faqBuild() {
