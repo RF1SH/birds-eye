@@ -1778,6 +1778,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     wrongsea: { italic: true, weight: 600, fill: BAD, track: '0.02em' },
     gain: { fill: GOOD, size: 14 },
     loss: { fill: BAD, size: 14 },
+    cap: { k: 0.8 },          // a capital's name by its symbol, where a landing shows where the capital is: as the line under a name (ink, 0.8 of a name)
   };
   // a place's name on the globe grows with the screen: 18 px on a small one, 26 at 1280 wide, 34 on a big one;
   // the line under it is 0.8 of that
@@ -1841,6 +1842,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function nameplate(c, str, x, y, cls, sub, alpha, size) {
     [str, sub] = disputed(c, str, sub);
     const o = Object.assign({ size: size || namePx(), edge: size ? 3.5 : 3.5 * nameUp() }, STYLE[cls] || STYLE.name);
+    if (o.k) o.size = Math.round(o.size * o.k);
     ctx.globalAlpha = alpha;
     const flag = c && c.flag ? c.flag : null;
     ctx.font = (o.italic ? 'italic ' : '') + (o.weight || 700) + ' ' + o.size + 'px ' + DISPLAY;
@@ -1917,6 +1919,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function plateBox(c, str, cls, sub) {
     [str, sub] = disputed(c, str, sub);
     const o = Object.assign({ size: namePx() }, STYLE[cls] || STYLE.name);
+    if (o.k) o.size = Math.round(o.size * o.k);
     ctx.font = (o.italic ? 'italic ' : '') + (o.weight || 700) + ' ' + o.size + 'px ' + DISPLAY;
     if ('letterSpacing' in ctx) ctx.letterSpacing = o.track || '0.05em';        // as it will be drawn: else the width is whatever was drawn last
     let w = ctx.measureText(str).width;
@@ -2233,9 +2236,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (tab === 'challenge' && runKind === 'day' && tripDone()) return;          // one trip a day (one begun is carried on)
     S.game = tab === 'challenge' ? 'trip' : tab;
     Object.assign(S, { mode: 'fly', paused: false, t: 0, energy: TANK, n: 0, streak: 0, bestStreak: 0, firstTry: 0, fresh: 0, route: null, legs: null, tickets: [], last: null,
-      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), newC: 0, sawN: 0, intro: null, began: null, replay: null });
+      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, capAt: null, capFit: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), newC: 0, sawN: 0, intro: null, began: null, replay: null });
     S.log = new Map();
     S.drops = [];
+    Object.assign(fitv, { on: false, k: 0, lh: null, s0: 1 });          // no rest of the view left over from the flight before (it is cleared on the title, but only once a frame is drawn there)
     fx.length = 0; flashes.length = 0;
     holdOff();
     ticketsEl.replaceChildren();
@@ -2349,6 +2353,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function touchDown() {
     const lon = bird.lon, lat = bird.lat, was = bird.at, p = unit(lon, lat);
     Object.assign(bird, { a: 0, va: 0, vx: 0, vy: 0, down: true, squash: 1 });
+    S.capFit = null;          // where the view rested for the last landing (restOn)
     const here = locationAt(lon, lat);
     bird.at = here.key;
     if (S.game === 'free') { (here.sea || here.wet ? sfx.splash : sfx.thud)(); showPlace(here); return; }
@@ -2730,10 +2735,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function fitFor(A, card) {
     const me = unit(bird.lon, bird.lat), land = A.land;
     let pts = null, low = view.H0;
-    if (land && land.fine) { pts = partPoints(land, partAt(land, bird.lon, bird.lat)); if (!land.tiny) low = view.H0 / FIT_IN; }
+    if (land && land.fine) { pts = partPoints(land, partAt(land, bird.lon, bird.lat)); if (!land.tiny) low = A.least || view.H0 / FIT_IN; }
     else if (A.water && !isOcean(A.water)) pts = seaShape(A.water);
     if (!pts || !pts.length) return null;
-    pts = pts.concat([me]);
+    pts = pts.concat([me], A.also || []);          // also: what else must be in view (Study: the capital)
     const u = view.ui / 1.5, padX = FIT_PAD_X * u, padY = FIT_PAD_Y * u, left = card && view.w > 900 ? card.x1 : 0, under = card && view.w <= 900 ? card.y0 : view.h - view.deck;          // the room beside the card, or above it in a narrow window (the card lies along the bottom there)
     const x0 = left + padX, x1 = view.w - padX, y0 = padY, y1 = under - padY, rx = (x0 + x1) / 2, ry = (y0 + y1) / 2;
     const saved = Object.assign({}, cam);
@@ -2761,7 +2766,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   // The names are laid out for where the view will rest, at once: the camera is put there for the working out. A.T: how
   // long the arrival takes: REVEAL when the view hardly moves, up to 2.25 times that the farther it goes (out to a view
-  // 4 times as high, or the bird 900 px from the middle of the room on a 1913 px screen).
+  // 4 times as high, or the bird 900 px from the middle of the room on a 1913 px screen). restSecs: that time, worked
+  // out with the camera already put at the rest.
+  function restSecs(fit) {
+    const at = project(unit(bird.lon, bird.lat)), far = Math.max(Math.log(fit.H / view.H0) / Math.log(4), at ? Math.hypot(at[0] - fit.rx, at[1] - fit.ry) / (600 * view.ui) : 1);
+    return REVEAL * (1 + 1.25 * clamp(far, 0, 1));
+  }
   function aroundLayout(A) {
     const cr = $('place').getBoundingClientRect(), st = stage.getBoundingClientRect();
     const card = cr.width ? { x0: cr.left - st.left - 12, x1: cr.right - st.left + 12, y0: cr.top - st.top - 12, y1: cr.bottom - st.top + 12 } : null;
@@ -2769,11 +2779,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     A.fit = fitFor(A, card);
     if (A.fit) aim(A.fit.c, A.fit.H, A.fit.rx, A.fit.ry); else cam.cx += view.slide - slid;
     A.L = layoutAround(A, card);
-    if (A.T === undefined) {
-      const at = A.fit ? project(unit(bird.lon, bird.lat)) : null;
-      const far = A.fit ? Math.max(Math.log(A.fit.H / view.H0) / Math.log(4), at ? Math.hypot(at[0] - A.fit.rx, at[1] - A.fit.ry) / (600 * view.ui) : 1) : 0;
-      A.T = REVEAL * (1 + 1.25 * clamp(far, 0, 1));
-    }
+    if (A.T === undefined) A.T = A.fit ? restSecs(A.fit) : REVEAL;
     Object.assign(cam, saved);
   }
   function drawAround() {
@@ -3813,11 +3819,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
     } else {
       flash(c, 1, FLASH);
       S.drops.push({ p, t: S.t });
+      // where its capital is (capShown): the view rests on the whole country, and where the name stands is worked out for that rest
+      const cap = capShown(c), sub = cap ? null : capLine(c), saved = Object.assign({}, cam), F = cap ? restOn(c) : null;
+      if (F) aim(F.c, F.H, F.rx, F.ry);
       const there = !c.tiny && project(c.u), on = there && there[0] > 50 && there[0] < view.w - 50 && there[1] > 50 && there[1] < view.h - view.deck - 30;
       // at its middle when that is in sight and the name and flag stand clear of the bird there; else under the bird
-      const box = plateBox(c, c.name, 'name', capLine(c)), me = birdBox(project(p) || [view.w / 2, view.gy]);
+      const box = plateBox(c, c.name, 'name', sub), me = birdBox(project(p) || [view.w / 2, view.gy]);
       const clear = on && (Math.abs(there[0] - me.x) >= box.half + me.half || there[1] - box.up >= me.y + me.down || there[1] + box.down <= me.y - me.up);
-      label(c, c.name, clear ? c.u : p, 'name', GROUND, capLine(c), clear ? AREA : UNDER);
+      Object.assign(cam, saved);
+      label(c, c.name, clear ? c.u : p, 'name', GROUND, sub, clear ? AREA : UNDER);
+      if (cap) markCapital(c);
       ring(p, 4, 22, INK, 2.5, 0.45);
     }
     (spot ? sfx.spot : sfx.drop)();
@@ -3844,6 +3855,34 @@ button { font: inherit; color: inherit; cursor: pointer; }
     countAgainst(t);
   }
 
+  // A landing in a country shows where its capital is (the player, 2026-11-14: "if you land in China, for example, it
+  // should show you where Beijing is. It shouldn't just have the capital name under the flag ... the map is going to zoom
+  // out to show you where the whole country and its territory is. So it might as well show you where the actual capital
+  // is"; asked again 2026-11-15: "rather than just having it below the country's name. or both if that isn't too
+  // redundant/excessive?"; their pick from picture CAPITAL-question, 2026-11-17: "A: just the capital"). In Study, when a
+  // landing names a country (a wrong landing, or the country's own postcard delivered, by its name or by its flag):
+  // the capital's symbol stands at the capital with its name over it (markCapital), and the view rests on the whole
+  // of the country and its capital while the bird stands there (restOn: Free flight's own rest, fitFor, never closer
+  // than the ground view). The capital is no longer named a second time under the country's name. All of it goes at
+  // take-off, as a delivered capital's symbol does, so nothing on the globe gives away where you have been. A country
+  // drawn as a dot keeps the line under its name: its capital is that dot. The third wrong landing shows the way
+  // first, and the view comes back to this rest (placeCamera). Not on Free flight's screen, their question of the same
+  // day: that names the neighbors, and with Mongolia's postcard aboard it would print MONGOLIA next to China.
+  const capShown = (c) => !!c && !!c.cap && !c.tiny;
+  function markCapital(c) {
+    const city = unit(c.cap[1], c.cap[2]);
+    S.capAt = { p: city, t: S.t };
+    label(null, c.cap[0], city, 'cap', GROUND, null, OVER);
+  }
+  function restOn(c) {
+    const fit = fitFor({ land: c, also: [unit(c.cap[1], c.cap[2])], least: view.H0 }, null);
+    if (!fit) return (S.capFit = null);
+    const saved = Object.assign({}, cam);
+    aim(fit.c, fit.H, fit.rx, fit.ry);
+    S.capFit = { fit, t: S.t, T: restSecs(fit) };
+    Object.assign(cam, saved);
+    return fit;
+  }
   // Nothing here for this letter. Say where "here" is, so the wrong landing still teaches something.
   function strand(here, p) {
     const t = S.tickets[0];
@@ -3856,7 +3895,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const lit = here.c || (here.sea && here.w >= 0 ? WATERS[here.w] : null);
     // a country never asked, named here: it comes sooner as a new one (SAW_REACH), at a turn drawn now; named again, it keeps its turn
     if (here.c && !here.sea && here.c.where && memOf(here.c.where).box === 0 && !S.saw.has(here.c.id)) S.saw.set(here.c.id, (S.newC + Math.floor(Math.random() * SAW_WITHIN)) * 1e4 + S.sawN++);
-    if (here.name) label(here.sea ? null : here.c, here.name, p, here.sea ? 'wrongsea' : 'wrong', GROUND, here.sea ? null : underName(here), UNDER);
+    const cap = !here.sea && capShown(here.c);
+    if (here.name) label(here.sea ? null : here.c, here.name, p, here.sea ? 'wrongsea' : 'wrong', GROUND, here.sea || cap ? null : underName(here), UNDER);
+    if (cap) { markCapital(here.c); restOn(here.c); }
     sfx.miss();
     if (t) countAgainst(t);
   }
@@ -3866,7 +3907,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     S.mode = 'over'; atlas.zoom = 1;
     S.landedAt = performance.now();
     S.energy = 0;
-    S.look = null;
+    S.look = null; S.capAt = null; S.capFit = null;
     stage.classList.remove('flying');
     stage.classList.add('atlas');
     keys.left = keys.right = keys.up = keys.down = keys.flap = false;
@@ -4170,22 +4211,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
     } else { slid += (0 - slid) * 0.1; slide.to = null; }          // leaving a flight: back under the title's own turn
     let cx = lerp(S.mode === 'title' ? view.tx : view.ox, view.w / 2, k) + slid;
     let cy = lerp(S.mode === 'title' ? view.ty : (view.h - view.deck - view.keyRoom) / 2, view.gy, k);
-    if (S.look) {
-      const L = S.look, t = L.t;
-      const k = smooth(t < L.go ? t / L.go : t < L.go + L.hold ? 1 : clamp(1 - (t - L.go - L.hold) / L.go, 0, 1));
-      const moving = t < L.go || t > L.go + L.hold;
-      L.me = me;                                     // the way back is to wherever the bird is now
-      n = along(L, k);
-      logH = lerp(logH, Math.max(logH, Math.log(L.H)), smooth(clamp(k * 3, 0, 1))) + (moving ? L.rise * Math.sin(Math.PI * k) : 0);
-    }
-    if (S.mode === 'fly' && S.game === 'free') {
-      const A = S.around, F = fitv, on = bird.down && !!(A && A.fit), dt = clamp(S.t - F.tp, 0, 0.1), own = logH;
+    let rest = false;          // the view rests on a place: Free flight's landing, and Study's landing in a country (restOn)
+    if (S.mode === 'fly' && (S.game === 'free' || S.game === 'study')) {
+      const A = S.game === 'free' ? S.around : S.capFit, F = fitv, on = bird.down && !!(A && A.fit), dt = clamp(S.t - F.tp, 0, 0.1), own = logH;
       F.tp = S.t;
       if (on) F.fit = A.fit;
       if (on !== F.on) { if (on) F.h0 = F.lh !== null ? F.lh : own; else F.s0 = groundScale(); F.k0 = F.k; F.t0 = on ? A.t : S.t; F.T = on ? A.T : FIT_BACK; F.on = on; }
       const p = arrive((S.t - F.t0) / F.T);
       F.k = on ? F.k0 + (1 - F.k0) * p : F.k0 * (1 - p);
-      if (F.k > 0 && F.fit) { n = slerp(n, F.fit.c, F.k); cx = lerp(cx, F.fit.rx, F.k); cy = lerp(cy, F.fit.ry, F.k); }
+      if (F.k > 0 && F.fit) { n = slerp(n, F.fit.c, F.k); cx = lerp(cx, F.fit.rx, F.k); cy = lerp(cy, F.fit.ry, F.k); rest = true; }
       if (on) F.lh = logH = lerp(F.h0, Math.log(F.fit.H), p);          // from the height the view had when the bird came down (it may still have been on its way down to the bird)
       else if (F.lh !== null) {
         const above = F.lh > own;
@@ -4194,6 +4228,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
         if (Math.abs(F.lh - own) < 0.01 && !(above && keys.flap)) F.lh = null; else logH = F.lh;          // while you climb toward a higher view it waits for the bird to pass it: no step down
       }
     } else { fitv.on = false; fitv.k = 0; fitv.lh = null; fitv.s0 = 1; }
+    if (S.look) {
+      const L = S.look, t = L.t;
+      const k = smooth(t < L.go ? t / L.go : t < L.go + L.hold ? 1 : clamp(1 - (t - L.go - L.hold) / L.go, 0, 1));
+      const moving = t < L.go || t > L.go + L.hold;
+      L.me = rest ? n : me;                          // the way back is to wherever the bird is now, or to where the view rests on its country
+      n = along(L, k);
+      logH = lerp(logH, Math.max(logH, Math.log(L.H)), smooth(clamp(k * 3, 0, 1))) + (moving ? L.rise * Math.sin(Math.PI * k) : 0);
+    }
     aim(n, Math.exp(logH), cx, cy);
   }
 
@@ -4291,6 +4333,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // just a box. Who would even know that that's a postcard?")
   function drawDrops() {
     const big = clamp(0.7 + (cam.pxRad / R_KM) * 0.5, 0.75, 1);
+    if (S.capAt && S.mode === 'fly') {          // where a landing shows the capital (markCapital): it leaves as its name does (label)
+      const A = S.capAt, age = S.t - A.t;
+      if (A.left === undefined && !bird.down) A.left = Math.max(age, 1.2);
+      const a = A.left === undefined ? 1 : clamp(1 - (age - A.left) / 0.35, 0, 1), s = project(A.p);
+      if (s && a > 0) { ctx.globalAlpha = a * rimDot(s, 10 * view.mk); starAt(s[0], s[1], 6 * big, view.mk); ctx.globalAlpha = 1; }
+      if (a <= 0) S.capAt = null;
+    }
     for (const d of S.drops) {
       const age = S.t - d.t;
       if (d.from) {
@@ -4463,8 +4512,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // 2026-11-15, told as the one thing that differs from "it should still maintain its like relative size"), and after
   // a take-off it grows back to its flying size in BIRD_GROW seconds.
   const BIRD_LEAST = 0.4, BIRD_GROW = 0.4;
-  const groundScale = () => Math.max(S.game === 'free' ? BIRD_LEAST : 0, Math.min(1, view.H0 / cam.H));
-  const onMap = () => (S.mode !== 'fly' ? 1 : bird.down ? groundScale() : S.game === 'free' && fitv.s0 < 1 && S.t - fitv.t0 < BIRD_GROW ? lerp(fitv.s0, 1, arrive((S.t - fitv.t0) / BIRD_GROW)) : 1);
+  const groundScale = () => Math.max(S.game === 'free' || S.capFit ? BIRD_LEAST : 0, Math.min(1, view.H0 / cam.H));
+  const onMap = () => (S.mode !== 'fly' ? 1 : bird.down ? groundScale() : fitv.s0 < 1 && S.t - fitv.t0 < BIRD_GROW ? lerp(fitv.s0, 1, arrive((S.t - fitv.t0) / BIRD_GROW)) : 1);
   // The room the bird takes on the screen in a flight, with its energy ring: names keep clear of it.
   function birdBox(g) {
     const k = onMap(), size = birdSize() * k, r = 26 * size, pad = 6 * view.mk * k, ring = S.game === 'free' ? 0 : 11 * Math.max(1, 0.95 * view.ui) * k;
@@ -5423,7 +5472,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
   // Ground speed in km a second at a height, flying flat out.
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
-  const setBird = (lon, lat, a, down) => Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down });
+  // for the tests: the bird put somewhere by hand. That is no flight, so the view is the bird's own at once (no rest on the last landing's country still being handed back)
+  const setBird = (lon, lat, a, down) => { Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down }); S.capFit = null; Object.assign(fitv, { on: false, k: 0, lh: null, s0: 1 }); };
   window.birdsEye = { hoverBox: () => hoverBox, slerp, showLeg, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, flagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     project: projectLL, unproject, speedAt, FLY_TOP, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
