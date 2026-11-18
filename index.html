@@ -1473,8 +1473,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const KEY = 'birds-eye-world-1';
   const KINDS = ['c', 'k', 'f', 's'], REGIONS = ['World', 'Africa', 'Americas', 'Asia', 'Europe', 'Oceania'];
   // asked, games: Ranked's turns. games counts the Ranked games begun; asked holds, for a country, the game it was last asked in
-  // told: the games (day, ranked) whose first wrong landing has said why speed and energy use have an X
-  const save = { mem: {}, best: 0, sound: true, study: { kinds: KINDS.slice(), where: ['World'] }, trips: {}, endless: 0, skill: null, visited: false, asked: {}, games: 0, told: {} };
+  // told: how often a wrong landing has said why speed and energy use have an X (n, in the tutorial and the real games together), and the real games that have said it (day, ranked)
+  const save = { mem: {}, best: 0, sound: true, study: { kinds: KINDS.slice(), where: ['World'] }, trips: {}, endless: 0, skill: null, visited: false, asked: {}, games: 0, told: { n: 0 } };
   const wholeWorld = (w) => !w.length || w.includes('World') || REGIONS.every((r) => r === 'World' || w.includes(r));      // no region, World itself, or all five
   try {
     const got = JSON.parse(localStorage.getItem(KEY)) || {};
@@ -1506,7 +1506,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const w = st && (Array.isArray(st.where) ? st.where : [st.where]).filter((x) => REGIONS.includes(x));
     if (w && w.length) save.study.where = wholeWorld(w) ? ['World'] : w;
     if (got.visited === true) save.visited = true;
-    if (got.told && typeof got.told === 'object') for (const k of ['day', 'ranked']) if (got.told[k] === true) save.told[k] = true;
+    if (got.told && typeof got.told === 'object') {
+      for (const k of ['day', 'ranked']) if (got.told[k] === true) save.told[k] = true;
+      save.told.n = Number.isInteger(got.told.n) && got.told.n >= 0 ? got.told.n : (save.told.day ? 1 : 0) + (save.told.ranked ? 1 : 0);          // (a save of the day's first hours had no count)
+    }
     if (got.scale === 2) save.scale = 2;          // saved since a round is worth what it is today
   } catch (e) { /* private window, or nothing saved yet */ }
   // A first visit: the first card's choice (Start tutorial or Skip) has not been made in this browser, and nothing has
@@ -2968,7 +2971,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // message that we already drafted ... just so it's at least explained to everybody once"; their picks from picture
   // WRONG-NOTE-question, 2026-11-17: under the X's, there in the tutorial too, "Once in each game"). Until then the
   // tutorial had it in the bar beside the card and a real game had none.
-  const ONLY_RIGHT = 'Speed and energy points only count on a correct landing.';
+  // And three times a person at most, wherever they were, the tutorial and practice counted in (the player, the same
+  // evening: "I don't want to overwhelm the person with too many messages ... it should say it a maximum of 3 times,
+  // whether that's 3 times in the tutorial, or whether that's once in the tutorial, once in day trip, and once in
+  // ranked. Regardless, I think after it says it 3 times per person, then it should be done"). So the tutorial keeps
+  // one thing after all: this count.
+  const ONLY_RIGHT = 'Speed and energy points only count on a correct landing.', ONLY_RIGHT_TIMES = 3;
   // A round as the game holds it: a country (asked by its name or by its flag), a capital (by its name or by its
   // country's flag), a city.
   const areaAsk = (kind, c) => ({ kind, c, p: c.u, lon: c.lx, lat: c.ly, name: c.name });
@@ -3422,8 +3430,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // no error, then a round of ranked should theoretically be endless.. it's the error that drains the energy").
     // Until then every correct landing gave back three quarters of par, so a perfect flyer ran down too.
     if (T.endless && right) S.energy = Math.min(S.cap, S.energy + Math.min(used, cheap + ENERGY_BACK));
-    const game = T.endless ? 'ranked' : 'day', why = !right && (T.tutor || !save.told[game]);          // the sentence under the two X's (ONLY_RIGHT)
-    if (why && !T.tutor) save.told[game] = true;          // written with the landing, by the line below
+    const game = T.endless ? 'ranked' : 'day', why = !right && save.told.n < ONLY_RIGHT_TIMES && (T.tutor || !save.told[game]);          // the sentence under the two X's (ONLY_RIGHT)
+    if (why) { save.told.n++; if (T.tutor) persist(); else save.told[game] = true; }          // a real game's is written with the landing, by the line below
     if (T.endless) rankedKeep(); else tripSave();
     $('count').textContent = num(T.score);
     $('trip-clock').hidden = true;
