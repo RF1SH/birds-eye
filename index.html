@@ -2183,8 +2183,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // Above the bird only when that spot is clear of the symbol and of every other named place's own mark (shown the
     // way to San Marino, then a landing north of Rome: above the bird Italy's flag would stand on San Marino's dot);
     // otherwise the name stays under the bird and moves off the symbol as names move off one another (settle).
-    if (S.capAt && S.mode === 'fly' && bird.down) {
-      const q = project(S.capAt.p);
+    for (const A of [S.capAt, S.capAlso]) if (A && S.mode === 'fly' && bird.down) {
+      const q = project(A.p);
       if (q) {
         const k = S.capFit ? cam.H / S.capFit.fit.H : 1, at = [s[0] + (q[0] - s[0]) * k, s[1] + (q[1] - s[1]) * k], pad = 14 * view.mk;
         const covers = (yy, m) => Math.abs(m[0] - x) < box.half + pad && m[1] > yy - box.up - pad && m[1] < yy + box.down + pad;
@@ -2471,13 +2471,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
     }
     Object.assign(cam, saved);
     if (!away) return 0;
+    return lookGo(me, p, H);
+  }
+  // lookTo(fit): to a view that holds a country whole (fitFor), and back: Day Trip's and Ranked's answer when it is a
+  // country too big for the view a place is shown in (tripCaps). at: where on the screen that view has its middle.
+  const lookTo = (fit) => lookGo(unit(bird.lon, bird.lat), fit.c, fit.H, fit);
+  function lookGo(me, p, H, at) {
     const ang = Math.acos(clamp(dot(me, p), -1, 1));
     // the way there along the globe, by a midpoint, so even the far side of the world has one way round
     let mid = slerp(me, p, 0.5);
     if (ang > Math.PI - 0.05) { const up = Math.abs(me[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0]; mid = norm([me[1] * up[2] - me[2] * up[1], me[2] * up[0] - me[0] * up[2], me[0] * up[1] - me[1] * up[0]]); }
     const go = 0.55 + 0.6 * (ang / Math.PI);
     const rise = Math.log(view.H1 * 1.1 / H) * clamp((ang - 0.3) / 1.2, 0, 1);
-    S.look = { me, mid, p, go, hold: LOOK_HOLD, end: 2 * go + LOOK_HOLD, H, rise: Math.max(0, rise), t: 0 };
+    S.look = { me, mid, p, go, hold: LOOK_HOLD, end: 2 * go + LOOK_HOLD, H, rise: Math.max(0, rise), t: 0, at: at || null };
     return S.look.end;
   }
   const along = (L, k) => (k < 0.5 ? slerp(L.me, L.mid, k * 2) : slerp(L.mid, L.p, k * 2 - 1));
@@ -2523,7 +2529,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (tab === 'challenge' && runKind === 'day' && tripDone()) return;          // one trip a day (one begun is carried on)
     S.game = tab === 'challenge' ? 'trip' : tab;
     Object.assign(S, { mode: 'fly', paused: false, t: 0, energy: TANK, n: 0, streak: 0, bestStreak: 0, firstTry: 0, fresh: 0, route: null, legs: null, tickets: [], last: null,
-      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, capAt: null, capFit: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), sawCap: new Set(), newC: 0, sawN: 0, intro: null, began: null, replay: null });
+      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, capAt: null, capAlso: null, capFit: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), sawCap: new Set(), newC: 0, sawN: 0, intro: null, began: null, replay: null });
     S.log = new Map();
     S.drops = [];
     Object.assign(fitv, { on: false, k: 0, lh: null, s0: 1 });          // no rest of the view left over from the flight before (it is cleared on the title, but only once a frame is drawn there)
@@ -3052,15 +3058,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function fitFor(A, card) {
     const me = unit(bird.lon, bird.lat), land = A.land;
     let pts = null, low = view.H0;
-    if (land && land.fine) { pts = partPoints(land, partAt(land, bird.lon, bird.lat)); if (!land.tiny) low = A.least || view.H0 / FIT_IN; }
+    if (A.pts) pts = A.pts;          // the points as given (tripCaps)
+    else if (land && land.fine) { pts = partPoints(land, partAt(land, bird.lon, bird.lat)); if (!land.tiny) low = A.least || view.H0 / FIT_IN; }
     else if (A.water && !isOcean(A.water)) pts = seaShape(A.water);
     if (!pts || !pts.length) return null;
-    pts = pts.concat([me], A.also || []);          // also: what else must be in view (Study: the capital)
+    pts = pts.concat(A.noMe ? [] : [me], A.also || []);          // also: what else must be in view (Study: the capital). noMe: without the bird (how high a country needs the view by itself)
     const u = view.ui / 1.5, padX = FIT_PAD_X * u, padY = FIT_PAD_Y * u, left = card && view.w > 900 ? card.x1 : 0, under = card && view.w <= 900 ? card.y0 : view.h - view.deck;          // the room beside the card, or above it in a narrow window (the card lies along the bottom there)
     const x0 = left + padX, x1 = view.w - padX, y0 = padY, y1 = under - padY, rx = (x0 + x1) / 2, ry = (y0 + y1) / 2;
     const saved = Object.assign({}, cam);
     let mid = norm(pts.reduce((a, q) => [a[0] + q[0], a[1] + q[1], a[2] + q[2]], [0, 0, 0])), H = low, whole = true;
-    const holds = (h) => { aim(mid, h, rx, ry); return pts.every((q) => { const at = project(q); return at && at[0] >= x0 && at[0] <= x1 && at[1] >= y0 && at[1] <= y1; }); };
+    // meRoom: px kept free over and under the bird, for the name that goes with it (it stands under the bird, or over it)
+    const birdRoom = () => { if (!A.meRoom) return true; const at = project(me); return !!at && at[1] - A.meRoom >= 4 && at[1] + A.meRoom <= under - 4; };
+    const holds = (h) => { aim(mid, h, rx, ry); return pts.every((q) => { const at = project(q); return at && at[0] >= x0 && at[0] <= x1 && at[1] >= y0 && at[1] <= y1; }) && birdRoom(); };
     const lowest = () => {
       whole = true;
       if (holds(low)) return low;
@@ -3074,6 +3083,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       aim(mid, H, rx, ry);
       let bx0 = 1e9, bx1 = -1e9, by0 = 1e9, by1 = -1e9;
       for (const q of pts) { const at = project(q); if (at) { bx0 = Math.min(bx0, at[0]); bx1 = Math.max(bx1, at[0]); by0 = Math.min(by0, at[1]); by1 = Math.max(by1, at[1]); } }
+      if (A.meRoom) { const at = project(me); if (at) { by0 = Math.min(by0, at[1] - A.meRoom + padY - 4); by1 = Math.max(by1, at[1] + A.meRoom - padY + 4); } }          // the bird's room is part of what is put in the middle: the view moves over before it pulls back
       const ll = bx1 >= bx0 ? unproject((bx0 + bx1) / 2, (by0 + by1) / 2) : null;
       if (ll) mid = unit(ll[0], ll[1]);
     }
@@ -3603,6 +3613,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (T.endless && !T.rounds[i]) T.rounds[i] = endlessRound(i);
     if (T.tutor && !T.rounds[i]) T.rounds[i] = tutorRound(i);
     Object.assign(T, { wait: true, ready: false, count: S.t + COUNT, next: i, reveal: null, lesson: null });
+    if (S.capFit) S.capFit.done = true;          // the view goes back to the bird (placeCamera); the landing's names keep their size meanwhile (flagUp)
     if (!T.endless) { S.cap = S.energy = 1; T.cheap = 0; }          // a Day Trip's ring is full again for the round to come
     $('trip-clock').hidden = false; $('trip-secs').textContent = '0.0 s'; $('trip-bar').style.width = '0%';
     const node = document.createElement('div');
@@ -3618,6 +3629,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function tripShow(i) {
     const T = S.trip, R = T.rounds[i];
     T.intro = null;
+    S.capFit = null;          // the last landing's rest is over (the view went back when the count began: tripCount)
     const goal = goalOf(R, bird.lon, bird.lat), km = kmBetween(bird.lon, bird.lat, goal[0], goal[1]), cheap = cheapFor(km);
     // A Day Trip: a full ring every round (the player's pick, 2026-11-12). In it: the cheapest flight for this round with
     // its room for error, and ENERGY_WASTE to spare. What is left of the spare at the landing gives the round's energy
@@ -3732,6 +3744,42 @@ button { font: inherit; color: inherit; cursor: pointer; }
       '<div class="parts"><span>Accuracy <b>' + num(r.closeness) + '</b>/' + num(accMax(T, R)) + '</span>' +
       '<span>Speed ' + (r.right ? '<b>' + r.speed + '</b>' : NOT_EARNED) + '/' + part + '</span><span>Energy use ' + (r.right ? '<b>' + r.energy + '</b>' : NOT_EARNED) + '/' + part + '</span></div>' + (why ? '<div class="why">' + ONLY_RIGHT + '</div>' : '');      // always listed, so the card adds up to its total; a wrong landing shows its X where a number was not earned (the player's idea, 2026-11-13: "X out of 20"; 0/20 had read as slow and wasteful, and leaving them off as 74/160 beside 74/200)
   }
+  // Day Trip and Ranked, a round that asks a COUNTRY (by its name or by its flag): the capital of each country the
+  // landing names stands at its location on the map, with its name next to its symbol, as in Study (markCapital),
+  // and is not listed under the country's name: the name stands alone. The country asked, and the country a wrong
+  // landing names. (The player, 2026-11-18, of a picture of a Ranked landing: "also it doesn't show where the capital
+  // is here? just lists it under the country name", "is that on purpose? jw". It was Claude's doing of 2026-11-17,
+  // never asked of them. Their picks from picture CAPITAL-daytrip-ranked, by button: "Only when a country is asked",
+  // over the same in a round that asks a capital too; "No, the name alone", over the population under the name as in
+  // Study. PLAN 128.) A round that asks a capital or a city is as it was: the answer wears the only symbol, and the
+  // country of a wrong landing lists its capital under its name. A country drawn as a dot keeps that line too.
+  // The view (counted on the built page, 5,138 landings in 172 countries: with the view left on the bird the capital
+  // was on the screen in 81 of 100 correct landings, in the United States in 1 of 30): after a correct landing it
+  // rests on the whole country and its capital, Study's own rest (restOn). After a wrong landing it rests where the
+  // country asked is whole on the screen, its capital and the capital of the country landed in are in sight and the
+  // bird has room for its name, never closer than the ground view. Never higher than the view goes when it shows a
+  // location (half the height of a flight), or REST_MORE times what the country asked needs by itself: when the
+  // capital of the country landed in is too far for that, the view holds the rest and that capital stays listed
+  // under its country's name; when the country asked is too far, the view goes to it and comes back, as it always
+  // did (to all of it, when it is too big for the view a location is shown in: Russia's Moscow was out of that view).
+  // Returns what was marked and how long the view takes (secs: null when nothing changed and the caller looks).
+  const REST_MORE = 1.25, NO_CAPS = { showA: false, showW: false, secs: null };
+  // the room a name by the bird takes over or under the bird, at the size it has on the ground (the view may still be on its way down)
+  const nameRoom = (c, str, cls, sub) => { const h = cam.H; cam.H = view.H0; ownName = true; const box = plateBox(c, str, cls, sub); ownName = false; cam.H = h; return Math.max(UNDER_GAP * view.mk, ZZZ_TOP + 24) + box.up + box.down + 4; };
+  function tripCaps(R, W, right, room) {
+    const A = R.c, capA = capShown(A), capW = !right && capShown(W), at = (c) => unit(c.cap[1], c.cap[2]);
+    if (!capA && !capW) return NO_CAPS;
+    if (right) { markCapital(A); restOn(A); return { showA: true, showW: false, secs: S.capFit ? S.capFit.T : 0 }; }
+    const ptsA = capA ? partPoints(A, partAt(A, A.cap[1], A.cap[2])).concat([at(A)]) : [R.p];
+    const own = fitFor({ pts: ptsA, noMe: true }), lim = Math.max(heightFor(0.5), own.H * REST_MORE) * 1.001, ok = (f) => !!f && f.whole && f.H <= lim;
+    const both = capW ? fitFor({ pts: ptsA.concat([at(W)]), meRoom: room }) : null, one = ok(both) ? null : fitFor({ pts: ptsA, meRoom: room });
+    const fit = ok(both) ? both : ok(one) ? one : null, showW = ok(both);
+    if (!capA && !showW) return NO_CAPS;          // a country drawn as a dot asked, and no capital that can be shown: as it was
+    if (showW) markCapital(W);
+    if (capA) markCapital(A, showW);
+    if (fit) { restAt(fit); return { showA: capA, showW, secs: S.capFit.T }; }
+    return { showA: true, showW: false, secs: own.H > heightFor(0.5) ? lookTo(own) : lookAt(R.p) };
+  }
   function tripLand(here, lon, lat) {
     const T = S.trip;
     if (!T || T.wait) { (here.sea || here.wet ? sfx.splash : sfx.thud)(); if (T && T.lesson) lessonLand(); return; }      // between rounds: nothing counts
@@ -3759,11 +3807,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // is in the answer's own country: the answer's name already carries that country and its flag.
     const col = right ? GOOD : BAD;        // the verdict is worn by the landing: its ring and its name
     if (countryRound) { if (right) flash(R.c, 1, FLASH); else flash(R.c, 0, 4, null, 0.5); }      // the answer: lit as a delivery is, or held paper-white while you find it
-    if (!right && here.name && (here.sea || here.c !== R.c)) outlined(label(here.sea ? null : here.c, here.name, p, here.sea ? 'wrongsea' : 'wrong', GROUND, here.sea ? null : underName(here), UNDER), here.sea ? null : here.c);
-    // a country round's answer: its capital under its name, as under any country a landing names. A capital: its country,
-    // left out where the capital has the country's own name (Singapore, Monaco: until 2026-11-15 the name stood twice)
-    const sub = R.kind === 'city' ? R.c.name + ', population ~' + people(R.city.pop) : countryRound ? capLine(R.c) : R.c.name === R.name ? null : R.c.name;
-    outlined(label(R.c, R.name, R.p, 'name', GROUND, sub, countryRound ? AREA : OVER), countryRound ? R.c : null);          // a country asked: its border (a capital's name names the city)
     ring(p, 6, 30, col, 2.5, 0.5);
     (right ? (tier === 'spot' ? sfx.spot : sfx.drop) : sfx.miss)();
     const node = document.createElement('div');
@@ -3776,9 +3819,20 @@ button { font: inherit; color: inherit; cursor: pointer; }
     ticketsEl.replaceChildren(node);
     if (!T.endless && !T.tutor) [...document.querySelectorAll('#trip-pips i')][T.i].className = 'done';
     T.least = S.t + 1.2;          // the result stands at least this long, also when Space hurries the view back
-    T.after = S.t + Math.max(1.2, lookAt(R.p) + 0.3);
+    const away = countryRound ? 0 : lookAt(R.p);          // a capital or a city asked: the view goes to the answer when it is out of sight, and comes back
     tutorBar();
     measure();
+    // the names, once the result's card is measured: where the view rests is worked out for the room over that card
+    const namesW = !right && here.name && (here.sea || here.c !== R.c), W = namesW && !here.sea ? here.c : null;
+    // a country asked: the capitals at their locations, and where the view rests (tripCaps); before the names, as in Study
+    const caps = countryRound ? tripCaps(R, W, right, namesW ? nameRoom(here.sea ? null : here.c, here.name, here.sea ? 'wrongsea' : 'wrong', here.sea ? null : underName(here)) : 0) : NO_CAPS;
+    if (namesW) outlined(label(here.sea ? null : here.c, here.name, p, here.sea ? 'wrongsea' : 'wrong', GROUND, here.sea || caps.showW ? null : underName(here), UNDER), here.sea ? null : here.c);
+    // a country round's answer: its name alone when its capital stands at its location (tripCaps), else its capital under
+    // its name (a country drawn as a dot). A capital: its country, left out where the capital has the country's own
+    // name (Singapore, Monaco: until 2026-11-15 the name stood twice)
+    const sub = R.kind === 'city' ? R.c.name + ', population ~' + people(R.city.pop) : countryRound ? (caps.showA ? null : capLine(R.c)) : R.c.name === R.name ? null : R.c.name;
+    outlined(label(R.c, R.name, R.p, 'name', GROUND, sub, countryRound ? AREA : OVER), countryRound ? R.c : null);          // a country asked: its border (a capital's name names the city)
+    T.after = S.t + Math.max(1.2, (!countryRound ? away : caps.secs === null ? lookAt(R.p) : caps.secs) + 0.3);          // a country asked: the view rests (tripCaps), or goes to the answer and comes back
   }
   // The line from where you came down to the answer, and the circle that counted. A country has neither: anywhere in it
   // counts, so a line to one spot of it would be untrue (and the distance scored is to its nearest edge). It is lit
@@ -4263,15 +4317,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // first, and the view comes back to this rest (placeCamera). Not on Free flight's screen, their question of the same
   // day: that names the neighbors, and with Mongolia's postcard aboard it would print MONGOLIA next to China.
   const capShown = (c) => !!c && !!c.cap && !c.tiny;
-  function markCapital(c) {
+  function markCapital(c, also) {          // also: a second capital stands as well (Day Trip and Ranked: the country landed in, and the country asked)
     const city = unit(c.cap[1], c.cap[2]);
-    S.capAt = { p: city, t: S.t };
+    S[also ? 'capAlso' : 'capAt'] = { p: city, t: S.t };
+    if (!also) S.capAlso = null;
     S.sawCap.add(c.id);          // its capital has been shown in this flight (addTicket)
     label(null, c.cap[0], city, 'cap', GROUND, null, OVER);
   }
   function restOn(c, card) {          // card: the box of a landing's fact, when one stands (the country rests beside it)
     const fit = fitFor({ land: c, also: [unit(c.cap[1], c.cap[2])], least: view.H0 }, card || null);
-    if (!fit) return (S.capFit = null);
+    return fit ? restAt(fit) : (S.capFit = null);
+  }
+  function restAt(fit) {          // the view comes to rest on this fit
     const saved = Object.assign({}, cam);
     aim(fit.c, fit.H, fit.rx, fit.ry);
     S.capFit = { fit, t: S.t, T: restSecs(fit) };
@@ -4302,7 +4359,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     S.mode = 'over'; atlas.zoom = 1;
     S.landedAt = performance.now();
     S.energy = 0;
-    S.look = null; S.capAt = null; S.capFit = null;
+    S.look = null; S.capAt = null; S.capAlso = null; S.capFit = null;
     stage.classList.remove('flying');
     stage.classList.add('atlas');
     keys.left = keys.right = keys.up = keys.down = keys.flap = false; pull.at = null;
@@ -4620,8 +4677,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     let cx = lerp(S.mode === 'title' ? view.tx : view.ox, view.w / 2, k) + slid;
     let cy = lerp(S.mode === 'title' ? view.ty : (view.h - view.deck - view.keyRoom) / 2, view.gy, k);
     let rest = false;          // the view rests on a place: Free flight's landing, and Study's landing in a country (restOn)
-    if (S.mode === 'fly' && (S.game === 'free' || S.game === 'study')) {
-      const A = S.game === 'free' ? S.around : S.capFit, F = fitv, on = bird.down && !!(A && A.fit) && !A.free, dt = clamp(S.t - F.tp, 0, 0.1), own = logH;
+    if (S.mode === 'fly') {          // every game: Day Trip and Ranked rest on a landing in a round that asks a country (tripCaps)
+      const A = S.game === 'free' ? S.around : S.capFit, F = fitv, on = bird.down && !!(A && A.fit) && !A.free && !A.done, dt = clamp(S.t - F.tp, 0, 0.1), own = logH;
       F.tp = S.t;
       if (on) F.fit = A.fit;
       if (on !== F.on) { if (on) F.h0 = F.lh !== null ? F.lh : own; else F.s0 = groundScale(); F.k0 = F.k; F.t0 = on ? A.t : S.t; F.T = on ? A.T : A && A.free ? FIT_BACK / 2 : FIT_BACK; F.on = on; }          // a press of Space sent the view back (rested): twice as fast
@@ -4642,6 +4699,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       const moving = t < L.go || t > L.go + L.hold;
       L.me = rest ? n : me;                          // the way back is to wherever the bird is now, or to where the view rests on its country
       n = along(L, k);
+      if (L.at) { cx = lerp(cx, L.at.rx, k); cy = lerp(cy, L.at.ry, k); }          // a view fitted to a country: its own middle on the screen (lookTo)
       logH = lerp(logH, Math.max(logH, Math.log(L.H)), smooth(clamp(k * 3, 0, 1))) + (moving ? L.rise * Math.sin(Math.PI * k) : 0);
     }
     aim(n, Math.exp(logH), cx, cy);
@@ -4741,12 +4799,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // just a box. Who would even know that that's a postcard?")
   function drawDrops() {
     const big = clamp(0.7 + (cam.pxRad / R_KM) * 0.5, 0.75, 1);
-    if (S.capAt && S.mode === 'fly') {          // where a landing shows the capital (markCapital): it leaves as its name does (label)
-      const A = S.capAt, age = S.t - A.t;
+    for (const key of ['capAt', 'capAlso']) if (S[key] && S.mode === 'fly') {          // where a landing shows a capital (markCapital): it leaves as its name does (label)
+      const A = S[key], age = S.t - A.t;
       if (A.left === undefined && !bird.down) A.left = Math.max(age, 1.2);
       const a = A.left === undefined ? 1 : clamp(1 - (age - A.left) / 0.35, 0, 1), s = project(A.p);
       if (s && a > 0) { ctx.globalAlpha = a * rimDot(s, 10 * view.mk); starAt(s[0], s[1], 6 * big, view.mk); ctx.globalAlpha = 1; }
-      if (a <= 0) S.capAt = null;
+      if (a <= 0) S[key] = null;
     }
     for (const d of S.drops) {
       const age = S.t - d.t;
@@ -5609,7 +5667,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     }
     // Study's landing in a country shows its capital (markCapital): every name keeps off that symbol as names keep off
     // Day Trip's answer. The name under the bird has already taken the bird's other side for it (underY).
-    if (S.capAt && S.mode === 'fly') { const s = project(S.capAt.p), m = 11.5 * view.mk; if (s) placed.push({ x: s[0], y: s[1], half: m, up: m, down: m, cap: true }); }
+    for (const A of [S.capAt, S.capAlso]) if (A && S.mode === 'fly') { const s = project(A.p), m = 11.5 * view.mk; if (s) placed.push({ x: s[0], y: s[1], half: m, up: m, down: m, cap: true }); }
     for (const f of fx) if (f.top) f.draw(Math.min(1, f.t / f.secs));
     if (S.mode === 'fly') { drawRouteKm(); drawHud(); }
   }
