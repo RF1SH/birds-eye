@@ -2532,7 +2532,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, capAt: null, capAlso: null, capFit: null, around: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), sawCap: new Set(), newC: 0, sawN: 0, intro: null, began: null, replay: null });
     S.log = new Map();
     S.drops = [];
-    Object.assign(fitv, { on: false, k: 0, lh: null, s0: 1 });          // no rest of the view left over from the flight before (it is cleared on the title, but only once a frame is drawn there)
+    fitClear();          // no rest of the view left over from the flight before, and no way back from one (the clock starts at 0 again: fitClear)
     // around: Free flight's last landing with the view fitted to its country. It was kept over Home, so the next Free flight's view
     // went to that country and left the bird, which stood where the new flight began (the player, 2026-11-18, of a
     // picture of Iraq with no bird on it: "why is the bird not showing up in free flight rn").
@@ -4665,6 +4665,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // seconds, and its height is handed back without a dip: from a high view (a big country) it holds while you climb toward
   // it and comes down gently when you glide; from a close view (a small country) it rises to the bird's at once.
   const FIT_BACK = 0.5, fitv = { on: false, k: 0, k0: 0, t0: -1e9, T: FIT_BACK, fit: null, lh: null, h0: 0, s0: 1, tp: 0 };
+  // Nothing of a rest is left: not the view's share of it (k), and not the way back from it (k0: the share it began at, t0:
+  // when). Every flight's start calls this, in every game, because a flight's start sets the clock back to 0. Until 2026-11-18 only k
+  // was cleared: after a bird had taken off from a rested view (k0 1, t0 the flight's 40th second, say), Home or Restart and
+  // a new flight, the way back read as not begun for the new flight's first 40 seconds, and the view stood on the country of
+  // that old landing with the bird out of sight. (The player, of a picture of Ukraine with no bird on it: "the free flight
+  // bug where it doesn't show any bird and just zooms in on a country. is still happening, but it's not just free flight.
+  // It's also study mode.")
+  const fitClear = () => Object.assign(fitv, { on: false, k: 0, k0: 0, t0: -1e9, lh: null, s0: 1 });
   function placeCamera() {
     const k = smooth(S.blend);
     const lead = S.mode === 'fly' && !!S.trip && !!S.trip.intro && S.trip.intro.t < 0;          // out of the tutorial into a real game: straight up from where the bird stood
@@ -4695,7 +4703,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
         else if (!keys.flap) F.lh += (own - F.lh) * (1 - Math.exp(-dt / 0.3));
         if (Math.abs(F.lh - own) < 0.01 && !(above && keys.flap)) F.lh = null; else logH = F.lh;          // while you climb toward a higher view it waits for the bird to pass it: no step down
       }
-    } else { fitv.on = false; fitv.k = 0; fitv.lh = null; fitv.s0 = 1; }
+    } else fitClear();
     if (S.look) {
       const L = S.look, t = L.t;
       const k = smooth(t < L.go ? t / L.go : t < L.go + L.hold ? 1 : clamp(1 - (t - L.go - L.hold) / L.go, 0, 1));
@@ -6198,7 +6206,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // Ground speed in km a second at a height, flying flat out.
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   // for the tests: the bird put somewhere by hand. That is no flight, so the view is the bird's own at once (no rest on the last landing's country still being handed back)
-  const setBird = (lon, lat, a, down) => { Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down }); S.capFit = null; Object.assign(fitv, { on: false, k: 0, lh: null, s0: 1 }); };
+  const setBird = (lon, lat, a, down) => { Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down }); S.capFit = null; fitClear(); };
   window.birdsEye = { hoverBox: () => hoverBox, slerp, showLeg, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, flagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     outlines: () => fx.filter((f) => f.lined && f.shownA > 0).map((f) => f.lined.id), OUTLINE, pull, pullBy, steerable, PULL_FULL, PULL_RING, project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
