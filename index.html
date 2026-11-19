@@ -2112,7 +2112,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     });
     return (f.spot = best || [0, 0]);
   }
-  function plateBox(c, str, cls, sub) {
+  function plateBox(c, str, cls, sub, soon) {          // soon: a flag is counted in before its picture has loaded
     [str, sub] = disputed(c, str, sub);
     const o = Object.assign({ size: namePx() }, STYLE[cls] || STYLE.name);
     if (o.k) o.size = Math.round(o.size * o.k);
@@ -2125,9 +2125,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const ss = subPx(o), subs = subLines(sub), fall = subFall(o, subs.length);
     if (sub) { ctx.font = '700 ' + ss + 'px ' + DISPLAY; for (const line of subs) w = Math.max(w, subWidth(line, ss)); }
     const fh = flagH(basePx()), mid = fall / 2, half = o.size * 0.8;
-    if (c && c.flag) w += (c.flag.width / c.flag.height) * fh + 8;
+    const flag = c && (c.flag || (soon && c.a2 ? { width: 3, height: 2 } : null));
+    if (flag) w += (flag.width / flag.height) * fh + 8;
     // rise and drop: how far what is drawn reaches above and below the name's line. up and down: the room kept for it
-    const rise = c && c.flag ? Math.max(fh / 2 - mid, o.size * 0.4) : o.size * 0.4, drop = c && c.flag ? Math.max(mid + fh / 2, fall + ss * 0.4) : sub ? fall + ss * 0.4 : o.size * 0.4;
+    const rise = flag ? Math.max(fh / 2 - mid, o.size * 0.4) : o.size * 0.4, drop = flag ? Math.max(mid + fh / 2, fall + ss * 0.4) : sub ? fall + ss * 0.4 : o.size * 0.4;
     const tight = cls === 'cap' && !sub;          // a capital's name by its symbol keeps no room for a line under it (CAP_GAP)
     // over and under: how far this name's own letters reach from its line: a plain name's, and what its own add (CAP_GAP)
     return { half: w / 2 + 6, up: tight ? rise : Math.max(half, rise + 2), down: tight ? drop : Math.max(sub ? fall + ss * 0.8 : half, drop + 2), rise, drop, px: o.size,
@@ -2234,8 +2235,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
       }
       const s = project(p);
       if (!s) return;
-      const box = plateBox(c, str, cls, sub), spot = dy === AREA ? areaSpot(f, c, s, box) : null, sx = s[0] + (spot ? spot[0] : 0), x = sx + clamp(clamp(sx, box.half + 4, view.w - box.half - 4) - sx, -box.half, box.half);
-      if (dy === OVER && bird.down) { const me = project(unit(bird.lon, bird.lat)); below = !!me && me[1] < s[1]; }
+      const box = plateBox(c, str, cls, sub), spot = dy === AREA ? areaSpot(f, c, s, box) : f.pin || null, sx = s[0] + (spot ? spot[0] : 0), x = sx + clamp(clamp(sx, box.half + 4, view.w - box.half - 4) - sx, -box.half, box.half);
+      if (dy === OVER && bird.down) { const me = project(unit(bird.lon, bird.lat)); below = !!me && me[1] < s[1]; if (f.swap) below = !below; }          // swap: no room on that side (pinSide)
       if (cls === 'cap') { if (below) box.down = Math.max(box.down, box.px * 0.8); else box.up = Math.max(box.up, box.px * 0.8); }          // tight on the symbol's side only: on the other side the room every name keeps (a letter's tail, the next name)
       const want = spot ? s[1] + spot[1] : dy === UNDER ? underY(s, x, box, str)
         : dy === OVER ? (cls === 'cap' ? (below ? s[1] + (CAP_RIM + CAP_GAP) * view.mk + box.over + 1.75 * nameUp() : s[1] - (CAP_RIM + CAP_GAP) * view.mk - box.under - 1.75 * nameUp()) : below ? s[1] + NEAR * view.mk + box.up : s[1] - NEAR * view.mk - box.down)
@@ -2255,6 +2256,39 @@ button { font: inherit; color: inherit; cursor: pointer; }
       nameplate(c, str, x, y, cls, sub, alpha);
     }
     f.at = p; f.name = str;          // what it names and where: another name's spot above the bird is judged against it (underY)
+    return f;
+  }
+  // A name by a pin stands on the pin's far side from the bird: under the pin when the bird is above it, so it is never
+  // on the line between the two. Where that spot has no room, the name stands beside the pin instead, level with it, on
+  // the side away from the bird, else on the other side: wherever all of it is on the screen and over the bar at the
+  // bottom, clear of the line and of the bird. (Under a pin low on the screen the name ran under the result's card:
+  // Astana asked, the bird down by Novosibirsk, "Kazakhstan" cut by the card; over a pin near the top it left the
+  // screen.) No side free (a pin in a corner, the line leaving it across the only side with room): on the pin's near
+  // side, where names keep off the line as ever (settle). Decided once, at the landing, in the view the bird stands in
+  // (as lookAt judges "in sight": at the landing itself the view is still on its way down): a round that asks a capital
+  // or a city rests there, and comes back there when the view has gone to the answer. m: the pin's mark, from its middle.
+  function pinSide(f, c, str, p, cls, sub, m) {
+    const saved = Object.assign({}, cam), here = unit(bird.lon, bird.lat), line = [];
+    aim(here, heightFor(bird.a), view.w / 2, view.gy);
+    const s = project(p), me = project(here);
+    for (let i = 0; i <= 24; i++) { const q = project(slerp(here, p, i / 24)); if (q) line.push(q); }
+    ownName = true;
+    let box; try { box = plateBox(c, str, cls, sub, true); } finally { ownName = false; }
+    const bb = me ? birdBox(me) : null;
+    Object.assign(cam, saved);
+    const top = 4, bottom = view.h - view.deck - 4, gap = NEAR * view.mk, pad = 8 * view.mk;
+    if (!s || !me || s[0] < 0 || s[0] > view.w || s[1] < top || s[1] > bottom) return f;          // the pin itself is not on the screen
+    // a spot: the name's line, from the pin. It has room when all that is drawn is on the screen, over the bar and off the
+    // pause button's corner. Under or over its pin a name near the screen's side is slid along to stay on the screen, as it
+    // is drawn (label); beside its pin it is not: slid, it would lie on the pin.
+    const slid = (x) => x + clamp(clamp(x, box.half + 4, view.w - box.half - 4) - x, -box.half, box.half);
+    const room = (x, y) => x - box.half >= 3.5 && x + box.half <= view.w - 3.5 && y - box.rise >= top && y + box.drop <= bottom && !(x + box.half > view.w - 70 * view.ui - pad && y - box.rise < 66 * view.ui + pad);
+    const clear = (x, y) => !line.some((q) => Math.abs(q[0] - x) < box.half + pad && q[1] > y - box.rise - pad && q[1] < y + box.drop + pad) && !(Math.abs(bb.x - x) < bb.half + box.half && y - box.rise < bb.y + bb.down && y + box.drop > bb.y - bb.up);
+    const under = gap + box.up, over = -gap - box.down, far = me[1] < s[1] ? under : over;
+    if (room(slid(s[0]), s[1] + far)) return f;
+    const side = m + pad + box.half, level = clamp((box.rise - box.drop) / 2, top + box.rise - s[1], bottom - box.drop - s[1]), away = me[0] > s[0] ? -1 : 1;
+    const dx = [away * side, -away * side].find((d) => room(s[0] + d, s[1] + level) && clear(s[0] + d, s[1] + level));
+    if (dx) f.pin = [dx, level]; else if (room(slid(s[0]), s[1] + (far === under ? over : under))) f.swap = true;
     return f;
   }
   // A country that a landing names wears a thick ink border for as long as its name stands, and loses it as the name
@@ -2405,7 +2439,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     let row = addr.querySelector('.strikes');
     if (!row) { row = addr.appendChild(document.createElement('div')); row.className = 'strikes'; row.setAttribute('role', 'img'); }
     const n = Math.min(t.misses, GUESSES);
-    row.setAttribute('aria-label', n >= GUESSES ? 'Shown' : n === 1 ? '1 wrong landing' : n + ' wrong landings');
+    row.setAttribute('aria-label', n >= GUESSES ? 'Shown' : n === 1 ? '1 incorrect landing' : n + ' incorrect landings');          // "incorrect", the game's word wherever a player reads or hears it
     row.innerHTML = STRIKE_X.repeat(n) + STRIKE_O.repeat(GUESSES - n);
     measure();
   }
@@ -2819,16 +2853,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // of the screen's edges and the card, and sits inside its own country where it can.
   const CELL = 16;
   // a shape's rings (lon, lat in hundredths of a degree) traced on the screen into a Path2D
-  function tracePath(path, rings) {
+  function tracePath(path, rings) {          // path.box: the box round what was traced, as drawn (null: nothing in sight)
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
     for (const r of rings) {
       let pen = false;
       for (let i = 0; i < r.length; i += 2) {
         const q = project(unit(r[i] / 100, r[i + 1] / 100));
         if (!q) { pen = false; continue; }
         if (pen) path.lineTo(q[0], q[1]); else { path.moveTo(q[0], q[1]); pen = true; }
+        if (q[0] < x0) x0 = q[0]; if (q[0] > x1) x1 = q[0]; if (q[1] < y0) y0 = q[1]; if (q[1] > y1) y1 = q[1];
       }
       if (pen) path.closePath();
     }
+    path.box = x1 >= x0 ? [x0, y0, x1, y1] : null;
     return path;
   }
   // a water is labelled by its own name (the Gulf of Thailand, not the South China Sea it belongs to)
@@ -3013,8 +3050,20 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const key = [cam.n[0], cam.n[1], cam.n[2], cam.H, cam.cx, cam.cy, view.w, view.h, view.dpr].join();
     if (L.washKey === key) return;
     L.washKey = key;
-    let hole = null, land = null;
-    if (L.own) hole = tracePath(new Path2D(), L.own.fine);
+    let hole = null, land = null, border = null;
+    if (L.own) {
+      // The land you came down in, traced once: all of it is cut out of the wash, and its border is every piece of it but
+      // the smallest islets. A piece under 4 line widths across has no inside to show, and its border was a blot of ink
+      // (the islets of Greece and the Philippines, seen 2026-11-18); the other games' border of a landed country has left
+      // such pieces out since that day (drawOutlines). An islet keeps its color, which the wash round it does not have.
+      hole = new Path2D(); border = new Path2D();
+      const least = 4 * 3.5 * L.k;
+      for (const r of L.own.fine) {
+        const one = tracePath(new Path2D(), [r]), b = one.box;
+        hole.addPath(one);
+        if (b && Math.max(b[2] - b[0], b[3] - b[1]) >= least) border.addPath(one);
+      }
+    }
     else if (L.lands) {
       hole = new Path2D();
       for (const x of L.seaPieces) tracePath(hole, x.rings);
@@ -3022,7 +3071,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       for (const q of L.lands) tracePath(land, q.fine);
       for (const q of TINY) if (q.fine && project(q.u)) tracePath(land, q.fine);          // the small islands too
     }
-    L.border = L.own ? hole : null;
+    L.border = border;
     if (!hole) { L.wash = null; return; }
     const d = view.dpr, layer = L.wash || document.createElement('canvas'), g = layer.getContext('2d');
     const lw = Math.round(view.w * d), lh = Math.round(view.h * d);
@@ -3112,7 +3161,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (A.T === undefined) A.T = A.fit ? restSecs(A.fit) : REVEAL;
     Object.assign(cam, saved);
   }
-  function drawAround() {
+  // In two parts, the bird drawn between them: the map (the wash, the border, the cities' marks) lies under the bird, the
+  // names over it, as in every other game. (Until 2026-11-19 all of it was drawn after the bird: a bird down on Athens
+  // lay under the capital's symbol, its tail and a wing sticking out. The player, of a picture of it: "why is the bird
+  // under the capital..". PLAN 131.)
+  function drawAround(names) {
     const A = S.around;
     if (!A.L || A.L.key !== view.w + 'x' + view.h + ':' + Math.round(view.slide)) aroundLayout(A);          // the window changed size
     const L = A.L, k = L.k;
@@ -3121,23 +3174,29 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // What was laid out for the view at rest rides with the map while the view comes to rest: every name on its own spot
     // of the map and at the map's scale (z: how big the map is drawn now against how it will rest).
     const z0 = cam.pxRad / L.pxRad, z = Math.abs(z0 - 1) < 1e-3 ? 1 : z0;
-    aroundWash(A, L);
     ctx.save();
     ctx.globalAlpha = shown;
-    if (L.wash) { ctx.globalAlpha = shown * 0.42; ctx.drawImage(L.wash, 0, 0, view.w, view.h); ctx.globalAlpha = shown; }
-    if (L.border) { ctx.lineJoin = 'round'; ctx.strokeStyle = INK; ctx.lineWidth = 3.5 * k; ctx.stroke(L.border); }
-    // the seas round about in blue italics, the countries in grey capitals, so neither reads as a city
-    const pale = L.pale;          // on washed-out sea, dark blue names; on full-strength sea, white ones
-    for (const n of L.near) {
-      const q = project(n.p);
-      if (q) text(n.name, q[0], q[1], n.water ? (pale ? { size: n.small * z, italic: true, weight: 600, fill: SEA_DEEP, edge: 0, track: n.track } : { size: n.small * z, italic: true, weight: 600, fill: PAPER, stroke: SEA_DEEP, edge: 3, track: n.track }) : { size: n.small * z, fill: INK_SOFT, edge: 0, track: n.track });
-    }
-    for (const { it, sz, at } of L.cities) {
-      const q = project(it.p);
-      if (!q) continue;
-      if (it.cap) starAt(q[0], q[1], 9 * k * z);
-      else { ctx.beginPath(); ctx.arc(q[0], q[1], 6 * k * z, 0, 7); ctx.fillStyle = PAPER; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.stroke(); }
-      if (at) text(it.name, q[0] + at.dx * z, q[1] + at.dy * z, { size: sz * z, align: 'left', edge: 4.5 });
+    if (!names) {
+      aroundWash(A, L);
+      if (L.wash) { ctx.globalAlpha = shown * 0.42; ctx.drawImage(L.wash, 0, 0, view.w, view.h); ctx.globalAlpha = shown; }
+      if (L.border) { ctx.lineJoin = 'round'; ctx.strokeStyle = INK; ctx.lineWidth = 3.5 * k; ctx.stroke(L.border); }
+      for (const { it } of L.cities) {
+        const q = project(it.p);
+        if (!q) continue;
+        if (it.cap) starAt(q[0], q[1], 9 * k * z);
+        else { ctx.beginPath(); ctx.arc(q[0], q[1], 6 * k * z, 0, 7); ctx.fillStyle = PAPER; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.stroke(); }
+      }
+    } else {
+      // the seas round about in blue italics, the countries in grey capitals, so neither reads as a city
+      const pale = L.pale;          // on washed-out sea, dark blue names; on full-strength sea, white ones
+      for (const n of L.near) {
+        const q = project(n.p);
+        if (q) text(n.name, q[0], q[1], n.water ? (pale ? { size: n.small * z, italic: true, weight: 600, fill: SEA_DEEP, edge: 0, track: n.track } : { size: n.small * z, italic: true, weight: 600, fill: PAPER, stroke: SEA_DEEP, edge: 3, track: n.track }) : { size: n.small * z, fill: INK_SOFT, edge: 0, track: n.track });
+      }
+      for (const { it, sz, at } of L.cities) {
+        const q = project(it.p);
+        if (q && at) text(it.name, q[0] + at.dx * z, q[1] + at.dy * z, { size: sz * z, align: 'left', edge: 4.5 });
+      }
     }
     ctx.restore();
     ctx.globalAlpha = 1;
@@ -3834,7 +3893,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // its name (a country drawn as a dot). A capital: its country, left out where the capital has the country's own
     // name (Singapore, Monaco: until 2026-11-15 the name stood twice)
     const sub = R.kind === 'city' ? R.c.name + ', population ~' + people(R.city.pop) : countryRound ? (caps.showA ? null : capLine(R.c)) : R.c.name === R.name ? null : R.c.name;
-    outlined(label(R.c, R.name, R.p, 'name', GROUND, sub, countryRound ? AREA : OVER), countryRound ? R.c : null);          // a country asked: its border (a capital's name names the city)
+    const named = label(R.c, R.name, R.p, 'name', GROUND, sub, countryRound ? AREA : OVER);
+    if (countryRound) outlined(named, R.c); else pinSide(named, R.c, R.name, R.p, 'name', sub, (R.kind === 'city' ? 8.5 : 11.5) * view.mk);          // a country asked: its border (a capital's name names the city); a capital or a city: its name where it has room by its pin
     T.after = S.t + Math.max(1.2, (!countryRound ? away : caps.secs === null ? lookAt(R.p) : caps.secs) + 0.3);          // a country asked: the view rests (tripCaps), or goes to the answer and comes back
   }
   // The line from where you came down to the answer, and the circle that counted. A country has neither: anywhere in it
@@ -5664,10 +5724,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
     drawTop();
     for (const f of fx) if (!f.top) f.draw(Math.min(1, f.t / f.secs));
     if (S.mode === 'fly') drawRoute();
-    if (S.mode === 'fly') drawBird();          // no bird outside a flight (until 2026-11-13 one faded out above the globe for a second after Home or a flight's end: "a bird appears and fades away on top of the globe on the home page")
-    if (S.mode === 'fly' && S.game === 'free') { drawBelow(); if (S.around && bird.down) drawAround(); }
-    if (S.mode === 'fly') drawPull();
+    // Every mark on the map lies under the bird, in every game: Free flight's map of the landing (the wash, the border, the
+    // cities' marks) and a Day Trip's or Ranked's answer (its circle, the line to it, a capital's symbol or a city's dot),
+    // as Study's capitals always did (drawDrops, above). The bird stands on the ground it came down on. PLAN 131.
+    if (S.mode === 'fly' && S.game === 'free' && S.around && bird.down) drawAround(false);
     if (S.trip && S.trip.reveal && S.mode === 'fly') drawReveal();
+    if (S.mode === 'fly') drawBird();          // no bird outside a flight (until 2026-11-13 one faded out above the globe for a second after Home or a flight's end: "a bird appears and fades away on top of the globe on the home page")
+    if (S.mode === 'fly' && S.game === 'free') { drawBelow(); if (S.around && bird.down) drawAround(true); }
+    if (S.mode === 'fly') drawPull();
     placed.length = 0;
     if (S.mode === 'fly') { const g = project(unit(bird.lon, bird.lat)); if (g) placed.push(birdBox(g)); }
     // Day Trip's answer: names keep off the line from where you came down to it, and off the answer's mark (a
