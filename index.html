@@ -3895,22 +3895,23 @@ button { font: inherit; color: inherit; cursor: pointer; }
       if (e.x) T.used.add(cityKey(e));
       return e.x ? cityAsk(e.x) : e.kind === 'country' || e.kind === 'flag' ? areaAsk(e.kind, e.c) : pointAsk(e.kind, e.c);
     };
-    for (let tries = 0; tries < 60; tries++) {
-      const list = pool[Math.floor(Math.random() * pool.length)].filter((e) => !T.used.has(e.c.id) && !(last && last.c === e.c) && !(e.x && T.used.has(cityKey(e))));
-      let fit = [];
-      // nothing rested near the level in this kind: another kind; after 30 tries look further before a country comes back early
-      for (const tol of tries > 30 ? [1, 2, Infinity] : [RANKED_TOL]) {
-        fit = list.filter((e) => off(e) <= tol && rested(e));
-        if (fit.length >= 3) break;
-      }
-      if (fit.length < 3) {
-        if (tries <= 30) continue;
-        fit = list.slice().sort((a, b) => (asked[a.c.id] || -99) - (asked[b.c.id] || -99) || off(a) - off(b)).slice(0, 6);          // every one was asked lately: the ones that have waited longest
-      }
-      if (!fit.length) continue;
+    const free = (e) => !T.used.has(e.c.id) && !(last && last.c === e.c) && !(e.x && T.used.has(cityKey(e)));
+    const draw = (fit) => {
       const waited = fit.map((e) => [asked[e.c.id] || -99, Math.random(), e]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);          // the longest waiting first, those alike in any order
       return take(waited[Math.floor(Math.random() * Math.min(RANKED_NEAR, waited.length))][2]);
+    };
+    for (let tries = 0; tries < 30; tries++) {          // nothing rested near the level in this kind: another kind
+      const fit = pool[Math.floor(Math.random() * pool.length)].filter((e) => free(e) && off(e) <= RANKED_TOL && rested(e));
+      if (fit.length >= 3) return draw(fit);
     }
+    // No kind has three rested rounds near the level (a player on a fourth game in a row: the best known countries are
+    // all resting). The rest is kept and the level is left by as little as can be: of every kind together, the six
+    // rested rounds nearest the level. (Until 2026-11-18 the look went wider inside ONE kind picked by chance, at last to
+    // any level: about 1 game in 1,000 began with a round almost nobody lands, Plzen as round 1; found by a smoke check
+    // that failed now and then.) Only with nothing rested at all do the ones that have waited longest come back early.
+    const all = pool.flat().filter(free), near = all.filter(rested).sort((a, b) => off(a) - off(b)).slice(0, 6);
+    if (near.length >= 3) return take(near[Math.floor(Math.random() * near.length)]);
+    if (all.length) return draw(all.slice().sort((a, b) => (asked[a.c.id] || -99) - (asked[b.c.id] || -99) || off(a) - off(b)).slice(0, 6));
     const left = pool[0].filter((e) => !T.used.has(e.c.id)).sort((a, b) => off(a) - off(b));
     return take(left[0] || pool[0][Math.floor(Math.random() * pool[0].length)]);
   }
