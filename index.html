@@ -2038,7 +2038,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // A capital's name by its symbol (markCapital): CAP_GAP of bare map between the symbol's rim and the name's letters,
   // the same over the symbol and under it: 9 px on a big screen. Counted from what is drawn: the rim is CAP_RIM from the
   // symbol's middle, and a name's letters reach 0.303 of its size under its line and 0.386 over it, with half of the
-  // paper edge round them more (measured on the page in two window sizes, audit/cg1.py). Until 2026-11-18 it stood NEAR from the symbol, a pin's distance, counted to
+  // paper edge round them more (measured on the page in two window sizes, audit/cg1.py). A name whose own letters reach
+  // farther (a letter that hangs below the line: Beijing's j and g; an accent over a tall letter) is counted from where
+  // they reach (plateBox's over and under: what the browser measures that name to reach beyond a plain one): until 2026-11-18 by 20:18 EST "Beijing" over
+  // its symbol stood 2 px from the rim where "Moscow" stood 9 (found by Claude on the trial page of PLAN 128, the
+  // same in the live game's Study). Until 2026-11-18 it stood NEAR from the symbol, a pin's distance, counted to
   // a box with room for a line under the name: 24 px of bare map over the symbol and 20 under it. (The player, with
   // a picture of "Moscow": "why is there a weird gap between the capital symbol and its name label?"; from a picture
   // of 24, 9 and 6 px, by button: "9 px". PLAN 126.)
@@ -2114,7 +2118,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (o.k) o.size = Math.round(o.size * o.k);
     ctx.font = (o.italic ? 'italic ' : '') + (o.weight || 700) + ' ' + o.size + 'px ' + DISPLAY;
     if ('letterSpacing' in ctx) ctx.letterSpacing = o.track || '0.05em';        // as it will be drawn: else the width is whatever was drawn last
-    let w = ctx.measureText(str).width;
+    ctx.textBaseline = 'middle';          // as it will be drawn (text): the letters' reach is counted from that line
+    // how much farther this name's own letters reach than a plain name's (a capital M over the line, a round o under it)
+    const ink = ctx.measureText(str), more = { over: Math.max(0, (ink.actualBoundingBoxAscent || 0) - (ctx.measureText('M').actualBoundingBoxAscent || 0)), under: Math.max(0, (ink.actualBoundingBoxDescent || 0) - (ctx.measureText('o').actualBoundingBoxDescent || 0)) };
+    let w = ink.width;
     const ss = subPx(o), subs = subLines(sub), fall = subFall(o, subs.length);
     if (sub) { ctx.font = '700 ' + ss + 'px ' + DISPLAY; for (const line of subs) w = Math.max(w, subWidth(line, ss)); }
     const fh = flagH(basePx()), mid = fall / 2, half = o.size * 0.8;
@@ -2122,7 +2129,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // rise and drop: how far what is drawn reaches above and below the name's line. up and down: the room kept for it
     const rise = c && c.flag ? Math.max(fh / 2 - mid, o.size * 0.4) : o.size * 0.4, drop = c && c.flag ? Math.max(mid + fh / 2, fall + ss * 0.4) : sub ? fall + ss * 0.4 : o.size * 0.4;
     const tight = cls === 'cap' && !sub;          // a capital's name by its symbol keeps no room for a line under it (CAP_GAP)
-    return { half: w / 2 + 6, up: tight ? rise : Math.max(half, rise + 2), down: tight ? drop : Math.max(sub ? fall + ss * 0.8 : half, drop + 2), rise, drop, px: o.size };
+    // over and under: how far this name's own letters reach from its line: a plain name's, and what its own add (CAP_GAP)
+    return { half: w / 2 + 6, up: tight ? rise : Math.max(half, rise + 2), down: tight ? drop : Math.max(sub ? fall + ss * 0.8 : half, drop + 2), rise, drop, px: o.size,
+      over: 0.386 * o.size + more.over, under: 0.303 * o.size + more.under };
   }
   function settle(x, y, box, ax, ay, alpha, quiet) {
     const beside = (b) => Math.abs(b.x - x) < b.half + box.half;
@@ -2229,7 +2238,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       if (dy === OVER && bird.down) { const me = project(unit(bird.lon, bird.lat)); below = !!me && me[1] < s[1]; }
       if (cls === 'cap') { if (below) box.down = Math.max(box.down, box.px * 0.8); else box.up = Math.max(box.up, box.px * 0.8); }          // tight on the symbol's side only: on the other side the room every name keeps (a letter's tail, the next name)
       const want = spot ? s[1] + spot[1] : dy === UNDER ? underY(s, x, box, str)
-        : dy === OVER ? (cls === 'cap' ? (below ? s[1] + (CAP_RIM + CAP_GAP) * view.mk + 0.386 * box.px + 1.75 * nameUp() : s[1] - (CAP_RIM + CAP_GAP) * view.mk - 0.303 * box.px - 1.75 * nameUp()) : below ? s[1] + NEAR * view.mk + box.up : s[1] - NEAR * view.mk - box.down)
+        : dy === OVER ? (cls === 'cap' ? (below ? s[1] + (CAP_RIM + CAP_GAP) * view.mk + box.over + 1.75 * nameUp() : s[1] - (CAP_RIM + CAP_GAP) * view.mk - box.under - 1.75 * nameUp()) : below ? s[1] + NEAR * view.mk + box.up : s[1] - NEAR * view.mk - box.down)
         : s[1] + (typeof dy === 'function' ? dy() : dy || 0);
       // never out over space, and never without what it names: under the bird it goes when the bird does
       const dot = 10 * view.mk;
