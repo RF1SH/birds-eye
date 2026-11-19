@@ -2217,27 +2217,70 @@ button { font: inherit; color: inherit; cursor: pointer; }
     } finally { ownName = was; }
     return up;
   }
-  function stackSpot(c, str, cls, sub, card) {
-    const s = project(c.u), me = project(unit(bird.lon, bird.lat));
-    if (!s || !me || !c.flag || !c.fine) return null;
+  // THE BIRD SOMEWHERE ELSE (o.loose; THE WHOLE LIST 46). Day Trip, Ranked and a country Study shows the way to name a
+  // country while the bird stands in another, so "by the bird" is no answer there, and at the size of a landing's flag
+  // most countries cannot hold their flag and name (the flag is 244 px wide in a 1913 px window, Slovenia 228).
+  // The player's pick by button, 2026-11-19, from picture ANSWER-question (Belgium and Panama asked in Ranked, the flag
+  // and name on the country as far as they fit): "B, because since the border and capital are showing, i think it's
+  // relatively clear that that is what the flag is referring to". Their one rule for a country that cannot hold them,
+  // the same day: "if it isn't able to sit with the majority in the country it is intended to label, shouldn't sit
+  // ENTIRELY in a different country ... If it doesn't fit, it doesn't fit. But just don't have it wholly in another
+  // country"; "for bodies of water it's fine if that's all u can do, bc it's obvious that it's not labeling a body of
+  // water"; and of the screen this makes of Slovenia (its flag over the country's lower left corner, a twentieth of it
+  // on Slovenia; Croatia's on the bird's far side): "That's perfect ... use ur reasoning and judgement." The rest is
+  // Claude's:
+  // 1. IN the country, all of it, where it fits (one row; the flag over the name).
+  // 2. ON the country: the spot with the most of the flag and name on it (by the root of that share: from a twentieth to
+  //    a tenth is a gain one sees, from a half to 55 in 100 is not), at least STACK_LEAST of them, with at least
+  //    STACK_HIDE of the country left in view; of spots about as good the one on the country's far side from the bird,
+  //    and not right by the bird. Round the country's biggest piece.
+  // 3. BY the country, where none of it fits on it (the capital's symbol and name fill it: Luxembourg; a country smaller
+  //    than STACK_SMALL of its own flag and name, which is not covered at all: Mauritius): hiding none of it, as near
+  //    as it gets, behind the country as the bird sees it (STACK_TURN px of distance are worth a quarter turn), alongside
+  //    one of its sides before a corner. Never wholly on another country: of 20 points of what is drawn no more than
+  //    STACK_ONE lie on any one other country (so it lies across a border, or on water), and no more than 3 on the
+  //    country the bird came down in (o.off). No bird in sight: over the country.
+  // The name of where you came down takes the bird's far side from the country asked (underY), and the view keeps room
+  // for it there (tripCaps), so the bird stands between the two names.
+  // Always clear, by 8 k, of the bird, of every capital's symbol and name that stands, of the dot of a country drawn
+  // as one, of the pause button's corner; on the screen and over the bar.
+  // (Before the player had seen a screen they liked: a first build took the spot with the most on the country and left
+  // Croatia's name over the bird, as near to Slovenia as Slovenia's own: "This is terribly confusing ... both just as
+  // close to Slovenia, so you don't really know." A second put Slovenia's flag and name over Slovenia, wholly on
+  // Austria, a third beside it, wholly on Italy: "slovenia label awkward af here", "your terrible slovenia labels".)
+  // o.caps: the capitals whose marks stand in that view (else the country's own); o.live: the boxes a frame has
+  // placed, for a name found again in a view that moves (liveSpot): nothing is foretold, and the name keeps the size
+  // its label has. It returns the spot on the globe, the lines as broken, loose (not all of it in the country), out
+  // (by it, none of it on it), and box: its room in this view.
+  const STACK_HIDE = 0.5, STACK_LEAST = 0.03, STACK_SMALL = 0.1, STACK_ONE = 15, STACK_TURN = 24;
+  function stackSpot(c, str, cls, sub, card, o) {
+    const s = project(c.u), me = project(unit(bird.lon, bird.lat)), loose = !!(o && o.loose), live = o && o.live;
+    if (!s || (!me && !live) || !c.flag || !c.fine) return null;
     let F, up;
-    ownName = true;
-    try { F = stackForm(c, str, cls, sub); up = capMarks(capShown(c) ? [{ name: c.cap[0], p: unit(c.cap[1], c.cap[2]) }] : [], me); } finally { ownName = false; }
+    const was = ownName;
+    ownName = live ? was : true;
+    try { F = stackForm(c, str, cls, sub); up = live || capMarks(o && o.caps ? o.caps : capShown(c) ? [{ name: c.cap[0], p: unit(c.cap[1], c.cap[2]) }] : [], me); } finally { ownName = was; }
+    // as far as it fits, it can reach off the country: never onto the dot of a country drawn as one (it would read as that country's name)
+    if (loose) for (const t of TINY) { const q = project(unit(t.lx, t.ly)), r = Math.max(DOT_KM / R_KM * cam.pxRad, 14 * view.mk); if (q) up.push({ x: q[0], y: q[1], half: r, up: r, down: r }); }
     const m = 8 * view.mk, pad = STACK_PAD * view.mk, hw = F.w / 2 + 5, hh = F.h / 2 + 4;
     const X0 = card ? card.x1 : 4, X1 = view.w - 4, Y0 = 4, Y1 = view.h - view.deck - 4;
     // the country's outline on the screen, ring by ring (a ring that runs round the back of the globe is no part of this view)
     const rings = [];
-    let bx0 = 1e9, bx1 = -1e9, by0 = 1e9, by1 = -1e9;
+    let bx0 = 1e9, bx1 = -1e9, by0 = 1e9, by1 = -1e9, main = null;
     for (const r of c.fine) {
       const pts = new Float32Array(r.length);
       let seen = true;
       for (let i = 0; i < r.length && seen; i += 2) { const q = project(unit(r[i] / 100, r[i + 1] / 100)); if (q) { pts[i] = q[0]; pts[i + 1] = q[1]; } else seen = false; }
       if (!seen) continue;
       rings.push(pts);
-      for (let i = 0; i < pts.length; i += 2) { bx0 = Math.min(bx0, pts[i]); bx1 = Math.max(bx1, pts[i]); by0 = Math.min(by0, pts[i + 1]); by1 = Math.max(by1, pts[i + 1]); }
+      let rx0 = 1e9, rx1 = -1e9, ry0 = 1e9, ry1 = -1e9;
+      for (let i = 0; i < pts.length; i += 2) { rx0 = Math.min(rx0, pts[i]); rx1 = Math.max(rx1, pts[i]); ry0 = Math.min(ry0, pts[i + 1]); ry1 = Math.max(ry1, pts[i + 1]); }
+      if (!main || (rx1 - rx0) * (ry1 - ry0) > (main[1] - main[0]) * (main[3] - main[2])) main = [rx0, rx1, ry0, ry1];          // the biggest piece as drawn
+      bx0 = Math.min(bx0, rx0); bx1 = Math.max(bx1, rx1); by0 = Math.min(by0, ry0); by1 = Math.max(by1, ry1);
     }
-    const G = 4;
-    bx0 = Math.floor(Math.max(bx0, X0) / G) * G; bx1 = Math.min(bx1, X1); by0 = Math.floor(Math.max(by0, Y0) / G) * G; by1 = Math.min(by1, Y1);          // the grid's lines at whole steps of the screen: the same spots whatever the country's own box
+    if (!rings.length) return null;
+    const G = 4, wx = loose ? F.w : 0, wy = loose ? F.h : 0, [ox0, ox1, oy0, oy1] = main;          // (main: the box of the country's biggest piece as drawn; a name on the country or by it stands on or by that, never by a far island)
+    bx0 = Math.floor(Math.max(bx0 - wx, X0) / G) * G; bx1 = Math.min(bx1 + wx, X1); by0 = Math.floor(Math.max(by0 - wy, Y0) / G) * G; by1 = Math.min(by1 + wy, Y1);          // the grid's lines at whole steps of the screen: the same spots whatever the country's own box
     if (bx1 - bx0 < F.w || by1 - by0 < F.h) return null;
     const cols = Math.ceil((bx1 - bx0) / G), rows = Math.ceil((by1 - by0) / G), W1 = cols + 1;
     const cv = stackMask || (stackMask = document.createElement('canvas')), g2 = cv.getContext('2d', { willReadFrequently: true });
@@ -2258,20 +2301,106 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // a box on the screen: is every point of the grid it touches wholly the country's? and what share of it is the country's (what lies off the grid is not)?
     const inside = (x0, y0, x1, y1) => { const i0 = cell(x0, bx0), j0 = cell(y0, by0), i1 = cellUp(x1, bx0), j1 = cellUp(y1, by0); return i0 >= 0 && j0 >= 0 && i1 <= cols && j1 <= rows && of(whole, i0, j0, i1, j1) === (i1 - i0) * (j1 - j0); };
     const share = (x0, y0, x1, y1) => { const i0 = cell(x0, bx0), j0 = cell(y0, by0), i1 = cellUp(x1, bx0), j1 = cellUp(y1, by0), n = (i1 - i0) * (j1 - j0); return n > 0 ? of(sum, clamp(i0, 0, cols), clamp(j0, 0, rows), clamp(i1, 0, cols), clamp(j1, 0, rows)) / (255 * n) : 0; };
+    const all = of(sum, 0, 0, cols, rows) / 255, raw = (x0, y0, x1, y1) => of(sum, clamp(cell(x0, bx0), 0, cols), clamp(cell(y0, by0), 0, rows), clamp(cellUp(x1, bx0), 0, cols), clamp(cellUp(y1, by0), 0, rows)) / 255;          // the country as drawn, in points of the grid; and how many of them a box hides
     const pauseX = view.w - 70 * view.ui - m, pauseY = 66 * view.ui + m, from = (lo, least) => lo + Math.max(0, Math.ceil((least - lo) / G)) * G;          // the spots tried: steps of the grid from the room's own corner
-    let best = null;
-    for (let y = from(Y0 + hh, by0 + hh); y <= by1 - hh; y += G) for (let x = from(X0 + hw, bx0 + hw); x <= bx1 - hw; x += G) {
+    const reachX = hw + m + (loose ? F.w + 5 * NEAR * view.mk : 0), reachY = hh + m + (loose ? F.h + 5 * NEAR * view.mk : 0), by_ = up.filter((b) => b.x + b.half > bx0 - reachX && b.x - b.half < bx1 + reachX && b.y + b.down > by0 - reachY && b.y - b.up < by1 + reachY);          // what stands near the room that is searched
+    const taken = (x, y) => (x + hw > pauseX && y - hh < pauseY) || by_.some((b) => Math.abs(x - b.x) < hw + b.half + m && y - hh < b.y + b.down + m && y + hh > b.y - b.up - m);
+    let best = null, most = null, out = false;
+    const fa = F.fw * F.fh / (G * G), ta = F.tw * F.th / (G * G);          // the flag and the lines, in points of the grid
+    const small = all < STACK_SMALL * (fa + ta);          // a country far smaller than its own flag and name: they stand by it, hiding none of it
+    // away from the bird: from the bird through the country's middle (mx, my), as 1 (straight away) to -1 (toward the bird)
+    const away = (x, y, mx, my) => { if (!me) return 0; const d = Math.hypot(mx - me[0], my - me[1]), e = Math.hypot(x - mx, y - my); return d > 1 && e > 1 ? ((x - mx) * (mx - me[0]) + (y - my) * (my - me[1])) / (d * e) : 0; };
+    for (let j = 0, y = from(Y0 + hh, by0 + hh); y <= by1 - hh; j++, y += G) for (let i = 0, x = from(X0 + hw, bx0 + hw); x <= bx1 - hw; i++, x += G) {
       const top = y - F.h / 2, mid = top + F.fh;
-      if (!inside(x - F.fw / 2 - pad, top - pad, x + F.fw / 2 + pad, mid + pad) || !inside(x - F.tw / 2 - pad, mid + F.gap - pad, x + F.tw / 2 + pad, y + F.h / 2 + pad)) continue;
-      if (x + hw > pauseX && y - hh < pauseY) continue;
-      if (up.some((b) => Math.abs(x - b.x) < hw + b.half + m && y - hh < b.y + b.down + m && y + hh > b.y - b.up - m)) continue;
-      const all = share(x - hw, y - hh, x + hw, y + hh);
-      if (all < 0.98) continue;
-      const sc = all - Math.hypot(x - s[0], y - s[1]) / 4000;
-      if (!best || sc > best.sc) best = { sc, x, y };
+      const whole = inside(x - F.fw / 2 - pad, top - pad, x + F.fw / 2 + pad, mid + pad) && inside(x - F.tw / 2 - pad, mid + F.gap - pad, x + F.tw / 2 + pad, y + F.h / 2 + pad);
+      if (whole) {
+        if (taken(x, y)) continue;
+        const on = share(x - hw, y - hh, x + hw, y + hh);
+        if (on >= 0.98) { const sc = on - Math.hypot(x - s[0], y - s[1]) / 4000; if (!best || sc > best.sc) best = { sc, x, y }; continue; }
+      }
+      if (!loose || best || small || ((i | j) & 1) || x + hw < ox0 || x - hw > ox1 || y + hh < oy0 || y - hh > oy1) continue;          // on the country: every second spot each way, round its biggest piece
+      const fc = raw(x - F.fw / 2, top, x + F.fw / 2, mid), tc = raw(x - F.tw / 2, mid + F.gap, x + F.tw / 2, y + F.h / 2);
+      if (fc + tc < STACK_LEAST * (fa + ta) || fc + tc > STACK_HIDE * all || taken(x, y)) continue;
+      // the most of it on the country; of spots about as good, away from the bird, and not right by the bird
+      const bb = me && up[0] && (!live || up[0].bird) ? up[0] : null, gx = bb ? Math.max(bb.x - bb.half - x - hw, x - hw - bb.x - bb.half, 0) : 0, gy = bb ? Math.max(bb.y - bb.up - y - hh, y - hh - bb.y - bb.down, 0) : 0;
+      const sc = Math.sqrt((fc + tc) / (fa + ta)) + 0.1 * away(x, y, (ox0 + ox1) / 2, (oy0 + oy1) / 2) - (bb ? 0.15 * Math.max(0, 1 - Math.hypot(gx, gy) / (47 * view.mk)) : 0);          // (the root: from a twentieth to a tenth on the country is a gain one sees, from a half to 55 in 100 is not)
+      if (!most || sc > most.sc) most = { sc, x, y };
     }
-    const ll = best && unproject(best.x, best.y);
-    return ll ? { on: unit(ll[0], ll[1]), lines: F.lines } : null;
+    if (loose && !best && !most) {          // by the country
+      out = true;
+      const mx = (ox0 + ox1) / 2, my = (oy0 + oy1) / 2, bw = ox1 - ox0, bh = oy1 - oy0, near = NEAR * view.mk, reach = 4 * near, list = [];
+      // how much of the country lies within d of what is drawn (the flag's box and the lines' box)
+      const by = (x, y, d) => { const top = y - F.h / 2, mid = top + F.fh; return raw(x - F.fw / 2 - d, top - d, x + F.fw / 2 + d, mid + d) + raw(x - F.tw / 2 - d, mid + F.gap - d, x + F.tw / 2 + d, y + F.h / 2 + d); };
+      for (let y = from(Y0 + hh, oy0 - hh - reach); y <= Math.min(oy1 + hh + reach, Y1 - hh); y += 2 * G) for (let x = from(X0 + hw, ox0 - hw - reach); x <= Math.min(ox1 + hw + reach, X1 - hw); x += 2 * G) {
+        if (by(x, y, pad) > 0 || !(by(x, y, reach) > 0) || taken(x, y)) continue;          // it hides none of the country, and stands by it
+        let lo = pad, hi = reach;          // how far from the country it stands
+        while (hi - lo > G) { const d = (lo + hi) / 2; if (by(x, y, d) > 0) hi = d; else lo = d; }
+        // alongside one of the country's four sides (half of the shorter of the two runs beside the other), not at a corner only
+        const side = Math.min(y + hh, oy1) - Math.max(y - hh, oy0) >= 0.5 * Math.min(2 * hh, bh) || Math.min(x + hw, ox1) - Math.max(x - hw, ox0) >= 0.5 * Math.min(2 * hw, bw);
+        // 0: straight behind the country as the bird sees it (no bird in sight: straight over the country); 2: between the two
+        const turn = me ? 1 - away(x, y, mx, my) : 1 + (y - my) / (Math.hypot(x - mx, y - my) || 1);
+        list.push([hi + STACK_TURN * view.mk * turn + (side ? 0 : near), x, y]);
+      }
+      list.sort((a, b) => a[0] - b[0]);
+      // NEVER WHOLLY IN ANOTHER COUNTRY (the player, 2026-11-19: "if it isn't able to sit with the majority in the country it is
+      // intended to label, shouldn't sit ENTIRELY in a different country ... If it doesn't fit, it doesn't fit. But just don't have
+      // it wholly in another country"; and: "for bodies of water it's fine if that's all u can do, bc it's obvious that it's not
+      // labeling a body of water"). 20 points of what is drawn are asked what lies under them: no more than STACK_ONE of them on
+      // any one other country (so it lies across a border, or partly on water), and no more than 3 on the country the bird came
+      // down in. The spots are tried in their order; one near a spot that failed is passed over (it lies on the same land).
+      const off = o && o.off, at20 = (x, y) => { const top = y - F.h / 2, mid = top + F.fh, pts = []; for (let i = 0; i < 4; i++) { for (let j = 0; j < 3; j++) pts.push([x + (i - 1.5) / 1.5 * (F.fw / 2 - 6), top + 6 + (F.fh - 12) * j / 2]); for (let j = 0; j < 2; j++) pts.push([x + (i - 1.5) / 1.5 * (F.tw / 2 - 6), mid + F.gap + 6 + (F.th - 12) * j]); } return pts; };
+      const lands = (x, y) => { const n = {}; let one = 0, mine = 0; for (const q of at20(x, y)) { const ll = unproject(q[0], q[1]), r = ll && regionAt(ll[0], ll[1]); if (!r || r.sea || r.c === c) continue; if (off && r.c === off) mine++; one = Math.max(one, n[r.key] = (n[r.key] || 0) + 1); } return [one, mine]; };
+      let hit = null, fair = null, tried = 0;
+      const failed = [];
+      for (const e of list) {
+        if (failed.some((f) => Math.abs(f[1] - e[1]) < 6 * G && Math.abs(f[2] - e[2]) < 6 * G)) continue;
+        if (tried++ >= 40) break;
+        const [one, mine] = lands(e[1], e[2]);
+        if (one <= STACK_ONE && mine <= 3) { hit = e; break; }
+        if (one <= STACK_ONE && !fair) fair = e;
+        failed.push(e);
+      }
+      hit = hit || fair || list[0];          // (none: a country in the middle of one other country and too small to be touched across a border)
+      if (hit) most = { x: hit[1], y: hit[2] };
+    }
+    const at = best || most, ll = at && unproject(at.x, at.y);
+    return ll ? { on: unit(ll[0], ll[1]), lines: F.lines, loose: !best, out, box: { x: at.x, y: at.y, half: hw, up: hh, down: hh } } : null;
+  }
+  // WHICH FORM a country's own flag and name take, worked out once for the view as it is (the camera at the landing's
+  // rest): one row at the country's middle where the row has room there (areaSpot, as ever); else the flag in the
+  // country with the name under it (stackSpot); a row that has no room by the rest's own measure and had by areaSpot's
+  // last (rowHeld) stays a row where the country cannot hold the flag over the name. It returns { row, stack }; neither:
+  // by the bird, when the bird stands in the country.
+  // Study's delivery: a row only where the name and flag at the country's middle stand clear of the bird (else by the
+  // bird, as since the first builds). trip (Day Trip and Ranked, a round that asks a country): a row keeps off the
+  // bird by itself, at another spot in the country (areaSpot, as there ever); trip.loose (a wrong landing, the bird
+  // somewhere else): a country that can hold neither gets the flag and the name on it or against it (stackSpot);
+  // trip.caps: the capitals whose marks stand; trip.off: the country the bird came down in. from: the map's scale
+  // at the landing.
+  function ownForm(c, str, sub, card, from, trip) {
+    const there = !c.tiny && project(c.u), on = there && there[0] > 50 && there[0] < view.w - 50 && there[1] > 50 && there[1] < view.h - view.deck - 30;
+    ownName = true;
+    const box = plateBox(c, str, 'name', sub), me = birdBox(project(unit(bird.lon, bird.lat)) || [view.w / 2, view.gy]);
+    ownName = false;
+    // at its middle when that is in sight and the name and flag stand clear of the bird there
+    const clear = on && (!!trip || Math.abs(there[0] - me.x) >= box.half + me.half || there[1] - box.up >= me.y + me.down || there[1] + box.down <= me.y - me.up);
+    const fits = clear && rowFits(c, there, box), any = clear && !fits ? stackSpot(c, str, 'name', sub, card, trip) : null;
+    const stack = any && !any.loose ? any : null, row = fits || (clear && !stack && rowHeld(c, box, from));
+    return { row, stack: row ? null : any };
+  }
+  // ON ITS COUNTRY IN A VIEW THAT MOVES (ONIT): a country named while no view rests on it. A country Study shows the way
+  // to keeps its name until its postcard is delivered, through the view that goes there, the flight and every landing
+  // on the way; the answer of a Day Trip's or Ranked's round that is too far from the bird for one view is shown by a
+  // view that goes there and comes back. The form is found for the view as it is, and again when the map's scale has
+  // changed by a step (as areaSpot finds a row's spot): one row where the row has room, else the flag over the name in
+  // the country, else on it as far as they fit; clear of what the frame has placed before it (the bird on the ground,
+  // the capitals' symbols and names, a landing's own names).
+  const ONIT = 'onit';
+  function liveSpot(f, c, str, cls, sub, s) {
+    const key = Math.round(Math.log(cam.pxRad) * 6) + (bird.down ? 'd' : 'a');
+    if (f.liveKey === key) return f.live;
+    f.liveKey = key; f.row = rowFits(c, s, plateBox(c, str, cls, sub));          // a row never leaves its country (areaSpot)
+    return (f.live = f.row ? null : stackSpot(c, str, cls, sub, null, { loose: true, live: placed.filter((b) => !b.bird || bird.down) }));
   }
   function plateBox(c, str, cls, sub, soon) {          // soon: a flag is counted in before its picture has loaded
     [str, sub] = disputed(c, str, sub);
@@ -2351,7 +2480,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (!A || !A.fit) return side;
     const key = own + (side === y ? '|under' : '|over');
     if (A.sideKey !== key) {
-      A.sideKey = key; A.flip = false; A.beside = 0;
+      A.sideKey = key; A.flip = false; A.beside = 0; A.slide = 0; A.shift = 0;
       const saved = Object.assign({}, cam);
       aim(A.fit.c, A.fit.H, A.fit.rx, A.fit.ry);
       const r = project(unit(bird.lon, bird.lat));
@@ -2359,7 +2488,49 @@ button { font: inherit; color: inherit; cursor: pointer; }
         const bb = birdBox(r), under = r[1] + UNDER_GAP * view.mk + box.up, over = Math.min(bb.y - bb.up, r[1] - birdLift() - ZZZ_TOP) - box.down - 1;
         const fits = (yy) => yy - box.rise >= 0 && yy + box.drop <= view.h - view.deck;
         A.flip = !fits(side === y ? under : over) && fits(side === y ? over : under);
-        A.beside = besideBird(r, bb, box, (side === y) !== A.flip ? under : over, c);
+        // AWAY FROM THE COUNTRY ASKED. Day Trip and Ranked, a country asked and the bird down outside it: the name of where
+        // you came down stands on the bird's side that faces away from that country, so that the bird stands between
+        // the two names and neither can be taken for the other's: of the bird's sides (right, left, under, over) the one
+        // that faces away the most, from the country asked and from the answer's own flag and name (A.own), and the
+        // first that is free: on the screen, over the bar, clear of the capitals' marks and of A.own, not on the country
+        // asked. None free: as in every other game (under the bird or over it, beside it when pushed far). The same rule
+        // had been there for one case since 2026-11-18 (the name over the bird when under the bird it lay on the country
+        // asked: Hungary and Slovakia, the player's "Outline and move"). (The player, 2026-11-19, of Slovenia asked and
+        // the bird down in Croatia, Croatia's flag over the bird and as near to Slovenia as Slovenia's own: "This is
+        // terribly confusing ... the labels are ... both just as close to Slovenia, so you don't really know. Croatia
+        // should be on the right"; of the screen with Croatia's on the bird's far side: "That's perfect".)
+        const tv = S.trip && S.trip.reveal, q = tv && tv.area && !tv.right ? project(tv.to) : null;
+        let set = false;
+        if (q) {
+          const asked = S.trip.rounds[S.trip.i].c, marks = capMarks([S.capAt, S.capAlso].filter((M) => M && M.name), r).concat(A.own ? [A.own] : []);
+          const x0 = r[0] + clamp(clamp(r[0], 4 + box.half, view.w - box.half - 4) - r[0], -box.half, box.half);
+          const clearAt = (xx, yy) => xx - box.half >= 4 && xx + box.half <= view.w - 4 && fits(yy) && !marks.some((b) => !b.bird && Math.abs(b.x - xx) < b.half + box.half && yy - box.up < b.y + b.down && yy + box.down > b.y - b.up) && nameCover(asked, box, xx, yy)[0] <= 3;
+          // Three of the bird's four sides, the most away first (never the one that faces the country most); on a side the
+          // name may slide along the bird, in steps, as far as the two still stand side by side: something in the way on
+          // the best side (the capital's symbol of where you came down: Riyadh's, Qatar asked) moves the name along that
+          // side before it sends it to another, where it could end up under the answer's own flag.
+          // (away from the answer's own flag and name too, A.own, where they stand: Slovenia asked, the bird down north of it and
+          // Vienna's symbol over the bird: of the bird's left and right, as far from Slovenia as each other, the side where
+          // Slovenia's flag is not)
+          const dq = Math.hypot(r[0] - q[0], r[1] - q[1]) || 1, da = A.own ? Math.hypot(A.own.x - r[0], A.own.y - r[1]) || 1 : 1;
+          const faces = (ux, uy) => (ux * (r[0] - q[0]) + uy * (r[1] - q[1])) / dq - (A.own ? (ux * (A.own.x - r[0]) + uy * (A.own.y - r[1])) / da : 0);
+          const step = 16 * view.mk, ways = [[1, faces(1, 0)], [-1, faces(-1, 0)], ['under', faces(0, 1)], ['over', faces(0, -1)]].sort((a, b) => b[1] - a[1]).slice(0, 3);
+          search: for (const [way] of ways) {
+            const first = typeof way === 'number' ? (r[1] >= q[1] ? 1 : -1) : (r[0] >= q[0] ? 1 : -1);          // slid away from the country asked first
+            for (const k of [0, first, -first, 2 * first, -2 * first, 3 * first, -3 * first]) {
+              if (typeof way === 'number') {
+                const slide = k * step, at = besideAt(bb, box, way);
+                if (Math.abs(slide) > (box.rise + box.drop) / 2 + Math.min(bb.up, bb.down) - 8 * view.mk) continue;
+                if (besideBird(r, bb, box, 0, c, way, slide, marks) && nameCover(asked, box, at[0], at[1] + slide)[0] <= 3) { A.beside = way; A.slide = slide; set = true; break search; }
+              } else {
+                const shift = k * step;
+                if (Math.abs(shift) > box.half + bb.half - 8 * view.mk) continue;
+                if (clearAt(x0 + shift, way === 'under' ? under : over)) { A.flip = (side === y) !== (way === 'under'); A.shift = shift; set = true; break search; }
+              }
+            }
+          }
+        }
+        if (!set) A.beside = besideBird(r, bb, box, (side === y) !== A.flip ? under : over, c);
       }
       Object.assign(cam, saved);
     }
@@ -2421,16 +2592,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // y: the name's line as underY gives it. It returns the side, 1 or -1, or 0.
   const BESIDE_GAP = 8;
   const besideAt = (bb, box, dir) => [bb.x + dir * (bb.half + BESIDE_GAP * view.mk + box.half), clamp(bb.y + (box.rise - box.drop) / 2, 4 + box.rise, view.h - view.deck - 4 - box.drop)];
-  function besideBird(r, bb, box, y, c) {
-    const up = capMarks([S.capAt, S.capAlso].filter((A) => A && A.name), r), x0 = r[0] + clamp(clamp(r[0], 4 + box.half, view.w - box.half - 4) - r[0], -box.half, box.half);
-    const frame = placed.splice(0, placed.length, ...up), at = settle(x0, y, box, r[0], r[1], 0, true, true);
-    placed.splice(0, placed.length, ...frame);
-    if (Math.max(at - box.rise - (bb.y + bb.down), bb.y - bb.up - (at + box.drop)) <= box.rise + box.drop) return 0;
+  function besideBird(r, bb, box, y, c, want, slide, marks) {          // want: the side asked for (underY), whatever room there is under and over the bird; slide: that far down along the bird; marks: what stands, when the caller has worked it out
+    const up = marks || capMarks([S.capAt, S.capAlso].filter((A) => A && A.name), r), x0 = r[0] + clamp(clamp(r[0], 4 + box.half, view.w - box.half - 4) - r[0], -box.half, box.half);
+    if (!marks && S.capFit && S.capFit.own) up.push(S.capFit.own);          // Day Trip and Ranked: the answer's flag and name on its country (tripLand): the name by the bird keeps off them
+    if (!want) {
+      const frame = placed.splice(0, placed.length, ...up), at = settle(x0, y, box, r[0], r[1], 0, true, true);
+      placed.splice(0, placed.length, ...frame);
+      if (Math.max(at - box.rise - (bb.y + bb.down), bb.y - bb.up - (at + box.drop)) <= box.rise + box.drop) return 0;
+    }
     const m = 8 * view.mk, E = factEdge && factEdge.rest ? factEdge : null;
     let best = 0, most = -1;
-    for (const dir of [1, -1]) {
-      const [cx, cy] = besideAt(bb, box, dir);
-      if (cx - box.half < 4 || cx + box.half > view.w - 4) continue;
+    for (const dir of want ? [want] : [1, -1]) {
+      const [cx, cy0] = besideAt(bb, box, dir), cy = cy0 + (slide || 0);
+      if (cx - box.half < 4 || cx + box.half > view.w - 4 || (slide && (cy - box.rise < 4 || cy + box.drop > view.h - view.deck - 4))) continue;
       if (cx + box.half > view.w - 70 * view.ui - m && cy - box.rise < 66 * view.ui + m) continue;
       if (E && cx - box.half < E.x1 && cy - box.rise < E.y1 && cy + box.drop > E.y0) continue;
       if (up.some((b) => !b.bird && Math.abs(b.x - cx) < b.half + box.half && cy - box.up < b.y + b.down && cy + box.down > b.y - b.up)) continue;
@@ -2443,7 +2617,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // With secs = GROUND it stays while the bird is on the ground, and fades once it takes off.
   // With `until`, it stays for as long as that holds (the place you were shown, until its postcard is delivered).
   function label(c, str, p, cls, secs, sub, dy, until) {
-    const hold = secs === GROUND || !!until;
+    const hold = secs === GROUND || !!until, seek = dy === ONIT;
     let below = false;        // by a pin: under it, when the bird is above it. Chosen while the bird is on the ground.
     const f = animate(hold ? 1e9 : secs, (k) => { ownName = secs === GROUND; try { paint(k); } finally { ownName = false; } }, true);
     function paint(k) {
@@ -2456,6 +2630,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       }
       const s = project(p);
       if (!s) return;
+      if (seek) dy = liveSpot(f, c, str, cls, sub, s) || AREA;          // found again for the view as it is
       if (dy && dy.on) {          // the flag over the name at its own spot on the country (stackSpot): it stands on the map, nothing moves it
         const q = project(dy.on);
         if (!q) return;
@@ -2465,7 +2640,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
         f.shownA = alpha;
         stackDraw(F, c, q[0], q[1], alpha);
         placed.push({ x: q[0], y: q[1], half: F.w / 2 + 5, up: F.h / 2 + 4, down: F.h / 2 + 4, name: str, sub: F.sub, ink: (STYLE[cls] || {}).sub === INK, flag: true, ax: s[0], ay: s[1], rise: F.h / 2, drop: F.h / 2, px: F.o.size,
-          lines: F.lines, parts: stackParts(F, q[0], q[1]) });      // for the tests: the lines as broken, and the two boxes of what is drawn
+          lines: F.lines, parts: stackParts(F, q[0], q[1]), loose: !!dy.loose, out: !!dy.out });      // for the tests: the lines as broken, the two boxes of what is drawn, and whether all of it had room on the country
         return;
       }
       const box = plateBox(c, str, cls, sub), spot = dy === AREA ? areaSpot(f, c, s, box) : f.pin || null, sx = s[0] + (spot ? spot[0] : 0), slideX = (lo) => sx + clamp(clamp(sx, lo + box.half, view.w - box.half - 4) - sx, -box.half, box.half);
@@ -2479,7 +2654,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       // beside the bird (besideBird): for as long as that landing's rest is the view's, and where it stood while it fades at take-off
       if (dy === UNDER) {
         const A = S.mode === 'fly' && bird.down ? S.capFit : null;
-        if (A && A.fit && A.sideKey && A.sideKey.startsWith(str + '|')) { f.beside = A.beside || 0; if (f.beside) { const q = besideAt(birdBox(s), box, f.beside); f.off = [q[0] - s[0], q[1] - s[1]]; } }
+        if (A && A.fit && A.sideKey && A.sideKey.startsWith(str + '|')) { f.beside = A.beside || 0; if (f.beside) { const q = besideAt(birdBox(s), box, f.beside); f.off = [q[0] - s[0], q[1] - s[1] + (A.slide || 0)]; } else if (A.shift) { x += A.shift; want = wantAt(x); } }          // (slide, shift: moved along the bird, underY)
         if (f.beside && f.off) { x = s[0] + f.off[0]; want = s[1] + f.off[1]; }
       }
       const byBird = dy === UNDER && f.beside && f.off;
@@ -2693,7 +2868,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const c = t.it.c, p = pointOf(t.it), here = () => S.mode === 'fly' && S.tickets.includes(t);
     if (t.label) t.label.secs = 0;
     if (t.it.kind === 'k') t.label = label(c, c.cap[0], p, 'name', 0, c.name, OVER, here);
-    else t.label = label(c.water ? null : c, c.name, p, c.water ? 'sea' : 'name', 0, null, c.water ? () => 22 + namePx() / 2 : c.tiny ? OVER : AREA, here);
+    else t.label = label(c.water ? null : c, c.name, p, c.water ? 'sea' : 'name', 0, null, c.water ? () => 22 + namePx() / 2 : c.tiny ? OVER : ONIT, here);          // a country: on it, never beside it (liveSpot)
   }
   function countAgainst(t) {
     t.misses++;
@@ -3537,25 +3712,37 @@ button { font: inherit; color: inherit; cursor: pointer; }
     let mid = norm(pts.reduce((a, q) => [a[0] + q[0], a[1] + q[1], a[2] + q[2]], [0, 0, 0])), H = low, whole = true;
     // meRoom: px kept free over and under the bird, for the name that goes with it (it stands under the bird, or over it)
     const birdRoom = () => { if (!A.meRoom) return true; const at = project(me); return !!at && at[1] - A.meRoom >= 4 && at[1] + A.meRoom <= under - 4; };
-    const holds = (h) => { aim(mid, h, rx, ry); return pts.every((q) => { const at = project(q); return at && at[0] >= x0 && at[0] <= x1 && at[1] >= y0 && at[1] <= y1; }) && birdRoom(); };
-    const lowest = () => {
+    // meSide: [px, p]: room kept free BESIDE the bird, on its side away from p, when that side is its left or its right: Day
+    // Trip and Ranked, a country asked and the bird down outside it: the name of where you came down stands on the bird's
+    // far side from the country asked (underY), and where the bird rested near the screen's side it had no room there
+    // (Bhutan asked, the bird down east of it with New Delhi kept in view: India's name stood over the bird, next to
+    // Bhutan's own flag). The view moves over just as far as that name needs; a view that has the room is as it was.
+    const sideOf = () => { if (!A.meSide) return null; const at = project(me), q = project(A.meSide[1]); return at && q && Math.abs(at[0] - q[0]) >= Math.abs(at[1] - q[1]) ? [at[0], at[0] >= q[0] ? 1 : -1] : null; };
+    const sideRoom = () => { const sd = sideOf(); return !sd || (sd[1] > 0 ? sd[0] + A.meSide[0] <= view.w - 4 : sd[0] - A.meSide[0] >= left + 4); };
+    const holds = (h, beside) => { aim(mid, h, rx, ry); return pts.every((q) => { const at = project(q); return at && at[0] >= x0 && at[0] <= x1 && at[1] >= y0 && at[1] <= y1; }) && birdRoom() && (!beside || sideRoom()); };
+    const lowest = (beside) => {
       whole = true;
-      if (holds(low)) return low;
-      if (!holds(view.H1)) { whole = false; return view.H1; }          // wider than the top of the flight shows (Antarctica): as much of it as there is
+      if (holds(low, beside)) return low;
+      if (!holds(view.H1, beside)) { whole = false; return view.H1; }          // wider than the top of the flight shows (Antarctica): as much of it as there is
       let a = Math.log(low), b = Math.log(view.H1);
-      for (let i = 0; i < 16; i++) { const m = (a + b) / 2; if (holds(Math.exp(m))) b = m; else a = m; }
+      for (let i = 0; i < 16; i++) { const m = (a + b) / 2; if (holds(Math.exp(m), beside)) b = m; else a = m; }
       return Math.exp(b);
     };
-    for (let round = 0; round < 5; round++) {          // moving the middle changes the box a little
-      H = lowest();
+    for (let round = 0; round < 5; round++) {          // moving the middle changes the box a little (the room beside the bird is asked of the view only once it has moved over: asked first, the view would pull back instead)
+      H = lowest(false);
       aim(mid, H, rx, ry);
       let bx0 = 1e9, bx1 = -1e9, by0 = 1e9, by1 = -1e9;
       for (const q of pts) { const at = project(q); if (at) { bx0 = Math.min(bx0, at[0]); bx1 = Math.max(bx1, at[0]); by0 = Math.min(by0, at[1]); by1 = Math.max(by1, at[1]); } }
       if (A.meRoom) { const at = project(me); if (at) { by0 = Math.min(by0, at[1] - A.meRoom + padY - 4); by1 = Math.max(by1, at[1] + A.meRoom - padY + 4); } }          // the bird's room is part of what is put in the middle: the view moves over before it pulls back
+      const sd = sideOf();
+      if (sd && bx1 >= bx0) {          // where the bird will stand once the box is in the middle: the view moves over by what the name lacks
+        const xb = rx + sd[0] - (bx0 + bx1) / 2, over = 8 + (sd[1] > 0 ? xb + A.meSide[0] - (view.w - 4) : left + 4 - (xb - A.meSide[0]));          // (8 px to spare: the globe is not flat, the middle lands a few px off)
+        if (over > 0) { if (sd[1] > 0) bx1 += 2 * over; else bx0 -= 2 * over; }
+      }
       const ll = bx1 >= bx0 ? unproject((bx0 + bx1) / 2, (by0 + by1) / 2) : null;
       if (ll) mid = unit(ll[0], ll[1]);
     }
-    H = lowest();
+    H = lowest(true);
     Object.assign(cam, saved);
     return { c: mid, H, rx, ry, whole };
   }
@@ -4248,14 +4435,32 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const REST_MORE = 1.25, NO_CAPS = { showA: false, showW: false, secs: null };
   // the room a name by the bird takes over or under the bird, at the size it has on the ground (the view may still be on its way down)
   const nameRoom = (c, str, cls, sub) => { const h = cam.H; cam.H = view.H0; ownName = true; const box = plateBox(c, str, cls, sub); ownName = false; cam.H = h; return Math.max(UNDER_GAP * view.mk, ZZZ_TOP + 24) + box.up + box.down + 4; };
-  function tripCaps(R, W, right, room) {
+  // the room that name takes beside the bird, from the bird's place, at the size both have on the ground
+  const nameSide = (c, str, cls, sub) => { const h = cam.H; cam.H = view.H0; ownName = true; const box = plateBox(c, str, cls, sub, true), bb = birdBox([0, 0]); ownName = false; cam.H = h; return Math.max(bb.x + bb.half, bb.half - bb.x) + BESIDE_GAP * view.mk + 2 * box.half + 4; };
+  function tripCaps(R, W, right, room, side) {
     const A = R.c, capA = capShown(A), capW = !right && capShown(W), at = (c) => unit(c.cap[1], c.cap[2]);
     if (!capA && !capW) return NO_CAPS;
     if (right) { markCapital(A); restOn(A); return { showA: true, showW: false, secs: S.capFit ? S.capFit.T : 0 }; }
     const ptsA = capA ? partPoints(A, partAt(A, A.cap[1], A.cap[2])).concat([at(A)]) : [R.p];
     const own = fitFor({ pts: ptsA, noMe: true }), lim = Math.max(heightFor(0.5), own.H * REST_MORE) * 1.001, ok = (f) => !!f && f.whole && f.H <= lim;
-    const both = capW ? fitFor({ pts: ptsA.concat([at(W)]), meRoom: room }) : null, one = ok(both) ? null : fitFor({ pts: ptsA, meRoom: room });
-    const fit = ok(both) ? both : ok(one) ? one : null, showW = ok(both);
+    const P2 = capW ? ptsA.concat([at(W)]) : null, both = P2 ? fitFor({ pts: P2, meRoom: room }) : null, one = ok(both) ? null : fitFor({ pts: ptsA, meRoom: room });
+    let fit = ok(both) ? both : ok(one) ? one : null, showW = ok(both);
+    // ROOM BESIDE THE BIRD FOR ITS NAME (side: nameSide). The name of where you came down stands on the bird's far side from the
+    // country asked (underY). Where that side is the bird's left or right and the rest leaves it no room there (the bird near
+    // the screen's side: Bhutan asked, the bird down east of it and New Delhi kept in view; Saudi Arabia asked, the bird down in
+    // the United Arab Emirates), the view moves over by what the name lacks: with both capitals, else without the capital of
+    // where you came down (it is then listed under that name, as ever when it is too far), and never higher than the rest was.
+    // A rest that has the room is as it was.
+    if (fit && side) {
+      const saved = Object.assign({}, cam);
+      aim(fit.c, fit.H, fit.rx, fit.ry);
+      const a = project(unit(bird.lon, bird.lat)), q = project(R.p), lacks = !!a && !!q && Math.abs(a[0] - q[0]) >= Math.abs(a[1] - q[1]) && (a[0] >= q[0] ? a[0] + side > view.w - 4 : a[0] - side < 4);
+      Object.assign(cam, saved);
+      if (lacks) for (const w of showW ? [true, false] : [false]) {
+        const f = fitFor({ pts: w ? P2 : ptsA, meRoom: room, meSide: [side, R.p] });
+        if (ok(f) && f.H <= fit.H * 1.001) { fit = f; showW = w; break; }
+      }
+    }
     if (!capA && !showW) return NO_CAPS;          // a country drawn as a dot asked, and no capital that can be shown: as it was
     if (showW) markCapital(W);
     if (capA) markCapital(A, showW);
@@ -4307,13 +4512,39 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // the names, once the result's card is measured: where the view rests is worked out for the room over that card
     const namesW = !right && here.name && (here.sea || here.c !== R.c), W = namesW && !here.sea ? here.c : null;
     // a country asked: the capitals at their locations, and where the view rests (tripCaps); before the names, as in Study
-    const caps = countryRound ? tripCaps(R, W, right, namesW ? nameRoom(here.sea ? null : here.c, here.name, here.sea ? 'wrongsea' : 'wrong', here.sea ? null : underName(here)) : 0) : NO_CAPS;
-    if (namesW) outlined(label(here.sea ? null : here.c, here.name, p, here.sea ? 'wrongsea' : 'wrong', GROUND, here.sea || caps.showW ? null : underName(here), UNDER), here.sea ? null : here.c);
+    const wArgs = [here.sea ? null : here.c, here.name, here.sea ? 'wrongsea' : 'wrong', here.sea ? null : underName(here)];
+    const first = fx.length, caps = countryRound ? tripCaps(R, W, right, namesW ? nameRoom(...wArgs) : 0, namesW ? nameSide(...wArgs) : 0) : NO_CAPS;
+    const wc = here.sea ? null : here.c, wcls = here.sea ? 'wrongsea' : 'wrong', wsub = here.sea || caps.showW ? null : underName(here);          // the name of where you came down
+    if (namesW) outlined(label(wc, here.name, p, wcls, GROUND, wsub, UNDER), wc);
     // a country round's answer: its name alone when its capital stands at its location (tripCaps), else its capital under
     // its name (a country drawn as a dot). A capital: its country, left out where the capital has the country's own
     // name (Singapore, Monaco: until 2026-11-15 the name stood twice)
     const sub = R.kind === 'city' ? R.c.name + ', population ~' + people(R.city.pop) : countryRound ? (caps.showA ? null : capLine(R.c)) : R.c.name === R.name ? null : R.c.name;
-    const named = label(R.c, R.name, R.p, 'name', GROUND, sub, countryRound ? AREA : OVER);
+    // A COUNTRY ASKED WEARS ITS OWN FLAG AND NAME (THE WHOLE LIST 46; until 2026-11-19 a country without room for them
+    // on one row had them beside it wherever they hid least, a rule of Claude's of 2026-11-12: Belgium's name lay on
+    // the Netherlands, Panama's on the sea). Decided once, for the view at rest (tripCaps), as Study decides a
+    // delivery (ownForm). A correct landing, the bird in the country: one row; else the flag in the country with the
+    // name under it; else by the bird (Study's three forms). A wrong landing, the bird somewhere else: in the
+    // country; else on it as far as it fits; else by it, never wholly on another country (stackSpot). The answer takes
+    // its spot first: it stands on the map before the capitals' names and the name of where you came down (fx's
+    // order), which is by the bird and takes the bird's side away from the answer (underY: S.capFit.own is the
+    // answer's room). Without a rest (the country too far from the bird for one view: the view goes there and comes
+    // back) the form is found for each view on the way (ONIT). A country drawn as a dot: by its dot, as it was.
+    let how = countryRound ? AREA : OVER, at = R.p, row = false;
+    if (countryRound && !R.c.tiny) {
+      const A = S.capFit && S.capFit.fit;
+      how = ONIT;
+      if (A) {
+        const saved = Object.assign({}, cam);
+        aim(A.c, A.H, A.rx, A.ry);
+        const form = ownForm(R.c, R.name, sub, null, saved.pxRad, { loose: !right, caps: [S.capAt, S.capAlso].filter((M) => M && M.name), off: W });
+        Object.assign(cam, saved);
+        if (form.row) { how = AREA; row = true; } else if (form.stack) { how = form.stack; S.capFit.own = form.stack.box; } else if (right) { how = UNDER; at = p; } else how = AREA;
+      }
+    }
+    const named = label(R.c, R.name, at, 'name', GROUND, sub, how);
+    named.row = row;
+    if (how.on) fx.splice(first, 0, fx.pop());
     if (countryRound) outlined(named, R.c); else pinSide(named, R.c, R.name, R.p, 'name', sub, (R.kind === 'city' ? 8.5 : 11.5) * view.mk);          // a country asked: its border (a capital's name names the city); a capital or a city: its name where it has room by its pin
     T.after = S.t + Math.max(1.2, (!countryRound ? away : caps.secs === null ? lookAt(R.p) : caps.secs) + 0.3);          // a country asked: the view rests (tripCaps), or goes to the answer and comes back
   }
@@ -4752,18 +4983,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
       // where its capital is (capShown): the view rests on the whole country, and where the name stands is worked out for that rest
       const fact = showLandFact(c), cap = capShown(c), sub = (cap ? null : capLine(c)) || popLine(c), saved = Object.assign({}, cam), F = cap ? restOn(c, fact) : null;
       if (F) aim(F.c, F.H, F.rx, F.ry);
-      const there = !c.tiny && project(c.u), on = there && there[0] > 50 && there[0] < view.w - 50 && there[1] > 50 && there[1] < view.h - view.deck - 30;
-      // at its middle when that is in sight and the name and flag stand clear of the bird there; else under the bird
-      ownName = true;
-      const box = plateBox(c, c.name, 'name', sub), me = birdBox(project(p) || [view.w / 2, view.gy]);
-      ownName = false;
-      const clear = on && (Math.abs(there[0] - me.x) >= box.half + me.half || there[1] - box.up >= me.y + me.down || there[1] + box.down <= me.y - me.up);
       // ON the country, never beside it (stackSpot, the player's pick of 2026-11-19): on one row where the country has
       // room for that (areaSpot, as ever); else the flag in the country with the name under it; else, a country too thin
-      // or small to hold them, by the bird. Which of the three is decided here, once, for the view at rest. A row that
-      // has no room by the rest's own measure and had by areaSpot's last (rowHeld) stays a row where the country cannot
-      // hold the flag over the name: it lies mostly on its country, which by the bird it would not.
-      const fits = clear && rowFits(c, there, box), stack = clear && !fits ? stackSpot(c, c.name, 'name', sub, fact) : null, row = fits || (clear && !stack && rowHeld(c, box, saved.pxRad));
+      // or small to hold them, by the bird. Which of the three is decided here, once, for the view at rest (ownForm). A
+      // row that has no room by the rest's own measure and had by areaSpot's last (rowHeld) stays a row where the country
+      // cannot hold the flag over the name: it lies mostly on its country, which by the bird it would not.
+      const { row, stack } = ownForm(c, c.name, sub, fact, saved.pxRad);
       Object.assign(cam, saved);
       if (cap && !stack) markCapital(c);          // before the country's name: the capital's name takes its spot next to its symbol, the country's name keeps off both
       const named = label(c, c.name, row || stack ? c.u : p, 'name', GROUND, sub, row ? AREA : stack || UNDER);
