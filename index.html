@@ -2529,10 +2529,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (tab === 'challenge' && runKind === 'day' && tripDone()) return;          // one trip a day (one begun is carried on)
     S.game = tab === 'challenge' ? 'trip' : tab;
     Object.assign(S, { mode: 'fly', paused: false, t: 0, energy: TANK, n: 0, streak: 0, bestStreak: 0, firstTry: 0, fresh: 0, route: null, legs: null, tickets: [], last: null,
-      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, capAt: null, capAlso: null, capFit: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), sawCap: new Set(), newC: 0, sawN: 0, intro: null, began: null, replay: null });
+      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, capAt: null, capAlso: null, capFit: null, around: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), sawCap: new Set(), newC: 0, sawN: 0, intro: null, began: null, replay: null });
     S.log = new Map();
     S.drops = [];
     Object.assign(fitv, { on: false, k: 0, lh: null, s0: 1 });          // no rest of the view left over from the flight before (it is cleared on the title, but only once a frame is drawn there)
+    // around: Free flight's last landing with the view fitted to its country. It was kept over Home, so the next Free flight's view
+    // went to that country and left the bird, which stood where the new flight began (the player, 2026-11-18, of a
+    // picture of Iraq with no bird on it: "why is the bird not showing up in free flight rn").
     fx.length = 0; flashes.length = 0;
     holdOff();
     ticketsEl.replaceChildren();
