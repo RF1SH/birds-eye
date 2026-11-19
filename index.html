@@ -292,7 +292,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .tick.spot, .tick.right { color: var(--good); }
 .tick.miss { color: var(--bad); }
 #trip-count { font: 700 30px/1.1 var(--display); }
-#trip-clock b { font: 700 30px/1 var(--display); font-variant-numeric: tabular-nums; }
+/* The seconds stand centered and take no width of their own, so the box is one size at every reading: with "sec" a
+   reading of 100.0 would have widened the box, and the whole bar with it, by 3 px (2026-11-19). */
+#trip-clock b { display: flex; justify-content: center; width: 0; white-space: nowrap; font: 700 30px/1 var(--display); font-variant-numeric: tabular-nums; }
 /* The stopwatch's time line: gray, with one mark in the middle at the fair time, and nothing else until it fills.
    It fills as the seconds pass: green up to the mark (every speed point), then a third each of yellow, orange and
    red, each worth less; at the end, none. No color shows ahead of the fill: the mark alone says where losing starts. */
@@ -305,11 +307,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* The tutorial. Its bar is the box beside the postcard: its label, one line at a time, and its buttons, each a cell
    of that box like the rounds and the stopwatch. Every part is one the game already has: the key caps, .go and .alt. */
 #tutor-label { display: grid; align-content: center; padding: 6px 18px; font: 700 20px/1 var(--display); white-space: nowrap; }
-#tutor-say { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 20px; font-size: 17px; line-height: 1.35; }
+#tutor-say { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 8px; min-width: 0; padding: 4px 20px; font-size: 17px; line-height: 1.35; }          /* wrap: in a window too narrow for a line's keys and words in one row (under 580 px for the second line) its last part takes a second row; the bar stays on the screen */
 #tutor-say > span { text-wrap: pretty; }          /* in a narrow window a sentence takes a second line, set as the How to play card sets its own: no word left alone */
 #tutor-say kbd { flex: none; margin: 0 1px; }
 #tutor-say .arrows { flex: none; gap: 2px; }          /* the four arrows as they stand on a keyboard, smaller than on the How to play card */
 #tutor-say .arrows kbd { min-width: 21px; margin: 0; padding: 0 4px 1px; font-size: 12px; line-height: 1.3; border-bottom-width: 2.5px; }
+/* the mouse with its words under it, as on the How to play card and smaller, as the arrows are: no taller than the four keys, so the bar keeps its height */
+#tutor-say .mouse { display: flex; flex: none; flex-direction: column; align-items: center; gap: 2px; font: 700 12px/1.1 var(--text); white-space: nowrap; }
+#tutor-say .mouse svg { flex: none; width: 19px; height: 28px; stroke: var(--ink); stroke-width: var(--b2z); }
 .tutor-btn { display: grid; align-content: center; padding: 6px 14px; }
 .tutor-btn button { pointer-events: auto; white-space: nowrap; }
 .tutor-btn .go { font-size: 20px; padding: 7px 14px 9px; }
@@ -652,7 +657,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
           <p>Fly up to see more of the world and fly faster. Let go to glide down.</p>
           <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><circle cx="24" cy="22" r="19.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/><circle cx="24" cy="22" r="12.5" fill="none" stroke="var(--ink)" stroke-width="1.5"/><circle cx="24" cy="22" r="5.5" fill="var(--good)" stroke="var(--ink)" stroke-width="1.5"/><use href="#i-bird" transform="translate(39.5 27.5) scale(.42)"/></svg></div>
           <p>The closer you land, the more points.</p>
-          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><text x="28" y="19" text-anchor="middle" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" font-size="16" fill="var(--ink)">3.9 s</text><rect x="1" y="26" width="54" height="4.4" rx="1.6" fill="var(--paper-shade)"/><path d="M2.6 26 H17 V30.4 H2.6 A1.6 1.6 0 0 1 1 28.8 V27.6 A1.6 1.6 0 0 1 2.6 26 Z" fill="var(--good)"/><rect x="27.4" y="24.2" width="1.2" height="8" fill="var(--ink)"/></svg></div>
+          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><text x="28" y="19" text-anchor="middle" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" font-size="16" fill="var(--ink)">3.9 sec</text><rect x="1" y="26" width="54" height="4.4" rx="1.6" fill="var(--paper-shade)"/><path d="M2.6 26 H17 V30.4 H2.6 A1.6 1.6 0 0 1 1 28.8 V27.6 A1.6 1.6 0 0 1 2.6 26 Z" fill="var(--good)"/><rect x="27.4" y="24.2" width="1.2" height="8" fill="var(--ink)"/></svg></div>
           <p>Land before the timer's halfway mark for full speed points.</p>
           <div class="ill"><svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="15" fill="var(--paper)" stroke="var(--ink)" stroke-width="2"/><circle cx="22" cy="22" r="10.5" fill="none" stroke="var(--paper-shade)" stroke-width="6"/><path d="M22 11.5 A10.5 10.5 0 1 1 11.6 23.4" fill="none" stroke="var(--good)" stroke-width="6"/></svg></div>
           <p>Flying up uses energy. The less you use, the more points.</p>
@@ -679,7 +684,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
         <div id="status">
           <div id="tutor-label" hidden>Tutorial</div>
           <div id="trip-pips" class="tripbox" hidden><div class="row5"><i></i><i></i><i></i><i></i><i></i></div><span id="trip-round">Round 1 of 5</span></div>
-          <div id="trip-clock" class="tripbox" hidden><b id="trip-secs">0.0 s</b><div class="bar"><div class="track"><div id="trip-bar"></div></div></div></div>
+          <div id="trip-clock" class="tripbox" hidden><b id="trip-secs">0.0 sec</b><div class="bar"><div class="track"><div id="trip-bar"></div></div></div></div>
           <div id="tutor-say" hidden></div>
           <div id="tutor-go" class="tutor-btn" hidden><button class="go" id="tutor-continue" type="button">Continue</button></div>
           <div id="tutor-skip" class="tutor-btn" hidden><button class="alt" id="tutor-skip-btn" type="button">Skip</button></div>
@@ -2134,7 +2139,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     return { half: w / 2 + 6, up: tight ? rise : Math.max(half, rise + 2), down: tight ? drop : Math.max(sub ? fall + ss * 0.8 : half, drop + 2), rise, drop, px: o.size,
       over: 0.386 * o.size + more.over, under: 0.303 * o.size + more.under };
   }
-  function settle(x, y, box, ax, ay, alpha, quiet) {
+  function settle(x, y, box, ax, ay, alpha, quiet, probe) {          // probe: only where it would end up; nothing is placed or drawn
     const beside = (b) => Math.abs(b.x - x) < b.half + box.half;
     const free = (yy) => !placed.some((b) => beside(b) && yy - box.up < b.y + b.down && yy + box.down > b.y - b.up);
     let at = y;
@@ -2146,6 +2151,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       const spot = spots.find((yy) => yy >= top && yy <= bottom && free(yy));
       if (spot !== undefined) at = spot;
     }
+    if (probe) return at;
     placed.push({ x, y: at, half: box.half, up: box.up, down: box.down });
     // A line back to its place when the name ended up far from it. None when the place is right under the bird: the
     // name is next to it anyway.
@@ -2235,12 +2241,20 @@ button { font: inherit; color: inherit; cursor: pointer; }
       }
       const s = project(p);
       if (!s) return;
-      const box = plateBox(c, str, cls, sub), spot = dy === AREA ? areaSpot(f, c, s, box) : f.pin || null, sx = s[0] + (spot ? spot[0] : 0), x = sx + clamp(clamp(sx, box.half + 4, view.w - box.half - 4) - sx, -box.half, box.half);
+      const box = plateBox(c, str, cls, sub), spot = dy === AREA ? areaSpot(f, c, s, box) : f.pin || null, sx = s[0] + (spot ? spot[0] : 0), slideX = (lo) => sx + clamp(clamp(sx, lo + box.half, view.w - box.half - 4) - sx, -box.half, box.half);
+      let x = slideX(4);
       if (dy === OVER && bird.down) { const me = project(unit(bird.lon, bird.lat)); below = !!me && me[1] < s[1]; if (f.swap) below = !below; }          // swap: no room on that side (pinSide)
       if (cls === 'cap') { if (below) box.down = Math.max(box.down, box.px * 0.8); else box.up = Math.max(box.up, box.px * 0.8); }          // tight on the symbol's side only: on the other side the room every name keeps (a letter's tail, the next name)
-      const want = spot ? s[1] + spot[1] : dy === UNDER ? underY(s, x, box, str)
+      const wantAt = (x) => spot ? s[1] + spot[1] : dy === UNDER ? underY(s, x, box, str)
         : dy === OVER ? (cls === 'cap' ? (below ? s[1] + (CAP_RIM + CAP_GAP) * view.mk + box.over + 1.75 * nameUp() : s[1] - (CAP_RIM + CAP_GAP) * view.mk - box.under - 1.75 * nameUp()) : below ? s[1] + NEAR * view.mk + box.up : s[1] - NEAR * view.mk - box.down)
         : s[1] + (typeof dy === 'function' ? dy() : dy || 0);
+      let want = wantAt(x);
+      // The sleeping bird's postcard at the left (factEdge): a name that would lie under it keeps clear of it, slid along as
+      // a name at the screen's side is, and no farther than its own half width (a wrong landing at a country's western edge:
+      // the name under the bird reached 22 px under the postcard, Turkey by the Aegean). It moves over as the postcard comes.
+      // Judged where the name would end up (settle's spot: Niger's name, moved up off its capital's, lay on the postcard's corner).
+      const E = factEdge && factEdge.k > 0 ? factEdge : null;
+      if (E && x - box.half < E.x1) { const yy = settle(x, want, box, s[0], s[1], 0, true, true); if (yy - box.rise < E.y1 && yy + box.drop > E.y0) { x = slideX(lerp(4, E.x1, E.k)); want = wantAt(x); } }
       // never out over space, and never without what it names: under the bird it goes when the bird does
       const dot = 10 * view.mk;
       alpha *= Math.min(rimIn({ x, y: want, half: box.half, up: box.rise, down: box.drop }), rimIn(dy === UNDER ? birdBox(s) : { x: s[0], y: s[1], half: dot, up: dot, down: dot }));
@@ -2563,7 +2577,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (tab === 'challenge' && runKind === 'day' && tripDone()) return;          // one trip a day (one begun is carried on)
     S.game = tab === 'challenge' ? 'trip' : tab;
     Object.assign(S, { mode: 'fly', paused: false, t: 0, energy: TANK, n: 0, streak: 0, bestStreak: 0, firstTry: 0, fresh: 0, route: null, legs: null, tickets: [], last: null,
-      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, capAt: null, capAlso: null, capFit: null, around: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), sawCap: new Set(), newC: 0, sawN: 0, intro: null, began: null, replay: null });
+      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, capAt: null, capAlso: null, capFit: null, named: null, around: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), sawCap: new Set(), newC: 0, sawN: 0, intro: null, began: null, replay: null });
     S.log = new Map();
     S.drops = [];
     fitClear();          // no rest of the view left over from the flight before, and no way back from one (the clock starts at 0 again: fitClear)
@@ -2684,6 +2698,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const lon = bird.lon, lat = bird.lat, was = bird.at, p = unit(lon, lat);
     Object.assign(bird, { a: 0, va: 0, vx: 0, vy: 0, down: true, squash: 1 });
     S.capFit = null;          // where the view rested for the last landing (restOn)
+    S.named = null;           // the name a landing has put on the map where the bird stands (Study: strand, warm); the sleeping bird's postcard leaves it out then
     const here = locationAt(lon, lat);
     bird.at = here.key;
     if (S.game === 'free') { (here.sea || here.wet ? sfx.splash : sfx.thud)(); showPlace(here); return; }
@@ -2710,18 +2725,35 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const FACTS = D.facts || {};
   // Study's results: a fun fact about a location from the flight, on a postcard beside the globe; a
   // different one every 45 s. Left out when no location has a checked fact, or the globe leaves no room.
-  let factTimer = 0, sleepFact = false, pauseFactTimer = 0, landFact = null;
+  let factTimer = 0, sleepFact = false, sleepBare = false, sleepRest = null, factEdge = null, pauseFactTimer = 0, landFact = null;          // factEdge: the box of the sleeping bird's postcard at the left, for the names (label): { x1, y0, y1, on, t, k }
   const factCard = (c, f) => '<svg class="stamp" viewBox="0 0 30 36" aria-hidden="true"><use href="#i-stamp"/></svg><div class="lab">Fun fact</div>' +
     '<div class="ttl' + (c.water ? ' sea' : '') + '">' + (c.a2 && !c.water ? flagImg(c, '') : '') + esc(c.name) + '</div><p>' + esc(f) + '</p>';
   // The sleeping bird: a fun fact about where it sleeps, on the same postcard. To the bird's left, level
   // with it (clear of the z's, which drift up and to the right); to its right and a little lower when the
   // left has no room or the pause card is up there. Kept above the bar at the bottom; placed again when
   // the game pauses or the window changes size.
+  // Where a landing has put the place's name on the map (a wrong landing in a country or a sea, or a landing in the
+  // country of the capital that is asked): the fact alone, at the left, where a delivered postcard's fact stands
+  // (bareFact), with no flag and no name on it: the map names the place. (The player's pick by button, 2026-11-19, from
+  // picture SLEEP-fact: "B: fun fact at the left", over "A: no fun fact". Until then the postcard by the bird named the
+  // country a second time and could lie on the capital's name, its symbol and most of the flag: a landing by Strasbourg.)
+  // Where the postcard there would lie on the country, its capital, the bird or their names (a country that fills the
+  // view: Russia, Canada), the view slides aside for it and rests on the country beside the postcard, as it does for a
+  // delivered postcard's fact (restBeside), and back when the postcard goes. By the bird as before: at a flight's start
+  // (nothing on the map names the place), while the pause card stands at the left, and in a window 900 px wide or narrower.
   function showSleepFact() {
     sleepFact = true;
     const here = locationAt(bird.lon, bird.lat), c = here.sea ? (here.w >= 0 ? WATERS[here.w] : null) : here.c;
     const facts = c ? FACTS[(here.sea ? 's:' : 'c:') + c.id] || [] : [];
     if (!facts.length) return;
+    if (S.named === c.name && $('card').hidden && view.w > 900) {          // the card: the pause card, at the left
+      sleepBare = true;
+      const card = bareFact(facts[0]);
+      factEdge = { x1: card.x1, y0: card.y0, y1: card.y1, on: true, t: S.t, k: 0 };
+      restBeside(here.sea ? null : c, card);
+      return;
+    }
+    sleepBare = false;
     const el = $('funfact');
     el.innerHTML = factCard(here.sea ? Object.assign({ water: true }, c) : c, facts[0]);
     el.classList.remove('bare'); el.style.width = '300px';
@@ -2731,7 +2763,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   function placeSleepFact() {
     const el = $('funfact');
-    if (!sleepFact || el.hidden) return;
+    if (!sleepFact || sleepBare || el.hidden) return;
     const g = project(unit(bird.lon, bird.lat));
     if (!g) { el.hidden = true; return; }
     const u = view.ui, w = 300 * u, half = el.offsetHeight * u / 2 + 12;
@@ -2749,6 +2781,51 @@ button { font: inherit; color: inherit; cursor: pointer; }
     sleepFact = false;
     const el = $('funfact');
     el.hidden = true; el.style.left = el.style.top = el.style.visibility = '';
+    if (sleepBare) { sleepBare = false; el.classList.remove('bare'); if (factEdge) Object.assign(factEdge, { on: false, t: S.t }); restBack(); }
+  }
+  // The view between the rest a landing gave it (restOn: the country in the middle of the screen) and the rest beside
+  // the sleeping bird's postcard. sleepRest: { A: the landing's rest, home: its own fit, side: the fit beside the
+  // postcard, from, to, t0, T }. Only when the postcard would lie on something of the place: a point of the country (the
+  // part the bird stands on), its capital's symbol or the bird, or when the bird stands in the postcard's column right
+  // over or under it (Niger's name by a bird on Niamey, in a window 1440 px wide). Worked out with the camera put at the
+  // rest, by the game's clock. The way there and back takes what a rest takes to arrive (restSecs' measure: longer the farther and
+  // the more the height changes).
+  function restBeside(c, card) {
+    const A = S.capFit;
+    if (!c || !card || !A || !A.fit || A.done || A.free || S.look) return;
+    if (sleepRest && sleepRest.A === A) return restGo(sleepRest.side);          // woken and asleep again before the view was back
+    const cap = unit(c.cap[1], c.cap[2]), me = unit(bird.lon, bird.lat), saved = Object.assign({}, cam);
+    aim(A.fit.c, A.fit.H, A.fit.rx, A.fit.ry);
+    const under = (q, r) => { const at = project(q); return !!at && at[0] - r < card.x1 && at[0] + r > card.x0 && at[1] - r < card.y1 && at[1] + r > card.y0; };
+    // the bird in the postcard's column, a name's height over or under it: the name that stands by the bird could not be slid clear (it stays on the bird)
+    const at = project(me), room = 200 * view.ui / 1.5, column = !!at && at[0] - 24 * view.mk < card.x1 && at[1] + room > card.y0 && at[1] - room < card.y1;
+    const hit = column || under(cap, 12 * view.mk) || under(me, 24 * view.mk) || partPoints(c, partAt(c, bird.lon, bird.lat)).some((q) => under(q, 0));
+    Object.assign(cam, saved);
+    const side = hit ? fitFor({ land: c, also: [cap], least: view.H0 }, card) : null;
+    if (!side) return;
+    sleepRest = { A, home: A.fit, side };
+    restGo(side);
+  }
+  function restGo(to) {
+    const R = sleepRest, from = R.A.fit;
+    const far = Math.max(Math.abs(Math.log(to.H / from.H)) / Math.log(4), Math.hypot(to.rx - from.rx, to.ry - from.ry) / (600 * view.ui));
+    Object.assign(R, { from, to, t0: S.t, T: REVEAL * (1 + 1.25 * clamp(far, 0, 1)) });
+  }
+  function restBack() {
+    const R = sleepRest;
+    if (!R) return;
+    if (S.capFit !== R.A || !bird.down || R.A.done || R.A.free) { sleepRest = null; return; }          // the bird is off, or the view is on its way back to the bird: nothing to bring back
+    restGo(R.home);
+  }
+  function stepSleepRest() {
+    const E = factEdge;
+    if (E) { const p = arrive((S.t - E.t) / REVEAL); E.k = E.on ? p : 1 - p; if (!E.on && p >= 1) factEdge = null; }
+    const R = sleepRest;
+    if (!R) return;
+    if (S.capFit !== R.A || !bird.down || R.A.done || R.A.free) { sleepRest = null; return; }
+    const q = arrive((S.t - R.t0) / R.T);
+    R.A.fit = q >= 1 ? R.to : { c: slerp(R.from.c, R.to.c, q), H: Math.exp(lerp(Math.log(R.from.H), Math.log(R.to.H), q)), rx: lerp(R.from.rx, R.to.rx, q), ry: lerp(R.from.ry, R.to.ry, q), whole: R.to.whole };
+    if (q >= 1 && R.to === R.home) sleepRest = null;          // back at the landing's own rest
   }
   // A delivered postcard in Study shows the fact of where you are (the player's family, 2026-11-14: "when you land in a
   // country in study mode ... it should have a fun fact. One fun fact ... it can almost look like the postcard at the
@@ -2768,9 +2845,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     landFact = f;
     return putLandFact();
   }
-  function putLandFact() {
+  function putLandFact() { return bareFact(landFact); }
+  // The fun-fact postcard with the fact alone on it, at the left. It returns its box on the screen.
+  function bareFact(fact) {
     const el = $('funfact');
-    el.innerHTML = '<svg class="stamp" viewBox="0 0 30 36" aria-hidden="true"><use href="#i-stamp"/></svg><div class="lab">Fun fact</div><p>' + esc(landFact) + '</p>';
+    el.innerHTML = '<svg class="stamp" viewBox="0 0 30 36" aria-hidden="true"><use href="#i-stamp"/></svg><div class="lab">Fun fact</div><p>' + esc(fact) + '</p>';
     el.classList.add('bare', 'fading');
     el.style.left = el.style.top = el.style.visibility = ''; el.style.width = '300px';
     el.hidden = false;
@@ -2778,7 +2857,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const r = el.getBoundingClientRect(), st = stage.getBoundingClientRect();
     return { x0: r.left - st.left - 12, x1: r.right - st.left + 12, y0: r.top - st.top - 12, y1: r.bottom - st.top + 12 };
   }
-  function hideFunFact() { clearInterval(factTimer); factTimer = 0; sleepFact = false; landFact = null; const el = $('funfact'); el.hidden = true; el.classList.remove('bare'); el.style.left = el.style.top = el.style.visibility = ''; }
+  function hideFunFact() { clearInterval(factTimer); factTimer = 0; sleepFact = sleepBare = false; sleepRest = factEdge = null; landFact = null; const el = $('funfact'); el.hidden = true; el.classList.remove('bare'); el.style.left = el.style.top = el.style.visibility = ''; }
   function showFunFact(places) {
     hideFunFact();
     const pool = [], seenKeys = new Set();
@@ -3505,7 +3584,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const TUTOR_LEAD = 0.6;                 // seconds the view takes to rise from where the bird stands before the globe turns to a start (the tutorial's round)
   const SAY = {
     space: 'Hold <kbd class="space">Space</kbd> to fly up.',
-    arrows: 'Use <span class="arrows"><kbd class="up">&uarr;</kbd><kbd>&larr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd></span> to navigate.',
+    // both ways of steering, as the How to play card's own row shows them (the player's pick by button, 2026-11-19: "Both"; until then the arrow keys alone, though
+    // press and pull steers since 2026-11-18 and moved this lesson on already)
+    arrows: 'Use <span class="arrows"><kbd class="up">&uarr;</kbd><kbd>&larr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd></span> or <span class="mouse">' +
+      '<svg viewBox="0 0 26 38" role="img" aria-label="the mouse:"><rect x="1.5" y="1.5" width="23" height="35" rx="11.5" fill="var(--paper)"/><path d="M1.5 15 V13 A11.5 11.5 0 0 1 13 1.5 V15 Z" fill="var(--ink)"/><path d="M1.5 15 H24.5 M13 1.5 V15" fill="none"/></svg>' +
+      '<span>press and pull</span></span> to navigate.',
     letgo: '<span>Flying up uses energy. Let go to glide down.</span>',
     land: '<span>Find somewhere nice to land.</span>',
     rule: '<span>A postcard will name a location.<br>You have one attempt to land there.</span>',
@@ -3677,7 +3760,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     Object.assign(T, { wait: true, ready: false, count: S.t + COUNT, next: i, reveal: null, lesson: null });
     if (S.capFit) S.capFit.done = true;          // the view goes back to the bird (placeCamera); the landing's names keep their size meanwhile (flagUp)
     if (!T.endless) { S.cap = S.energy = 1; T.cheap = 0; }          // a Day Trip's ring is full again for the round to come
-    $('trip-clock').hidden = false; $('trip-secs').textContent = '0.0 s'; $('trip-bar').style.width = '0%';
+    $('trip-clock').hidden = false; $('trip-secs').textContent = '0.0 sec'; $('trip-bar').style.width = '0%';
     const node = document.createElement('div');
     node.className = 'ticket ask';
     node.innerHTML = '<div class="addr"><span class="kind">' + (i ? 'Next location in' : T.tutor ? 'Location in' : 'First location in') + '</span><span class="what" id="trip-count">' + COUNT + '</span></div>';
@@ -3721,7 +3804,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   // the stopwatch: the seconds, and the time line under them (the mark in its middle is the fair time)
   function showClock(took) {
-    $('trip-secs').textContent = took.toFixed(1) + ' s';
+    $('trip-secs').textContent = took.toFixed(1) + ' sec';
     $('trip-bar').style.width = (100 * clamp(took / (2 * S.trip.fair), 0, 1)).toFixed(1) + '%';
   }
   function tripTick(dt) {
@@ -4013,7 +4096,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function statsRow(T, i) {
     const R = T.rounds[i], r = T.results[i];
     return '<tr' + (r.path ? ' data-i="' + i + '"' : '') + '><td class="n">' + (i + 1) + '</td>' + givenCell(R) + youCell(r, R) +
-      '<td class="num">' + out(r.closeness, accMax(T, R)) + '</td><td class="num">' + out(r.right ? r.speed : NOT_EARNED, partMax(T, R)) + '</td><td class="num">' + r.secs.toFixed(1) + ' s</td>' +
+      '<td class="num">' + out(r.closeness, accMax(T, R)) + '</td><td class="num">' + out(r.right ? r.speed : NOT_EARNED, partMax(T, R)) + '</td><td class="num">' + r.secs.toFixed(1) + ' sec</td>' +
       '<td class="num">' + out(r.right ? r.energy || 0 : NOT_EARNED, partMax(T, R)) + '</td><td class="pts">' + out(r.pts, roundWorth(T, R)) + '</td></tr>';
   }
   function rankedStats(T) {
@@ -4351,7 +4434,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // only says how far; after that it counts as a wrong landing, so hunting around has a price.
   function warm(t, p, lon, lat) {
     const c = t.it.c, off = kmBetween(lon, lat, c.cap[1], c.cap[2]);
-    S.said = 'correct country';
+    S.said = 'correct country'; S.named = c.name;
     flash(c, 1, FLASH);
     ring(p, 6, 30, PAPER, 2.5, 0.5);
     outlined(label(t.shown ? null : c, c.name, p, 'name', GROUND, popLine(c), UNDER), c);      // shown the way: the capital's name is still up, with the flag. No capital line here: the postcard itself names it. The population, as under any country a landing names
@@ -4405,7 +4488,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const cost = t && t.isNew ? MISS_NEW : MISS;          // nobody is expected to know what they have never met
     S.energy = Math.max(0, S.energy - cost);
     S.streak = 0;
-    S.said = here.name;
+    S.said = S.named = here.name;
     S.gain = -1;
     ring(p, 6, 30, BAD, 2.5, 0.5);
     const lit = here.c || (here.sea && here.w >= 0 ? WATERS[here.w] : null);
@@ -4588,7 +4671,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (on && !asleep) {
       hideSleepFact();
       if (S.game === 'study' && bird.down) pauseFactTimer = setTimeout(() => { if (S.paused) showSleepFact(); }, IDLE_SLEEP * 1000);
-    } else if (on && landFact) showSleepFact();
+    } else if (on && (landFact || sleepBare)) { hideSleepFact(); showSleepFact(); }
     else placeSleepFact();
     if (!on && landFact) { hideSleepFact(); putLandFact(); }
     if (!on) { S.idle = 0; stage.focus({ preventScroll: true }); }
@@ -4657,6 +4740,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // not in Free flight (its card already has the facts) or Challenge (a clock is running)
     if (landFact && !bird.down) hideFunFact();          // a landing's fact goes at take-off
     if (bird.down && S.idle > IDLE_SLEEP + 1 && S.game === 'study') { if (!sleepFact && !landFact) showSleepFact(); } else hideSleepFact();
+    stepSleepRest();
     if (S.idle > IDLE_PAUSE) { setPaused(true, true); return; }
 
     // Flapping is the only thing that costs energy. With none left, you can only glide down.
