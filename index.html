@@ -3061,6 +3061,44 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // (until 2026-11-15 their dots stood bare: three in the picture of Italy). Round about: within NEAR_DOT_KM of the
     // outline of where you landed. Not one whose dot lies under the capital's star (Vatican City's under Rome's).
     const edge = A.land && A.land.fine ? partPoints(A.land, partAt(A.land, bird.lon, bird.lat)) : A.water && !isOcean(A.water) ? seaShape(A.water) : [];
+    // Where the bold border of the land you came down in runs (aroundWash's border, 3.5 k wide): a mask of the screen
+    // in squares of 2 px, set half that width and a gap of 2 k to either side of it. For the names round about, below:
+    // a name whose letters would stand on that border moves clear of it. (Until 2026-11-19 such a name needed 6 tenths
+    // of its box over its own country or water and nothing more: at 1913 x 1073 a name's letters stood on the border
+    // in 32 of 220 landings, "MOROCCO" above Western Sahara among them. THE WHOLE LIST 38.)
+    const FINE = 2, fcols = Math.ceil(view.w / FINE), frows = Math.ceil(bottom / FINE), inked = new Uint8Array(fcols * frows);
+    if (A.land && A.land.fine) {
+      const reach = Math.ceil((3.5 * k / 2 + 2 * k) / FINE), least = 4 * 3.5 * k;
+      let last = -1;
+      const stamp = (x, y) => {
+        const ci = Math.floor(x / FINE), cj = Math.floor(y / FINE), at = cj * fcols + ci;
+        if (at === last || ci < -reach || cj < -reach || ci >= fcols + reach || cj >= frows + reach) return;
+        last = at;
+        for (let j = Math.max(0, cj - reach); j <= Math.min(frows - 1, cj + reach); j++) inked.fill(1, j * fcols + Math.max(0, ci - reach), j * fcols + Math.min(fcols - 1, ci + reach) + 1);
+      };
+      for (const r of A.land.fine) {
+        const pts = [];
+        let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+        for (let i = 0; i < r.length; i += 2) {
+          const q = project(unit(r[i] / 100, r[i + 1] / 100));
+          pts.push(q);
+          if (q) { if (q[0] < x0) x0 = q[0]; if (q[0] > x1) x1 = q[0]; if (q[1] < y0) y0 = q[1]; if (q[1] > y1) y1 = q[1]; }
+        }
+        if (Math.max(x1 - x0, y1 - y0) < least) continue;          // a piece too small for a border has none (aroundWash)
+        for (let i = 0; i < pts.length; i++) {
+          const a = pts[i], b = pts[(i + 1) % pts.length];
+          if (!a || !b || Math.max(a[0], b[0]) < -40 || Math.min(a[0], b[0]) > view.w + 40 || Math.max(a[1], b[1]) < -40 || Math.min(a[1], b[1]) > bottom + 40) continue;
+          const steps = Math.min(4000, Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / FINE)));
+          for (let n = 0; n <= steps; n++) stamp(a[0] + (b[0] - a[0]) * n / steps, a[1] + (b[1] - a[1]) * n / steps);
+        }
+      }
+    }
+    const onBorder = (x0, y0, x1, y1) => {
+      for (let j = Math.max(0, Math.floor(y0 / FINE)); j <= Math.min(frows - 1, Math.floor(y1 / FINE)); j++)
+        for (let i = Math.max(0, Math.floor(x0 / FINE)); i <= Math.min(fcols - 1, Math.floor(x1 / FINE)); i++) if (inked[j * fcols + i]) return true;
+      return false;
+    };
+    const laid = [];          // every name round about as it is laid: its box, its spot, its letters' reach
     const nearCos = Math.cos(NEAR_DOT_KM / R_KM);
     for (const { t, s, dot: own } of tinies) {
       if (t === A.c || !edge.some((q) => dot(q, t.u) >= nearCos)) continue;
@@ -3076,6 +3114,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
         if (!spot) continue;
         boxes.push(b);
         L.near.push({ name: label, p: unit(spot[0], spot[1]), small: px, water: false, track: '0.12em', tiny: t.name });
+        laid.push({ at: L.near.length - 1, b, x, y, w, up: px * 0.38, down: px * 0.38, dot: { s, g2, own, px } });
         break;
       }
     }
@@ -3094,7 +3133,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
       const label = water ? c.name : c.name.toUpperCase(), track = water ? '0.03em' : '0.12em';
       ctx.font = (water ? 'italic 600 ' : '700 ') + px + 'px ' + DISPLAY;
       if ('letterSpacing' in ctx) ctx.letterSpacing = track;
-      const w = ctx.measureText(label).width, own = water ? null : project(c.u);
+      ctx.textBaseline = 'middle';          // as the name is drawn (text): the letters' reach over and under the spot
+      const ink = ctx.measureText(label), w = ink.width, own = water ? null : project(c.u);
       let best = null;
       for (const n of seen.get(c)) {
         const x = (n % cols + 0.5) * CELL, y = (Math.floor(n / cols) + 0.5) * CELL;
@@ -3112,7 +3152,46 @@ button { font: inherit; color: inherit; cursor: pointer; }
       if (!spot) continue;
       boxes.push(best.b);
       L.near.push({ name: label, p: unit(spot[0], spot[1]), small: px, water, track });          // p: the spot of the map the name stands on
+      laid.push({ at: L.near.length - 1, b: best.b, x: best.x, y: best.y, w, up: ink.actualBoundingBoxAscent, down: ink.actualBoundingBoxDescent, c, px, water, own });
     }
+    // Then a name whose letters stand on the bold border of the land you came down in moves to a spot clear of it, if
+    // it has one in the room the other names leave: no other name moves for it and none is lost. A name with no such
+    // spot stays (a neighbor smaller than its own name: "BANGLADESH" inside India's border). A neighbor's or a water's
+    // name looks 36 px from the screen's edge first, then 20 px, as a dot's name may stand (a neighbor seen only as a
+    // strip along the edge: "MOROCCO" above Western Sahara); a dot's name tries its other sides.
+    for (const it of laid) {
+      if (!onBorder(it.x - it.w / 2, it.y - it.up, it.x + it.w / 2, it.y + it.down)) continue;
+      boxes.splice(boxes.indexOf(it.b), 1);          // its own box is no hindrance to it
+      let best = null;
+      if (it.dot) {
+        const { s, g2, own, px } = it.dot, w = it.w;
+        for (const [x, y] of [[s[0] + g2 + w / 2, s[1]], [s[0] - g2 - w / 2, s[1]], [s[0], s[1] + g2 + px * 0.5], [s[0], s[1] - g2 - px * 0.5]]) {
+          const b = { x0: x - w / 2 - 4, x1: x + w / 2 + 4, y0: y - px * 0.7, y1: y + px * 0.7 };
+          if (named(b, 20) || crowds(b, g2, own) || onBorder(x - w / 2, y - it.up, x + w / 2, y + it.down) || !unproject(x, y)) continue;
+          best = { b, x, y };
+          break;
+        }
+      } else {
+        const { c, px, water, own, w } = it;
+        for (const M of [36, 20]) {
+          for (const n of seen.get(c)) {
+            const x = (n % cols + 0.5) * CELL, y = (Math.floor(n / cols) + 0.5) * CELL;
+            const b = { x0: x - w / 2 - 6, x1: x + w / 2 + 6, y0: y - px * 0.75, y1: y + px * 0.75 };
+            if (named(b, M) || onBorder(x - w / 2, y - it.up, x + w / 2, y + it.down)) continue;
+            const inside = share(b, c);
+            if (inside < (water ? 0.85 : 0.6)) continue;
+            const pad = px * (water ? 1.4 : 0.7), room = share({ x0: b.x0 - pad, x1: b.x1 + pad, y0: b.y0 - pad, y1: b.y1 + pad }, c);
+            const sc = inside + room - (own ? Math.hypot(own[0] - x, own[1] - y) / 3000 : 0);
+            if (!best || sc > best.sc) best = { sc, b, x, y };
+          }
+          if (best) break;
+        }
+      }
+      const spot = best && unproject(best.x, best.y);
+      if (spot) { L.near[it.at].p = unit(spot[0], spot[1]); it.b = best.b; }
+      boxes.push(it.b);
+    }
+
     L.pxRad = cam.pxRad;          // the scale the names are laid out at
     L.own = A.land && A.land.fine ? A.land : null;          // the land you came down in: a country, or a land that is never asked (Greenland)
     L.seaPieces = L.own || !A.water ? null : D.seas.filter((x) => x.w === WATERS.indexOf(A.water));
