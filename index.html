@@ -2182,6 +2182,23 @@ button { font: inherit; color: inherit; cursor: pointer; }
         if (covers(y, at)) { const up = above(); if (!covers(up, at) && !fx.some((f) => { const m = f.at && f.name !== own ? project(f.at) : null; return !!m && covers(up, m); })) return up; }
       }
     }
+    // Day Trip and Ranked, the bird down in another country than the answer's: the name of where you came down never
+    // stands on the country that was asked (or, of a capital or a city asked, on its country). When the spot under the
+    // bird lies on it (more than 3 of 15 points of the name and flag) and the spot above the bird lies on less of it,
+    // the name stands above the bird. (Hungary asked, the bird down in Slovakia: Slovakia's red name and flag stood in
+    // the middle of Hungary. The player, from a picture of it both ways, by button: "Outline and move". PLAN 127.)
+    // Worked out again only when the view or the spot has moved.
+    const v = S.trip && S.trip.reveal;
+    if (v && bird.down) {
+      const key = Math.round(Math.log(cam.pxRad) * 6) + '|' + Math.round(x) + '|' + Math.round(y);
+      if (v.offKey !== key) {
+        const A = S.trip.rounds[S.trip.i].c, up = above();
+        const on = (yy) => { let n = 0; for (let i = 0; i < 5; i++) for (let j = 0; j < 3; j++) { const ll = unproject(x - box.half + 6 + (2 * box.half - 12) * i / 4, yy - box.rise + (box.rise + box.drop) * j / 2), r = ll && regionAt(ll[0], ll[1]); if (r && r.c === A) n++; } return n; };
+        const under = on(y);
+        v.offKey = key; v.off = under > 3 && on(up) < under;
+      }
+      if (v.off) return above();
+    }
     if (!L) return y;
     const len = Math.acos(clamp(dot(L[0], L[1]), -1, 1)) * cam.pxRad, far = Math.hypot(box.half, y + box.down - s[1]) + 12 * view.mk;
     let crossed = false;
@@ -2199,6 +2216,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     let below = false;        // by a pin: under it, when the bird is above it. Chosen while the bird is on the ground.
     const f = animate(hold ? 1e9 : secs, (k) => { ownName = secs === GROUND; try { paint(k); } finally { ownName = false; } }, true);
     function paint(k) {
+      f.shownA = 0;          // how strongly the name stands in this frame: its country's border is drawn as strongly (drawOutlines)
       let alpha = fade(k);
       if (hold) {
         if (until ? !until() : !bird.down || S.mode !== 'fly') { if (f.lift === undefined) f.lift = until ? f.t : Math.max(f.t, 1.2); }
@@ -2217,6 +2235,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       const dot = 10 * view.mk;
       alpha *= Math.min(rimIn({ x, y: want, half: box.half, up: box.rise, down: box.drop }), rimIn(dy === UNDER ? birdBox(s) : { x: s[0], y: s[1], half: dot, up: dot, down: dot }));
       if (alpha <= 0) return;
+      f.shownA = alpha;
       const moved = spot && (spot[0] || spot[1]), y = settle(x, want, box, s[0], s[1], alpha, moved);          // moved inside its country or beside it: no line either way
       // (Until 2026-11-18 a name beside its country was tied to the country's middle by a line with a dot. The player, of
       // Panama and Nicaragua in Study: "for some reason it draws a line to the country ... it just didn't seem like it
@@ -2228,6 +2247,42 @@ button { font: inherit; color: inherit; cursor: pointer; }
     }
     f.at = p; f.name = str;          // what it names and where: another name's spot above the bird is judged against it (underY)
     return f;
+  }
+  // A country that a landing names wears a thick ink border for as long as its name stands, and loses it as the name
+  // goes: Free flight's border of the country you came down in (the player, 2026-11-11: "Maybe bold the border of the
+  // country you land in?"), 3.5 times the marks' scale, 5 px on a big screen. In Study: a delivered country, the
+  // country of a wrong landing, "correct country". In Day Trip and Ranked: the country that was asked, and the country
+  // a wrong landing names. Why: the flag with its name is as big as Croatia as drawn, so by a small country they stand
+  // on a neighbor (Slovakia's flag on the Czech Republic, its name on Poland; in 11 of 100 of 1,170 landings none of
+  // them touched their own country), and since the line went (PLAN 127) nothing tied them to their country. No other
+  // spot mends it: beside its country a name lies on a neighbor more often still (19 of 100). Google Maps outlines a
+  // country you select. (The player, from pictures of Slovakia, Panama and a Ranked landing with and without it, by
+  // button: "Outline it", "Outline and move". PLAN 127.) Not a country drawn as a dot: its dot has its own ring. A piece
+  // of the country too small to show an inside (under 4 line widths across: an islet) gets none: it would be a blot.
+  // Drawn under every mark on the map (a capital's symbol, a tiny country's dot, the landing's dot), the bird and
+  // every name: a border is the ground, a mark stands on it.
+  const OUTLINE = 3.5;
+  const outlined = (f, c) => { if (c && c.fine && !c.tiny) f.lined = c; return f; };
+  function drawOutlines() {
+    const lw = OUTLINE * view.mk, key = [cam.n[0], cam.n[1], cam.n[2], cam.H, cam.cx, cam.cy, view.w, view.h].join();
+    for (const f of fx) {
+      if (!f.lined || !(f.shownA > 0)) continue;
+      if (f.lineKey !== key) {          // traced again only when the view has moved
+        f.lineKey = key; f.line = new Path2D();
+        for (const r of f.lined.fine) {
+          const pts = []; let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+          for (let i = 0; i < r.length; i += 2) { const q = project(unit(r[i] / 100, r[i + 1] / 100)); pts.push(q); if (q) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); } }
+          if (Math.max(x1 - x0, y1 - y0) < 4 * lw) continue;
+          // a piece partly round the back of the globe: each stretch in sight is a line of its own, never closed by a
+          // chord across the map (begun just after a hidden point, so no stretch runs through the ring's first point)
+          const n = pts.length, gap = pts.findIndex((q) => !q);
+          let pen = false;
+          for (let k = 1; k <= n; k++) { const q = pts[(gap + k + n) % n]; if (!q) { pen = false; continue; } if (pen) f.line.lineTo(q[0], q[1]); else { f.line.moveTo(q[0], q[1]); pen = true; } }
+          if (gap < 0) f.line.closePath();
+        }
+      }
+      ctx.save(); ctx.globalAlpha = f.shownA; ctx.lineJoin = 'round'; ctx.strokeStyle = INK; ctx.lineWidth = lw; ctx.stroke(f.line); ctx.restore();
+    }
   }
   function ring(p, from, to, col, width, secs) {
     animate(secs, (k) => {
@@ -3695,11 +3750,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // is in the answer's own country: the answer's name already carries that country and its flag.
     const col = right ? GOOD : BAD;        // the verdict is worn by the landing: its ring and its name
     if (countryRound) { if (right) flash(R.c, 1, FLASH); else flash(R.c, 0, 4, null, 0.5); }      // the answer: lit as a delivery is, or held paper-white while you find it
-    if (!right && here.name && (here.sea || here.c !== R.c)) label(here.sea ? null : here.c, here.name, p, here.sea ? 'wrongsea' : 'wrong', GROUND, here.sea ? null : underName(here), UNDER);
+    if (!right && here.name && (here.sea || here.c !== R.c)) outlined(label(here.sea ? null : here.c, here.name, p, here.sea ? 'wrongsea' : 'wrong', GROUND, here.sea ? null : underName(here), UNDER), here.sea ? null : here.c);
     // a country round's answer: its capital under its name, as under any country a landing names. A capital: its country,
     // left out where the capital has the country's own name (Singapore, Monaco: until 2026-11-15 the name stood twice)
     const sub = R.kind === 'city' ? R.c.name + ', population ~' + people(R.city.pop) : countryRound ? capLine(R.c) : R.c.name === R.name ? null : R.c.name;
-    label(R.c, R.name, R.p, 'name', GROUND, sub, countryRound ? AREA : OVER);
+    outlined(label(R.c, R.name, R.p, 'name', GROUND, sub, countryRound ? AREA : OVER), countryRound ? R.c : null);          // a country asked: its border (a capital's name names the city)
     ring(p, 6, 30, col, 2.5, 0.5);
     (right ? (tier === 'spot' ? sfx.spot : sfx.drop) : sfx.miss)();
     const node = document.createElement('div');
@@ -4158,7 +4213,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       const clear = on && (Math.abs(there[0] - me.x) >= box.half + me.half || there[1] - box.up >= me.y + me.down || there[1] + box.down <= me.y - me.up);
       Object.assign(cam, saved);
       if (cap) markCapital(c);          // before the country's name: the capital's name takes its spot next to its symbol, the country's name keeps off both
-      label(c, c.name, clear ? c.u : p, 'name', GROUND, sub, clear ? AREA : UNDER);
+      outlined(label(c, c.name, clear ? c.u : p, 'name', GROUND, sub, clear ? AREA : UNDER), c);
       ring(p, 4, 22, INK, 2.5, 0.45);
     }
     (spot ? sfx.spot : sfx.drop)();
@@ -4172,7 +4227,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     S.said = 'correct country';
     flash(c, 1, FLASH);
     ring(p, 6, 30, PAPER, 2.5, 0.5);
-    label(t.shown ? null : c, c.name, p, 'name', GROUND, popLine(c), UNDER);      // shown the way: the capital's name is still up, with the flag. No capital line here: the postcard itself names it. The population, as under any country a landing names
+    outlined(label(t.shown ? null : c, c.name, p, 'name', GROUND, popLine(c), UNDER), c);      // shown the way: the capital's name is still up, with the flag. No capital line here: the postcard itself names it. The population, as under any country a landing names
     if (!t.warm) {
       t.warm = true;
       sfx.thud();
@@ -4228,7 +4283,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (here.c && !here.sea && here.c.where && memOf(here.c.where).box === 0 && !S.saw.has(here.c.id)) S.saw.set(here.c.id, (S.newC + Math.floor(Math.random() * SAW_WITHIN)) * 1e4 + S.sawN++);
     const cap = !here.sea && capShown(here.c);
     if (cap) { markCapital(here.c); restOn(here.c); }          // the capital's name before the country's (as for a delivery)
-    if (here.name) label(here.sea ? null : here.c, here.name, p, here.sea ? 'wrongsea' : 'wrong', GROUND, here.sea ? null : (cap ? null : underName(here)) || popLine(here.c), UNDER);
+    if (here.name) outlined(label(here.sea ? null : here.c, here.name, p, here.sea ? 'wrongsea' : 'wrong', GROUND, here.sea ? null : (cap ? null : underName(here)) || popLine(here.c), UNDER), here.sea ? null : here.c);
     sfx.miss();
     if (t) countAgainst(t);
   }
@@ -5521,6 +5576,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     ctx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
     ctx.setTransform(d, 0, 0, d, 0, 0);
     drawZones();
+    drawOutlines();          // under every mark: a capital's symbol on the coast or the border stays whole (the player, of Panama City's in the first picture: "uhhh capital cut off?")
     drawDots();
     topHover = arrived = null;
     if (S.mode === 'fly') drawDrops();
@@ -6074,7 +6130,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // for the tests: the bird put somewhere by hand. That is no flight, so the view is the bird's own at once (no rest on the last landing's country still being handed back)
   const setBird = (lon, lat, a, down) => { Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down }); S.capFit = null; Object.assign(fitv, { on: false, k: 0, lh: null, s0: 1 }); };
   window.birdsEye = { hoverBox: () => hoverBox, slerp, showLeg, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, flagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
-    pull, pullBy, steerable, PULL_FULL, PULL_RING, project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
+    outlines: () => fx.filter((f) => f.lined && f.shownA > 0).map((f) => f.lined.id), OUTLINE, pull, pullBy, steerable, PULL_FULL, PULL_RING, project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
   if (gl) {
