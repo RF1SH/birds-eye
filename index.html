@@ -2193,26 +2193,36 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // the nearest to the country's middle.
   const STACK_PAD = 5;
   let stackMask = null;
-  function stackSpot(c, str, cls, sub, card) {
-    const s = project(c.u), me = project(unit(bird.lon, bird.lat));
-    if (!s || !me || !c.flag || !c.fine) return null;
-    const up = [birdBox(me)];
-    let F;
+  // What a frame places before a landing's own name, in the view as it is: the bird, each capital's symbol (markCapital)
+  // and each capital's name where label puts it (under its symbol when the bird is above the symbol, else over it, and
+  // moved off the bird and the symbols as settle moves it). For what is worked out once, for a view at rest (stackSpot,
+  // besideBird). A change to which side a capital's name takes is a change here too. caps: [{ name, p }]; me: the
+  // bird's place on the screen.
+  function capMarks(caps, me) {
+    const up = [birdBox(me)], was = ownName, r = 11.5 * view.mk, at = caps.map((A) => project(A.p));
+    for (const q of at) if (q) up.push({ x: q[0], y: q[1], half: r, up: r, down: r });
     ownName = true;
     try {
-      F = stackForm(c, str, cls, sub);
-      const q = capShown(c) ? project(unit(c.cap[1], c.cap[2])) : null;
-      if (q) {
-        const box = plateBox(null, c.cap[0], 'cap', null), below = me[1] < q[1], off = (CAP_RIM + CAP_GAP) * view.mk + 1.75 * nameUp(), r = 11.5 * view.mk;
+      caps.forEach((A, i) => {
+        const q = at[i];
+        if (!q) return;
+        const box = plateBox(null, A.name, 'cap', null), below = me[1] < q[1], off = (CAP_RIM + CAP_GAP) * view.mk + 1.75 * nameUp();
         if (below) box.down = Math.max(box.down, box.px * 0.8); else box.up = Math.max(box.up, box.px * 0.8);
         const x = q[0] + clamp(clamp(q[0], 4 + box.half, view.w - box.half - 4) - q[0], -box.half, box.half);
-        up.push({ x: q[0], y: q[1], half: r, up: r, down: r });
-        const frame = placed.splice(0, placed.length, ...up);          // what a frame has placed before the capital's name: the bird and the symbol
+        const frame = placed.splice(0, placed.length, ...up);          // what a frame has placed before the capital's name: the bird and the symbols
         const y = settle(x, below ? q[1] + off + box.over : q[1] - off - box.under, box, q[0], q[1], 0, true, true);
         placed.splice(0, placed.length, ...frame);
         up.push({ x, y, half: box.half, up: box.up, down: box.down });
-      }
-    } finally { ownName = false; }
+      });
+    } finally { ownName = was; }
+    return up;
+  }
+  function stackSpot(c, str, cls, sub, card) {
+    const s = project(c.u), me = project(unit(bird.lon, bird.lat));
+    if (!s || !me || !c.flag || !c.fine) return null;
+    let F, up;
+    ownName = true;
+    try { F = stackForm(c, str, cls, sub); up = capMarks(capShown(c) ? [{ name: c.cap[0], p: unit(c.cap[1], c.cap[2]) }] : [], me); } finally { ownName = false; }
     const m = 8 * view.mk, pad = STACK_PAD * view.mk, hw = F.w / 2 + 5, hh = F.h / 2 + 4;
     const X0 = card ? card.x1 : 4, X1 = view.w - 4, Y0 = 4, Y1 = view.h - view.deck - 4;
     // the country's outline on the screen, ring by ring (a ring that runs round the back of the globe is no part of this view)
@@ -2307,7 +2317,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       const edge = at < ay ? at + box.drop + 3 : at - box.rise - 3;
       ctx.globalAlpha = alpha;
       ctx.strokeStyle = INK; ctx.lineWidth = 1.2 * view.mk;
-      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(x, edge); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(clamp(ax, x - box.half + 12, x + box.half - 12), edge); ctx.stroke();          // straight up or down where the place lies under the name: a name slid aside (the screen's side, a postcard) had it slanting to its middle
       ctx.beginPath(); ctx.arc(ax, ay, 2.2 * view.mk, 0, 7); ctx.fillStyle = INK; ctx.fill();
       ctx.globalAlpha = 1;
     }
@@ -2326,7 +2336,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // name): when the line runs through that spot the name stands above the bird instead, clear of the bird and of the
   // Zs it breathes out when it dozes off.
   const ZZZ_TOP = 62;
-  function underY(s, x, box, own) {
+  function underY(s, x, box, own, c) {
     const y = s[1] + UNDER_GAP * view.mk + box.up, L = lineFromBird();
     const above = () => { const bb = birdBox(s); return Math.min(bb.y - bb.up, s[1] - birdLift() - ZZZ_TOP) - box.down - 1; };
     const side = pick();
@@ -2341,7 +2351,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (!A || !A.fit) return side;
     const key = own + (side === y ? '|under' : '|over');
     if (A.sideKey !== key) {
-      A.sideKey = key; A.flip = false;
+      A.sideKey = key; A.flip = false; A.beside = 0;
       const saved = Object.assign({}, cam);
       aim(A.fit.c, A.fit.H, A.fit.rx, A.fit.ry);
       const r = project(unit(bird.lon, bird.lat));
@@ -2349,6 +2359,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
         const bb = birdBox(r), under = r[1] + UNDER_GAP * view.mk + box.up, over = Math.min(bb.y - bb.up, r[1] - birdLift() - ZZZ_TOP) - box.down - 1;
         const fits = (yy) => yy - box.rise >= 0 && yy + box.drop <= view.h - view.deck;
         A.flip = !fits(side === y ? under : over) && fits(side === y ? over : under);
+        A.beside = besideBird(r, bb, box, (side === y) !== A.flip ? under : over, c);
       }
       Object.assign(cam, saved);
     }
@@ -2396,6 +2407,38 @@ button { font: inherit; color: inherit; cursor: pointer; }
       return crossed ? above() : y;
     }
   }
+  // BESIDE THE BIRD (THE WHOLE LIST 45). A name by the bird stands under the bird or over it, and what already stands
+  // there (the capital's symbol, the capital's name) moves it on, as names move off one another (settle). Where that
+  // leaves it farther from the bird than the name and flag are tall, it is no longer by the bird: a landing at Vietnam's
+  // north tip (no room over the bird on the screen, Hanoi's symbol and name under it) put VIETNAM and its flag under
+  // "Hanoi", 161 px from the bird at 1913 x 1073, the flag on Laos. (New with the build of 2026-11-19 that sends a
+  // country too thin for its flag by the bird; found by Claude on a picture.) There it stands BESIDE the bird, level
+  // with it, BESIDE_GAP from its box: the side where all of it is on the screen, over the bar, off the pause button's
+  // corner, clear of the landing's fun-fact postcard and of the capital's marks; of two such sides the one with more
+  // of its own country under it, then the right. No such side: as before. A distance alone is no measure: Cameroon's
+  // name, 79 px over a bird at the country's south edge in a 1280 px window, lies on Cameroon, and stays.
+  // Worked out once, with the flip above, for the view at rest (the camera is there). r: the bird's place, bb: its box,
+  // y: the name's line as underY gives it. It returns the side, 1 or -1, or 0.
+  const BESIDE_GAP = 8;
+  const besideAt = (bb, box, dir) => [bb.x + dir * (bb.half + BESIDE_GAP * view.mk + box.half), clamp(bb.y + (box.rise - box.drop) / 2, 4 + box.rise, view.h - view.deck - 4 - box.drop)];
+  function besideBird(r, bb, box, y, c) {
+    const up = capMarks([S.capAt, S.capAlso].filter((A) => A && A.name), r), x0 = r[0] + clamp(clamp(r[0], 4 + box.half, view.w - box.half - 4) - r[0], -box.half, box.half);
+    const frame = placed.splice(0, placed.length, ...up), at = settle(x0, y, box, r[0], r[1], 0, true, true);
+    placed.splice(0, placed.length, ...frame);
+    if (Math.max(at - box.rise - (bb.y + bb.down), bb.y - bb.up - (at + box.drop)) <= box.rise + box.drop) return 0;
+    const m = 8 * view.mk, E = factEdge && factEdge.rest ? factEdge : null;
+    let best = 0, most = -1;
+    for (const dir of [1, -1]) {
+      const [cx, cy] = besideAt(bb, box, dir);
+      if (cx - box.half < 4 || cx + box.half > view.w - 4) continue;
+      if (cx + box.half > view.w - 70 * view.ui - m && cy - box.rise < 66 * view.ui + m) continue;
+      if (E && cx - box.half < E.x1 && cy - box.rise < E.y1 && cy + box.drop > E.y0) continue;
+      if (up.some((b) => !b.bird && Math.abs(b.x - cx) < b.half + box.half && cy - box.up < b.y + b.down && cy + box.down > b.y - b.up)) continue;
+      const own = c ? nameCover(c, box, cx, cy)[0] : 0;
+      if (own > most) { most = own; best = dir; }
+    }
+    return best;
+  }
   // A name pinned to a place on the globe; it follows the globe as it turns and hides round the back.
   // With secs = GROUND it stays while the bird is on the ground, and fades once it takes off.
   // With `until`, it stays for as long as that holds (the place you were shown, until its postcard is delivered).
@@ -2429,22 +2472,52 @@ button { font: inherit; color: inherit; cursor: pointer; }
       let x = slideX(4);
       if (dy === OVER && bird.down) { const me = project(unit(bird.lon, bird.lat)); below = !!me && me[1] < s[1]; if (f.swap) below = !below; }          // swap: no room on that side (pinSide)
       if (cls === 'cap') { if (below) box.down = Math.max(box.down, box.px * 0.8); else box.up = Math.max(box.up, box.px * 0.8); }          // tight on the symbol's side only: on the other side the room every name keeps (a letter's tail, the next name)
-      const wantAt = (x) => spot ? s[1] + spot[1] : dy === UNDER ? underY(s, x, box, str)
+      const wantAt = (x) => spot ? s[1] + spot[1] : dy === UNDER ? underY(s, x, box, str, c)
         : dy === OVER ? (cls === 'cap' ? (below ? s[1] + (CAP_RIM + CAP_GAP) * view.mk + box.over + 1.75 * nameUp() : s[1] - (CAP_RIM + CAP_GAP) * view.mk - box.under - 1.75 * nameUp()) : below ? s[1] + NEAR * view.mk + box.up : s[1] - NEAR * view.mk - box.down)
         : s[1] + (typeof dy === 'function' ? dy() : dy || 0);
       let want = wantAt(x);
+      // beside the bird (besideBird): for as long as that landing's rest is the view's, and where it stood while it fades at take-off
+      if (dy === UNDER) {
+        const A = S.mode === 'fly' && bird.down ? S.capFit : null;
+        if (A && A.fit && A.sideKey && A.sideKey.startsWith(str + '|')) { f.beside = A.beside || 0; if (f.beside) { const q = besideAt(birdBox(s), box, f.beside); f.off = [q[0] - s[0], q[1] - s[1]]; } }
+        if (f.beside && f.off) { x = s[0] + f.off[0]; want = s[1] + f.off[1]; }
+      }
+      const byBird = dy === UNDER && f.beside && f.off;
       // The sleeping bird's postcard at the left (factEdge): a name that would lie under it keeps clear of it, slid along as
       // a name at the screen's side is, and no farther than its own half width (a wrong landing at a country's western edge:
       // the name under the bird reached 22 px under the postcard, Turkey by the Aegean). It moves over as the postcard comes.
       // Judged where the name would end up (settle's spot: Niger's name, moved up off its capital's, lay on the postcard's corner).
+      // A landing's own postcard (factEdge.rest, THE WHOLE LIST 37) comes with the landing's names, while the view is still on
+      // its way to its rest beside the postcard (restOn): there a name is judged where it will stand once the view rests, and
+      // stands that far aside from its first frame on, riding with the map. So no name is pushed about by a postcard it only
+      // passes on the way, and a name the postcard leaves alone stands where it always stood. It keeps its spot while it
+      // fades at take-off, when the postcard has gone. (Until 2026-11-19 no name knew of a landing's postcard: a delivered
+      // capital's name with its flag and line ran under it in 23 of 219 capital landings at 1440 x 900, "Abu Dhabi" 108 px,
+      // the bird down 110 km east of the city; a name by a bird at a country's western end too, Malaysia's at Kuala Lumpur.)
       const E = factEdge && factEdge.k > 0 ? factEdge : null;
-      if (E && x - box.half < E.x1) { const yy = settle(x, want, box, s[0], s[1], 0, true, true); if (yy - box.rise < E.y1 && yy + box.drop > E.y0) { x = slideX(lerp(4, E.x1, E.k)); want = wantAt(x); } }
+      if (E && E.rest) {
+        const A = S.capFit, fit = bird.down && A && A.fit && !A.free && !A.done ? A.fit : null;
+        let r = s;
+        if (fit) { const saved = Object.assign({}, cam); aim(fit.c, fit.H, fit.rx, fit.ry); r = project(p) || s; Object.assign(cam, saved); }
+        const rx = r[0] + (byBird ? f.off[0] : sx - s[0]), left = (byBird ? rx : rx + clamp(clamp(rx, 4 + box.half, view.w - box.half - 4) - rx, -box.half, box.half)) - box.half;
+        const yy = r[1] + settle(x, want, box, s[0], s[1], 0, true, true) - s[1];
+        f.aside = left < E.x1 && yy - box.rise < E.y1 && yy + box.drop > E.y0 ? Math.min(E.x1 - left, box.half) : 0;
+      }
+      if (E && !E.rest) { if (x - box.half < E.x1) { const yy = settle(x, want, box, s[0], s[1], 0, true, true); if (yy - box.rise < E.y1 && yy + box.drop > E.y0) { x = slideX(lerp(4, E.x1, E.k)); want = wantAt(x); } } }
+      else if (f.aside) { x += f.aside; if (!byBird) want = wantAt(x); }
+      // A name by the bird keeps its spot while it fades at take-off. (Until 2026-11-19 a name that stood over the bird, for the
+      // capital's symbol under the bird or for the bar, was worked out anew with the bird in the air, and for the third of a
+      // second of its fade it stood under the bird's place: Chile's at the country's south end. Found by Claude, reading the
+      // frames of a take-off.)
+      const kept = dy === UNDER && hold && f.lift !== undefined && f.keep;
+      if (kept) { x = s[0] + f.keep[0]; want = s[1] + f.keep[1]; }
       // never out over space, and never without what it names: under the bird it goes when the bird does
       const dot = 10 * view.mk;
       alpha *= Math.min(rimIn({ x, y: want, half: box.half, up: box.rise, down: box.drop }), rimIn(dy === UNDER ? birdBox(s) : { x: s[0], y: s[1], half: dot, up: dot, down: dot }));
       if (alpha <= 0) return;
       f.shownA = alpha;
-      const moved = spot && (spot[0] || spot[1]), y = settle(x, want, box, s[0], s[1], alpha, moved);          // moved inside its country or beside it: no line either way
+      const moved = spot && (spot[0] || spot[1]), y = kept ? (placed.push({ x, y: want, half: box.half, up: box.up, down: box.down }), want) : settle(x, want, box, s[0], s[1], alpha, moved);          // moved inside its country or beside it: no line either way
+      if (dy === UNDER && f.lift === undefined) f.keep = [x - s[0], y - s[1]];
       // (Until 2026-11-18 a name beside its country was tied to the country's middle by a line with a dot. The player, of
       // Panama and Nicaragua in Study: "for some reason it draws a line to the country ... it just didn't seem like it
       // should be drawing a line, and it should just like display the flag without having to draw a line"; from a picture
@@ -2909,7 +2982,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const FACTS = D.facts || {};
   // Study's results: a fun fact about a location from the flight, on a postcard beside the globe; a
   // different one every 45 s. Left out when no location has a checked fact, or the globe leaves no room.
-  let factTimer = 0, sleepFact = false, sleepBare = false, sleepRest = null, factEdge = null, pauseFactTimer = 0, landFact = null;          // factEdge: the box of the sleeping bird's postcard at the left, for the names (label): { x1, y0, y1, on, t, k }
+  let factTimer = 0, sleepFact = false, sleepBare = false, sleepRest = null, factEdge = null, pauseFactTimer = 0, landFact = null;          // factEdge: the box of the fun-fact postcard at the left (the sleeping bird's; a landing's own: rest), for the names (label): { x1, y0, y1, on, t, k, rest }
   const factCard = (c, f) => '<svg class="stamp" viewBox="0 0 30 36" aria-hidden="true"><use href="#i-stamp"/></svg><div class="lab">Fun fact</div>' +
     '<div class="ttl' + (c.water ? ' sea' : '') + '">' + (c.a2 && !c.water ? flagImg(c, '') : '') + esc(c.name) + '</div><p>' + esc(f) + '</p>';
   // The sleeping bird: a fun fact about where it sleeps, on the same postcard. To the bird's left, level
@@ -3029,7 +3102,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     landFact = f;
     return putLandFact();
   }
-  function putLandFact() { return bareFact(landFact); }
+  // The landing's names keep clear of it too (factEdge with rest: label). It comes with them, so it is there in full at once.
+  function putLandFact() { const card = bareFact(landFact); factEdge = { x1: card.x1, y0: card.y0, y1: card.y1, on: true, t: S.t - REVEAL, k: 1, rest: true }; return card; }
   // The fun-fact postcard with the fact alone on it, at the left. It returns its box on the screen.
   function bareFact(fact) {
     const el = $('funfact');
@@ -4738,7 +4812,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const capShown = (c) => !!c && !!c.cap && !c.tiny;
   function markCapital(c, also) {          // also: a second capital stands as well (Day Trip and Ranked: the country landed in, and the country asked)
     const city = unit(c.cap[1], c.cap[2]);
-    S[also ? 'capAlso' : 'capAt'] = { p: city, t: S.t };
+    S[also ? 'capAlso' : 'capAt'] = { p: city, t: S.t, name: c.cap[0] };
     if (!also) S.capAlso = null;
     S.sawCap.add(c.id);          // its capital has been shown in this flight (addTicket)
     label(null, c.cap[0], city, 'cap', GROUND, null, OVER);
