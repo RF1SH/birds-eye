@@ -2476,17 +2476,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // name): when the line runs through that spot the name stands above the bird instead, clear of the bird and of the
   // Zs it breathes out when it dozes off.
   const ZZZ_TOP = 62;
-  // WHERE THE NAME OF WHERE YOU CAME DOWN STANDS BY THE BIRD, a country asked and the bird down outside it (underY has
-  // the rule and its history): of the bird's sides the one that faces away the most from the country asked (q: its
-  // point in this view) and from the answer's own flag and name (own: their room, or null), slid along the bird where
+  // WHERE THE NAME OF WHERE YOU CAME DOWN STANDS BY THE BIRD, a country asked (Day Trip, Ranked) or shown the way to
+  // (Study) and the bird down outside it (underY has the rule and its history): of the bird's sides the one that
+  // faces away the most from that country (asked; q: its point in this view) and from its own flag and name (own:
+  // their room, or null), slid along the bird where
   // something is in the way; the first that is free. It returns the side (way: 1 right, -1 left, 'under', 'over'), how
   // far it is slid along the bird (slide, shift) and the name's middle there (x, y); null when no side is free. For the
   // view the camera is in. (A function of its own since 2026-11-19: the landing asks it before the answer's spot is
   // final, tripLand.)
-  function farSpot(r, bb, box, c, q, own) {
+  function farSpot(r, bb, box, c, asked, q, own) {
     const under = r[1] + UNDER_GAP * view.mk + box.up, over = Math.min(bb.y - bb.up, r[1] - birdLift() - ZZZ_TOP) - box.down - 1;
     const fits = (yy) => yy - box.rise >= 0 && yy + box.drop <= view.h - view.deck;
-    const asked = S.trip.rounds[S.trip.i].c, marks = capMarks([S.capAt, S.capAlso].filter((M) => M && M.name), r).concat(own ? [own] : []);
+    const marks = capMarks([S.capAt, S.capAlso].filter((M) => M && M.name), r).concat(own ? [own] : []);
     const x0 = r[0] + clamp(clamp(r[0], 4 + box.half, view.w - box.half - 4) - r[0], -box.half, box.half);
     const clearAt = (xx, yy) => xx - box.half >= 4 && xx + box.half <= view.w - 4 && fits(yy) && !marks.some((b) => !b.bird && Math.abs(b.x - xx) < b.half + box.half && yy - box.up < b.y + b.down && yy + box.down > b.y - b.up) && nameCover(asked, box, xx, yy)[0] <= 3;
     const dq = Math.hypot(r[0] - q[0], r[1] - q[1]) || 1, da = own ? Math.hypot(own.x - r[0], own.y - r[1]) || 1 : 1;
@@ -2542,7 +2543,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
         // the bird down in Croatia, Croatia's flag over the bird and as near to Slovenia as Slovenia's own: "This is
         // terribly confusing ... the labels are ... both just as close to Slovenia, so you don't really know. Croatia
         // should be on the right"; of the screen with Croatia's on the bird's far side: "That's perfect".)
-        const tv = S.trip && S.trip.reveal, q = tv && tv.area && !tv.right ? project(tv.to) : null;
+        // THE SAME FOR THE COUNTRY STUDY SHOWS THE WAY TO (the third wrong landing: its flag and name stand on it until its
+        // postcard is delivered, through every landing on the way). Until 2026-11-19 the rule asked for a round's answer,
+        // so it never reached Study: Belgium shown and the bird down in Germany, Germany's flag stood under the bird on
+        // Belgium, right under Belgium's own name (seen on the first real screen of it looked at; PLAN 46: "one rule" for
+        // Day Trip, Ranked and "shown the way"). The shown country's flag and name find their spot after this name, in
+        // every view (liveSpot), so there is no room of theirs to keep off here (own is null).
+        const tv = S.trip && S.trip.reveal, way = S.game === 'study' ? S.tickets.find((t) => t.shown && t.it.kind === 'c' && !t.it.c.water && !t.it.c.tiny && t.it.c !== c) : null;
+        const asked = tv && tv.area && !tv.right ? S.trip.rounds[S.trip.i].c : way ? way.it.c : null, q = asked ? project(way ? asked.u : tv.to) : null;
         let set = false;
         if (q) {
           // Three of the bird's four sides, the most away first (never the one that faces the country most); on a side the
@@ -2552,7 +2560,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
           // (away from the answer's own flag and name too, A.own, where they stand: Slovenia asked, the bird down north of it and
           // Vienna's symbol over the bird: of the bird's left and right, as far from Slovenia as each other, the side where
           // Slovenia's flag is not)
-          const sp = farSpot(r, bb, box, c, q, A.own);          // (the search itself: farSpot)
+          const sp = farSpot(r, bb, box, c, asked, q, A.own);          // (the search itself: farSpot)
           if (sp) { set = true; if (typeof sp.way === 'number') { A.beside = sp.way; A.slide = sp.slide; } else { A.flip = (side === y) !== (sp.way === 'under'); A.shift = sp.shift; } }
         }
         if (!set) A.beside = besideBird(r, bb, box, (side === y) !== A.flip ? under : over, c);
@@ -4577,10 +4585,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
             let wbox;
             ownName = true;
             try { wbox = plateBox(wc, here.name, wcls, wsub, true); } finally { ownName = false; }
-            const bb = birdBox(r), alone = farSpot(r, bb, wbox, wc, q, form.stack.box) ? null : farSpot(r, bb, wbox, wc, q, null);
+            const bb = birdBox(r), alone = farSpot(r, bb, wbox, wc, R.c, q, form.stack.box) ? null : farSpot(r, bb, wbox, wc, R.c, q, null);
             if (alone) {
               const again = ownForm(R.c, R.name, sub, null, saved.pxRad, Object.assign({ keep: [{ x: alone.x, y: alone.y, half: wbox.half, up: wbox.up, down: wbox.down }] }, o));
-              if (again.stack && farSpot(r, bb, wbox, wc, q, again.stack.box)) form = again;
+              if (again.stack && farSpot(r, bb, wbox, wc, R.c, q, again.stack.box)) form = again;
             }
           }
         }
