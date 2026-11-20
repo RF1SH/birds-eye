@@ -571,6 +571,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #stage.looking #ink { cursor: grab; }
 #stage.looking.dragging #ink { cursor: grabbing; }
 #place { transition: opacity .2s; }
+/* A click's one move (glide): a card that leaves fades out as a copy of itself, where it stood, while the game has already
+   moved on; the copy takes no press and does not hide the page beside it. The home card comes in after what leaves, and the
+   pause button comes in softly with a flight. */
+.ghost { pointer-events: none !important; }
+html #card.ghost ~ #place { visibility: visible; }
+@keyframes come-in { from { opacity: 0; } to { opacity: 1; } }
+#stage.flying #pause { animation: come-in .5s both; }
 #stage.looking #funfact, #stage.looking #place, #stage.looking #spoton { opacity: 0 !important; pointer-events: none; transition: opacity .2s; }
 #nogl { position: absolute; inset: auto 16px 16px; margin: 0; padding: 12px 14px; background: var(--paper); border: 2px solid var(--ink); border-radius: 3px; }
 /* a round left for another window: the globe is hidden until you are back (the stopwatch runs on) */
@@ -1969,6 +1976,94 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
   const bird = { lon: -20, lat: 20, a: 1, va: 0, vx: 0, vy: 0, h: -0.3, down: false, at: '*', beat: 0, spread: 1, squash: 0 };
   const keys = { left: false, right: false, up: false, down: false, flap: false };
+
+  // ---------- one move of the view ----------
+  // A click on a location (explore) and the way Home are ONE kind of move, from the view as it stands to the view that
+  // comes next: the clicked spot glides in one straight line from under the pointer to where it will rest, while the map
+  // grows or shrinks round it on one curve (the wheel's rule, "the place under the pointer stays under it", drawn out over
+  // a move). What leaves fades out over the move's first part (GLIDE_OUT), what comes fades in over the rest. The bird is
+  // on the ground the whole time: its size is a fixed power of the map's scale, from its size in the first view to its
+  // size in the second, so it only grows or only shrinks.
+  // (The player, 2026-11-20, of the click as first built, a flight's start followed by a landing's rest: "the bird sizing
+  // as you come in ... gets bigger, then stays the same size, then maybe gets smaller, then gets bigger again"; "when you
+  // click on it, all of a sudden everything disappears, and like it shows a bird that wasn't there before"; "it turns the
+  // globe like left, and then you go and you turn right again"; their idea: "have a really, really small bird that you
+  // can't see, and then just like zoom in on wherever it is, and then like even though a bird wasn't there, it looks like
+  // it was always there." Of this move on a trial page, by button: the length "Calm", the bird's flight to a second click
+  // kept, "Build it". PLAN 78, 82.)
+  // The tried and true way it starts from: a map's fly-to (MapLibre's flyTo, after van Wijk and Nuij, "Smooth and efficient
+  // zooming and panning", 2003): one easing over the whole move, a time that grows with the depth of the zoom and with the
+  // distance, and no rise in the middle when the target is already in view (a click is always on something in view).
+  let glide = null;
+  const GLIDE_OUT = 0.3;
+  { let held = false; Object.defineProperty(keys, 'flap', { get: () => held && !gliding(), set: (v) => { held = !!v; } }); }          // Space waits for the move to end: meanwhile the game reads the key as up, and a key still held then acts
+  // CSS's own "ease", the curve a map's fly-to runs on (MapLibre's default): a prompt start, a long gentle end
+  function glideEase(p) {
+    let t = p;
+    for (let i = 0; i < 8; i++) { const x = 0.75 * (1 - t) * (1 - t) * t + 0.75 * (1 - t) * t * t + t * t * t - p, dx = 0.75 * (1 - t) * (1 - t) + 2.25 * t * t; t = clamp(t - x / Math.max(1e-6, dx), 0, 1); }
+    return 0.3 * (1 - t) * (1 - t) * t + 3 * (1 - t) * t * t + t * t * t;
+  }
+  // Which way the globe must face (north up) for the point p to stand at (qx, qy) of the screen, in a view of height H whose
+  // middle is at (cx, cy); null where it cannot. (aim and project, turned round: p.e = X (D - d), p.u = Y (D - d), p.n = d,
+  // and the three squares add up to 1.)
+  function glideLook(p, H, cx, cy, qx, qy) {
+    const D = 1 + H, X = (qx - cx) / view.F, Y = -(qy - cy) / view.F, r2 = X * X + Y * Y;
+    const disc = r2 * r2 * D * D - (r2 + 1) * (r2 * D * D - 1);
+    if (disc < 0) return null;
+    const d = (r2 * D + Math.sqrt(disc)) / (r2 + 1), pe = X * (D - d), pu = Y * (D - d);
+    if (d < 1 / D + 0.02) return null;
+    const lon = Math.atan2(p[1], p[0]), cl = Math.hypot(p[0], p[1]);
+    if (Math.abs(pe) > 0.98 * cl) return null;
+    const a0 = lon - Math.asin(pe / cl), b0 = Math.atan2(p[2], cl * Math.cos(lon - a0)) - Math.atan2(pu, d);
+    return Math.abs(b0) < 86 * RAD ? unit(a0 / RAD, b0 / RAD) : null;
+  }
+  // from, to: views { n, H, cx, cy }. p: the point of the globe that glides from where it stands in the first view to where
+  // it stands in the second. The time: 1.1 s into Brazil from the home globe, 1.9 s into Luxembourg, 0.8 s at the least.
+  function glideStart(kind, from, to, p, more) {
+    const saved = Object.assign({}, cam);
+    from.H *= view.F / (from.F || view.F);          // the same size on the screen, should the window's measure have changed with the game
+    aim(from.n, from.H, from.cx, from.cy); const q0 = project(p);
+    aim(to.n, to.H, to.cx, to.cy); const q1 = project(p);
+    Object.assign(cam, saved);
+    const zoom = Math.abs(Math.log(from.H / to.H)) / 1.42, far = q0 && q1 ? Math.hypot(q1[0] - q0[0], q1[1] - q0[1]) / Math.max(view.w, view.h) : Math.acos(clamp(dot(from.n, to.n), -1, 1));
+    const G = Object.assign({ kind, from, to, p, q0, q1, t0: S.t, T: clamp(0.55 + 0.75 * (zoom + far), 0.8, 1.9), held: !!(q0 && q1) }, more);
+    for (let i = 1; i < 12 && G.held; i++) { const e = i / 12; if (!glideLook(p, Math.exp(lerp(Math.log(from.H), Math.log(to.H), e)), lerp(from.cx, to.cx, e), lerp(from.cy, to.cy, e), lerp(q0[0], q1[0], e), lerp(q0[1], q1[1], e))) G.held = false; }          // a spot the globe cannot hold on that line (by a pole, at the rim): the plain turn
+    glide = G;
+    return G;
+  }
+  const glideP = () => (glide ? clamp((S.t - glide.t0) / glide.T, 0, 1) : 1), glideE = () => glideEase(glideP());
+  const glideBird = () => slerp(glide.fly, glide.p, glideE());          // a bird on its way to a later click: where it is drawn
+  // The move belongs to the state it began in: the way home to the home screen, a click to Free flight with the bird down.
+  const glideOn = () => !!glide && (glide.kind === 'home' ? S.mode === 'title' : S.mode === 'fly' && S.game === 'free' && bird.down);
+  const gliding = () => !!glide && glideP() < 1 && glideOn();
+  function glideAim() {          // the camera of the move, while it runs (placeCamera)
+    const G = glide, p = glideP();
+    if (!gliding()) { glide = null; return false; }
+    const e = glideEase(p), H = Math.exp(lerp(Math.log(G.from.H), Math.log(G.to.H), e)), cx = lerp(G.from.cx, G.to.cx, e), cy = lerp(G.from.cy, G.to.cy, e);
+    const n = (G.held && glideLook(G.p, H, cx, cy, lerp(G.q0[0], G.q1[0], e), lerp(G.q0[1], G.q1[1], e))) || slerp(G.from.n, G.to.n, e);
+    aim(n, H, cx, cy);
+    return true;
+  }
+  // On the way home what the landing put on the map (the pale wash, the border, the names) fades out over the move's first part.
+  const glideLeaving = () => !!glide && glide.kind === 'home' && !!glide.A0 && glide.A0 === S.around && glideP() < GLIDE_OUT;
+  // What leaves fades out where it stood, while the game has already moved on: a copy of the card as it stands (ghost),
+  // put beside the card once the game has changed it (ghostFade). A flight's start takes any copy away (takeOff): two
+  // cards with the same buttons are never on the page once a game is on.
+  function ghost(el) {
+    const cs = getComputedStyle(el);
+    if (el.hidden || cs.visibility === 'hidden' || !+cs.opacity) return null;
+    const g = el.cloneNode(true);
+    g.classList.add('ghost'); g.inert = true; g.style.animation = 'none'; g.style.transition = 'none'; g.style.opacity = cs.opacity;
+    return g;
+  }
+  function ghostFade(g, el, secs) {
+    if (!g) return;
+    el.after(g);
+    g.getBoundingClientRect();          // drawn once as it stood
+    g.style.transition = 'opacity ' + secs.toFixed(2) + 's linear'; g.style.opacity = 0;
+    setTimeout(() => g.remove(), secs * 1000 + 120);
+  }
+  let cardIn = 0;          // the home card coming in on the way home: the timer that ends it
   // Press and pull: the mouse steers beside the arrow keys, at any moment, with nothing to set (the player's pick,
   // 2026-11-18: "Both always on"). The button down on the map in a flight plants a ring there; the pull away from the
   // ring is the bird's direction, at any angle, and its speed: all of it at a pull of PULL_FULL of view.ref (121 px on
@@ -3249,6 +3344,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (looking() || !canLook()) return false;
     placeCamera();
     const ll = lonLat(cam.n);
+    glide = null;          // the look-around takes the view over from a move, where the move stands
     gaze = { lon: ll[0], lat: clamp(ll[1], -80, 80), H: cam.H, cx0: cam.cx, cy0: cam.cy, t0: S.t, leaving: false, own: null };
     S.look = null; pull.at = null;          // the view is the player's now: one the game had sent away does not come back by itself
     stage.classList.add('looking');
@@ -3361,9 +3457,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (game === 'trip' && runKind === 'day' && tripDone()) return;          // one trip a day (one begun is carried on)
     S.game = game;
     Object.assign(S, { mode: 'fly', paused: false, t: 0, energy: TANK, n: 0, streak: 0, bestStreak: 0, firstTry: 0, fresh: 0, route: null, legs: null, tickets: [], last: null,
-      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, capAt: null, capAlso: null, capFit: null, named: null, around: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), sawCap: new Set(), newC: 0, sawN: 0, intro: null, began: null, replay: null, arrive: false });
+      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, capAt: null, capAlso: null, capFit: null, named: null, around: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), sawCap: new Set(), newC: 0, sawN: 0, intro: null, began: null, replay: null });
     S.log = new Map();
     S.drops = [];
+    glide = null;          // no move of the view left over (the clock starts at 0 again)
+    for (const x of document.querySelectorAll('.ghost')) x.remove();          // nor a card's copy still fading
     lookEnd(true);
     fitClear();          // no rest of the view left over from the flight before, and no way back from one (the clock starts at 0 again: fitClear)
     // around: Free flight's last landing with the view fitted to its country. It was kept over Home, so the next Free flight's view
@@ -3708,7 +3806,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // details and cities/surrounding labels pop up. it looks ugly, like things are always buffering ... an animation of
     // everything popping up might be nice. So it looks purposeful". Until then the names waited about a second for the
     // map to stop sliding, then stood there all at once.)
-    box.style.opacity = S.around ? 0 : '';          // the card fades in with the rest (drawAround, each frame)
+    box.style.transition = S.around ? 'none' : ''; box.style.opacity = S.around ? 0 : '';          // the card fades in with the rest (drawAround, each frame)
     if (S.around) aroundLayout(S.around);
   }
   const REVEAL = 0.4;          // seconds: as long as an interface's own larger transitions (Material: 300 to 400 ms)
@@ -4023,9 +4121,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (layer.width !== lw || layer.height !== lh) { layer.width = lw; layer.height = lh; }
     g.setTransform(d, 0, 0, d, 0, 0);
     g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, view.w, view.h);
-    g.fillStyle = PAPER; g.beginPath(); g.arc(cam.cx, cam.cy, cam.rho, 0, 7); g.fill();          // the globe, not the dark round it: a view from high up shows the globe's rim
-    g.globalCompositeOperation = 'destination-out'; g.fill(hole);
-    g.lineWidth = 3; g.lineJoin = 'round'; g.stroke(hole);          // a hair wider, closing the seams between pieces
+    g.fillStyle = PAPER;
+    if (!A.high) {          // seen from high up (a click on open water) no water goes pale, only the lands: the waters' own edges are straight lines there
+      g.beginPath(); g.arc(cam.cx, cam.cy, cam.rho, 0, 7); g.fill();          // the globe, not the dark round it: a view from high up shows the globe's rim
+      g.globalCompositeOperation = 'destination-out'; g.fill(hole);
+      g.lineWidth = 3; g.lineJoin = 'round'; g.stroke(hole);          // a hair wider, closing the seams between pieces
+    }
     g.globalCompositeOperation = 'source-over';
     if (land) g.fill(land);
     L.wash = layer;
@@ -4112,7 +4213,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const cr = $('place').getBoundingClientRect(), st = stage.getBoundingClientRect();
     const card = cr.width ? { x0: cr.left - st.left - 12, x1: cr.right - st.left + 12, y0: cr.top - st.top - 12, y1: cr.bottom - st.top + 12 } : null;
     const saved = Object.assign({}, cam);
-    A.fit = fitFor(A, card);
+    // A click on open water (A.high): the view keeps the height it had, the bird in the middle of the room beside the
+    // card, so the water's coasts stay in sight (as first built the view went down to the ground: a window of plain blue).
+    A.fit = fitFor(A, card) || (A.high ? { c: unit(bird.lon, bird.lat), H: A.high, rx: ((card && view.w > 900 ? card.x1 : 0) + view.w) / 2, ry: (card && view.w <= 900 ? card.y0 : view.h - view.deck) / 2, whole: true } : null);
     if (A.fit) aim(A.fit.c, A.fit.H, A.fit.rx, A.fit.ry); else cam.cx += view.slide - slid;
     A.L = layoutAround(A, card);
     if (A.T === undefined) A.T = A.fit ? restSecs(A.fit) : REVEAL;
@@ -4124,10 +4227,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // under the capital..". PLAN 131.)
   function drawAround(names) {
     const A = S.around;
-    if (!A.L || A.L.key !== view.w + 'x' + view.h + ':' + Math.round(view.slide)) aroundLayout(A);          // the window changed size
+    if (!A.L || (A.L.key !== view.w + 'x' + view.h + ':' + Math.round(view.slide) && !glideLeaving())) aroundLayout(A);          // the window changed size (on the way home the page is gone and the names fade where they stood)
     const L = A.L, k = L.k;
-    const shown = arrive((S.t - A.t) / A.T);
-    if (A.shown !== shown) { A.shown = shown; $('place').style.opacity = shown < 1 ? shown.toFixed(3) : ''; }          // the card, on the same clock
+    // A click's move: what leaves goes first (GLIDE_OUT), the page and the names come after, on the move's clock; on the way
+    // home they are what leaves. The card's own CSS transition is off while its opacity is set here each frame: it chased
+    // each new value, and a page that came after another flickered (solid for a frame, then see-through, then solid).
+    const shown = glideLeaving() ? 1 - smooth(glideP() / GLIDE_OUT) : glide && glide.A === A ? smooth(clamp((glideP() - GLIDE_OUT) / (1 - GLIDE_OUT), 0, 1)) : arrive((S.t - A.t) / A.T);
+    if (A.shown !== shown) { A.shown = shown; const pl = $('place'); pl.style.transition = shown < 1 ? 'none' : ''; pl.style.opacity = shown < 1 ? shown.toFixed(3) : ''; }          // the card, on the same clock
     // What was laid out for the view at rest rides with the map while the view comes to rest: every name on its own spot
     // of the map and at the map's scale (z: how big the map is drawn now against how it will rest).
     const z0 = cam.pxRad / L.pxRad, z = Math.abs(z0 - 1) < 1e-3 ? 1 : z0;
@@ -5558,6 +5664,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // Back to the title: the globe stays where you were and starts turning again.
   function goHome() {
     if (S.mode === 'title') return;
+    // From a flight the view goes home in one move, a click's move backwards (glide): where the bird stood glides to its
+    // spot on the home globe, the pause card and what the landing put on the map fade out, the home card comes in after.
+    // (As first built the card was back in one frame and the globe slid 293 px for 1.3 s.)
+    placeCamera();
+    const was = { n: cam.n.slice(), H: cam.H, cx: cam.cx, cy: cam.cy, F: view.F }, wasFly = S.mode === 'fly', wasAt = glide && glide.fly ? glideBird() : unit(bird.lon, bird.lat);
+    const wasK = wasFly && S.game === 'free' && bird.down ? onMap() : 0, wasA = wasK ? S.around : null, old = wasFly ? ghost($('card')) : null;
+    glide = null;
     abandon(true);
     const from = S.mode === 'fly' ? [bird.lon, bird.lat] : [atlas.lon, atlas.lat];
     S.mode = 'title'; S.paused = false; S.look = null; atlas.zoom = 1;
@@ -5578,6 +5691,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
     [atlas.lon, atlas.lat] = from;
     showWhere();
     measure();
+    if (wasFly) {
+      atlas.lat = clamp(atlas.lat, -45, 60); atlas.to = null; atlas.k = 1; S.blend = 0; slid = 0;
+      const to = { n: unit(atlas.lon, atlas.lat), H: view.Htitle, cx: view.tx, cy: view.ty };
+      const G = glideStart('home', was, to, wasAt, { k0: wasK, k1: Math.min(1, view.H0 / view.Htitle), A0: wasA });
+      atlas.idle = -G.T;          // the globe's rest begins when the view is home
+      ghostFade(old, $('card'), GLIDE_OUT * G.T);
+      const cd = $('card');
+      cd.style.animation = 'come-in ' + ((1 - GLIDE_OUT) * G.T).toFixed(2) + 's ' + (GLIDE_OUT * G.T).toFixed(2) + 's both';
+      clearTimeout(cardIn); cardIn = setTimeout(() => { cd.style.animation = ''; }, G.T * 1000 + 60);
+    }
     $($('go-trip').hidden ? 'see-trip' : 'go-trip').focus({ preventScroll: true });          // the card's leading button
   }
 
@@ -5644,6 +5767,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function step(dt) {
     const flying = S.mode === 'fly';
     S.t += dt;
+    if (glide && !gliding()) glide = null;          // a move of the view that is over, or whose state is (the bird has left the ground, another game began)
     const sand = S.mode === 'title' ? studyOpen : S.game === 'study';       // Study's choice shows while its choices are open on the home card, through its flight and on its end screen
     for (let i = 0; i < sanded.length; i++) sanded[i] += ((sand ? outside[i] : 0) - sanded[i]) * Math.min(1, dt * 7);
     const intro = flying && (S.trip ? S.trip.intro : S.intro);
@@ -5653,7 +5777,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
     }
     S.blend = intro && intro.t < 0 ? Math.max(0, S.blend - dt / TUTOR_LEAD) : intro && intro.t < INTRO_TURN + INTRO_HOLD ? 0 : clamp(S.blend + (flying ? dt / INTRO_ZOOM : -dt / 1.3), 0, 1);
     if (flying && S.intro && S.blend >= 1) S.intro = null;          // the view is down
-    if (S.arrive && flying && !S.intro) { S.arrive = false; if (bird.down) showPlace(locationAt(bird.lon, bird.lat)); }          // a click on the home globe: the location's page opens as a landing opens it, unless the bird has flown on
     for (let i = fx.length - 1; i >= 0; i--) { fx[i].t += dt; if (fx[i].t >= fx[i].secs) fx.splice(i, 1); }
     for (let i = flashes.length - 1; i >= 0; i--) { flashes[i].t += dt; if (flashes[i].t >= flashes[i].secs) flashes.splice(i, 1); }
     bird.squash = Math.max(0, bird.squash - dt / 0.18);
@@ -5690,6 +5813,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
         }
       } else if (!drag.on) {
         atlas.idle += dt;
+        if (S.mode === 'title' && hover) atlas.idle = Math.min(atlas.idle, 0);          // the home globe holds still while the pointer is on a location: the plate by a resting pointer does not change by itself, and a click lands where it was aimed
         if (atlas.idle > atlas.rest && !(atlas.zoom > 1)) atlas.lon = wrapLon(atlas.lon + atlas.spin * dt * clamp((atlas.idle - atlas.rest) / 2, 0, 1));          // zoomed in, it holds still
       }
       return;
@@ -5712,7 +5836,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const flap = keys.flap && !flapSpent && !S.look && S.energy > 0 && S.blend >= 1 && !(S.trip && S.trip.wait && !lessonFlies(S.trip)) && !(held && S.t < held.takeAt) && !gaze;          // nor until a look-around's view is back
     if (flap) {
       S.energy = Math.max(0, S.energy - BURN * dt);
-      if (bird.down) { bird.down = false; bird.va = CLIMB * 0.45; }
+      if (bird.down) { fitv.s0 = groundScale(); fitv.g0 = S.t; bird.down = false; bird.va = CLIMB * 0.45; }          // the size the bird has on the ground as it leaves it, and when: it grows from there (onMap)
       flapClock -= dt;
       if (flapClock <= 0) { flapClock = 0.15; sfx.flap(); puffs.push({ t: 0, side: 1 }, { t: 0, side: -1 }); }
     } else flapClock = 0;
@@ -5772,7 +5896,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // (fitv.k: 0 the bird's own view, 1 the view of the place). When the bird takes off the view goes back to it in FIT_BACK
   // seconds, and its height is handed back without a dip: from a high view (a big country) it holds while you climb toward
   // it and comes down gently when you glide; from a close view (a small country) it rises to the bird's at once.
-  const FIT_BACK = 0.5, fitv = { on: false, k: 0, k0: 0, t0: -1e9, T: FIT_BACK, fit: null, lh: null, h0: 0, s0: 1, tp: 0 };
+  const FIT_BACK = 0.5, fitv = { on: false, k: 0, k0: 0, t0: -1e9, T: FIT_BACK, fit: null, lh: null, h0: 0, s0: 1, g0: -1e9, tp: 0 };
   // Nothing of a rest is left: not the view's share of it (k), and not the way back from it (k0: the share it began at, t0:
   // when). Every flight's start calls this, in every game, because a flight's start sets the clock back to 0. Until 2026-11-18 only k
   // was cleared: after a bird had taken off from a rested view (k0 1, t0 the flight's 40th second, say), Home or Restart and
@@ -5780,7 +5904,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // that old landing with the bird out of sight. (The player, of a picture of Ukraine with no bird on it: "the free flight
   // bug where it doesn't show any bird and just zooms in on a country. is still happening, but it's not just free flight.
   // It's also study mode.")
-  const fitClear = () => Object.assign(fitv, { on: false, k: 0, k0: 0, t0: -1e9, lh: null, s0: 1 });
+  const fitClear = () => Object.assign(fitv, { on: false, k: 0, k0: 0, t0: -1e9, lh: null, s0: 1, g0: -1e9 });
   function placeCamera() {
     const k = smooth(S.blend);
     const lead = S.mode === 'fly' && !!S.trip && !!S.trip.intro && S.trip.intro.t < 0;          // out of the tutorial into a real game: straight up from where the bird stood
@@ -5800,7 +5924,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       const A = S.game === 'free' ? S.around : S.capFit, F = fitv, on = bird.down && !!(A && A.fit) && !A.free && !A.done, dt = clamp(S.t - F.tp, 0, 0.1), own = logH;
       F.tp = S.t;
       if (on) F.fit = A.fit;
-      if (on !== F.on) { if (on) F.h0 = F.lh !== null ? F.lh : own; else F.s0 = groundScale(); F.k0 = F.k; F.t0 = on ? A.t : S.t; F.T = on ? A.T : A && A.free ? FIT_BACK / 2 : FIT_BACK; F.on = on; }          // a press of Space sent the view back (rested): twice as fast
+      if (on !== F.on) { if (on) F.h0 = F.lh !== null ? F.lh : own; F.k0 = F.k; F.t0 = on ? A.t : S.t; F.T = on ? A.T : A && A.free ? FIT_BACK / 2 : FIT_BACK; F.on = on; }          // a press of Space sent the view back (rested): twice as fast
       const p = arrive((S.t - F.t0) / F.T);
       F.k = on ? F.k0 + (1 - F.k0) * p : F.k0 * (1 - p);
       if (F.k > 0 && F.fit) { n = slerp(n, F.fit.c, F.k); cx = lerp(cx, F.fit.rx, F.k); cy = lerp(cy, F.fit.ry, F.k); rest = true; }
@@ -5840,7 +5964,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       if (p >= 0.6) stage.classList.remove('looking');          // the cards around the bird are back when the view is nearly home
       if (p >= 1) gaze = null;
     }
-    aim(n, Math.exp(logH), cx, cy);
+    if (!(glide && glideAim())) aim(n, Math.exp(logH), cx, cy);          // a click's move, or the way home, is the view while it runs (glide)
   }
 
   // The line around a small island country's waters: its border, out at sea. In the borders' paper-white and width,
@@ -6114,10 +6238,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // In Free flight the view can rest far above the ground (the whole of Russia): there the bird stops shrinking at
   // BIRD_LEAST of its size (at the true scale it is 11 px wide in the United States' view; the player's pick of
   // 2026-11-15, told as the one thing that differs from "it should still maintain its like relative size"), and after
-  // a take-off it grows back to its flying size in BIRD_GROW seconds.
+  // a take-off it grows back to its flying size in BIRD_GROW seconds, counted from the frame it leaves the ground (fitv.g0),
+  // gently at both ends (a frame that takes long, as the first ones over the whole of Russia do, is then no jump either).
+  // (Until 2026-11-20 counted from the press of Space, a quarter second before the bird leaves the ground from a resting
+  // view: the bird went from 26 to 63 px in one frame. The player: "the bird like sort of glitches and goes from small to
+  // big, just like in one frame". PLAN 83.)
   const BIRD_LEAST = 0.4, BIRD_GROW = 0.4;
   const groundScale = () => Math.max(S.game === 'free' || S.capFit || gaze ? BIRD_LEAST : 0, Math.min(1, view.H0 / cam.H));
-  const onMap = () => (S.mode !== 'fly' ? 1 : bird.down ? groundScale() : fitv.s0 < 1 && S.t - fitv.t0 < BIRD_GROW ? lerp(fitv.s0, 1, arrive((S.t - fitv.t0) / BIRD_GROW)) : 1);
+  const onMap = () => (glide && glide.k0 ? glide.k0 * Math.pow(glide.k1 / glide.k0, glideE()) : S.mode !== 'fly' ? 1 : bird.down ? groundScale() : fitv.s0 < 1 && S.t - fitv.g0 < BIRD_GROW ? lerp(fitv.s0, 1, smooth((S.t - fitv.g0) / BIRD_GROW)) : 1);
   // The room the bird takes on the screen in a flight, with its energy ring: names keep clear of it.
   function birdBox(g) {
     const k = onMap(), size = birdSize() * k, r = 26 * size, pad = 6 * view.mk * k, ring = S.game === 'free' ? 0 : 11 * Math.max(1, 0.95 * view.ui) * k;
@@ -6126,13 +6254,28 @@ button { font: inherit; color: inherit; cursor: pointer; }
     return { x: (left + right) / 2, y: (top + bottom) / 2, half: (right - left) / 2, up: (bottom - top) / 2, down: (bottom - top) / 2, bird: true };
   }
   let seen = 1;         // how much of the bird is drawn: less as its place nears the globe's rim
+  // A bird on its way to a later click (glide.fly) is drawn flying: in a low arc along the shortest line, its wings beating,
+  // folding as it comes down. (The player, 2026-11-20: "they can still like zoom out, drag, scroll around, and then click on
+  // another country, and maybe the bird like then just flies from where they were automatically over there"; flown on the
+  // trial page, by button: "Yes, keep the flight".) Only how it is drawn: the bird's own place is the clicked spot at once.
   function drawBird() {
+    const G = glide, a0 = bird.a;
+    if (G && G.fly) {
+      const e = glideE(), q0 = project(glideBird()), q1 = project(slerp(G.fly, G.p, Math.min(1, e + 0.03)));
+      bird.a = 0.3 * Math.sin(Math.PI * e);
+      if (q0 && q1 && Math.hypot(q1[0] - q0[0], q1[1] - q0[1]) > 0.5) bird.h = Math.atan2(q1[1] - q0[1], q1[0] - q0[0]);
+      bird.spread = e < 0.9 ? 0.72 + 0.28 * Math.cos(S.t * 15) : lerp(1, 0.42, (e - 0.9) / 0.1);
+    }
+    try { drawBirdAt(); } finally { bird.a = a0; }
+  }
+  function drawBirdAt() {
     const k = onMap(), size = birdSize() * k, a = bird.a;          // on the ground, at the map's scale
-    const g = project(unit(bird.lon, bird.lat));
+    const g = project(glide && glide.fly ? glideBird() : unit(bird.lon, bird.lat));
     if (!g) return;                       // round the back of the globe while the view is away
     // When the view turns away to show a place, the bird goes with the ground it stands on: it fades as that nears
     // the globe's rim and is gone before it, with its shadow, its energy ring and the name under it.
     seen = rimIn(birdBox(g));
+    if (glide && glide.kind === 'home') seen *= 1 - smooth(clamp((glideP() - 0.45) / 0.55, 0, 1));          // on the way home the bird shrinks with the map and is gone when the globe is home
     if (seen <= 0) return;
     ctx.globalAlpha = seen;
     const lift = birdLift() * k, x = g[0], y = g[1] - lift, sh = 1 - 0.5 * a;
@@ -6844,12 +6987,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // cities' marks) and a Day Trip's or Ranked's answer (its circle, the line to it, a capital's symbol or a city's dot),
     // as Study's capitals always did (drawDrops, above). The bird stands on the ground it came down on. PLAN 131.
     veiled(true);
-    if (S.mode === 'fly' && S.game === 'free' && S.around && bird.down) drawAround(false);
+    if ((S.mode === 'fly' && S.game === 'free' && S.around && bird.down) || glideLeaving()) drawAround(false);
     veiled(false);
     if (S.trip && S.trip.reveal && S.mode === 'fly') drawReveal();
-    if (S.mode === 'fly') drawBird();          // no bird outside a flight (until 2026-11-13 one faded out above the globe for a second after Home or a flight's end: "a bird appears and fades away on top of the globe on the home page")
+    if (glide && !gliding()) glide = null;
+    if (glide && glide.plate) { const a = 1 - glideP() / GLIDE_OUT, q = a > 0 ? project(glide.p) : null; if (q) pointerPlate(Object.assign({}, glide.plate, { x: q[0], y: q[1] }), a); }          // the plate that was by the pointer goes with its location, fading
+    if (S.mode === 'fly' || (glide && glide.kind === 'home' && glide.k0)) drawBird();          // no bird outside a flight, but the one that shrinks away on the way home (until 2026-11-13 one faded out above the globe for a second after Home or a flight's end: "a bird appears and fades away on top of the globe on the home page")
     veiled(true);
     if (S.mode === 'fly' && S.game === 'free') { drawBelow(); if (S.around && bird.down) drawAround(true); }
+    else if (glideLeaving()) drawAround(true);
     veiled(false);
     if (S.mode === 'fly') drawPull();
     placed.length = 0;
@@ -7297,6 +7443,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // On the title and results screens: drag to turn the globe, and point at a place for its name.
   const drag = { on: false, x: 0, y: 0 };
   inkCanvas.addEventListener('pointerdown', (e) => {
+    flyPress = S.mode === 'fly' && e.button === 0 ? [e.clientX, e.clientY, performance.now()] : null;
     if (S.mode === 'fly' && looking()) {          // looking around: the drag turns the globe
       if (e.button !== 0 || S.paused) return;
       drag.on = true; drag.x = e.clientX; drag.y = e.clientY; S.idle = 0; hover = null;
@@ -7388,23 +7535,44 @@ button { font: inherit; color: inherit; cursor: pointer; }
       atlas.lon = wrapLon(atlas.lon - ((x - s[0]) * k) / Math.max(0.2, Math.cos(atlas.lat * RAD)));
     }
   }, { passive: false });
-  // A click on the home globe (not a drag): Free flight, the bird standing where the click was. The view comes down on
-  // it as on every flight's start and the location's page opens as a landing opens it; Space flies on from there.
+  // A click on a location (not a drag), on the home globe or once the bird is down in the flight a click began: the view
+  // glides to the location's resting view (glide) and its page opens on the same clock, as a landing opens it. After a
+  // click on the home globe the bird stands on the clicked spot from the first frame, at the map's own scale; after a
+  // later click it flies there (drawBird). Space flies on from there.
   // (The player, 2026-11-20: "Maybe the home screen should become basically free flight mode ... if you double click
   // on a country, then maybe it shows what free flight would show"; their picks from picture HOME-redesign: one click,
-  // and no tab or line for Free flight: "It can almost even be like an Easter egg". PLAN 76.) Until then Free flight
-  // was the title card's third tab and began where the globe was looking.
-  let homePress = null;
+  // and no tab or line for Free flight: "It can almost even be like an Easter egg"; of a later click: "if they click
+  // on one after, then maybe the bird like automatically flies there". PLAN 75, 76, 78, 82.) Not from a first visit's
+  // card: its choice comes first, and the click belongs to the home page ("On the home page, click any location").
+  let homePress = null, flyPress = null;
   function explore(lon, lat) {
-    takeOff('free');
-    Object.assign(bird, { lon, lat: clamp(lat, -75, 80) }); bird.at = locationAt(bird.lon, bird.lat).key;
-    startView();
-    S.arrive = true;          // the page opens when the view is down (step)
+    const first = !(S.mode === 'fly' && S.game === 'free' && bird.down);
+    placeCamera();
+    const from = { n: cam.n.slice(), H: cam.H, cx: cam.cx, cy: cam.cy, F: view.F }, plate = hover && !hover.pin ? Object.assign({}, hover) : null;
+    const k0 = first ? Math.min(1, view.H0 / cam.H) : onMap(), was = first ? null : glide && glide.fly ? glideBird() : unit(bird.lon, bird.lat);
+    let old = null;
+    if (first) { old = ghost($('card')); clearTimeout(cardIn); $('card').style.animation = ''; takeOff('free'); }
+    else { if (!looking()) old = ghost($('place')); lookEnd(true); fitClear(); S.look = null; }
+    Object.assign(bird, { lon, lat: clamp(lat, -75, 80), a: 0, va: 0, vx: 0, vy: 0, down: true });
+    bird.at = locationAt(bird.lon, bird.lat).key;
+    S.intro = null; S.blend = 1; S.idle = 0; S.around = null;
+    showPlace(locationAt(bird.lon, bird.lat));
+    const A = S.around, p = unit(bird.lon, bird.lat);
+    if (A && !A.fit) { A.high = clamp(from.H * view.F / from.F, view.H0, view.H1); aroundLayout(A); }          // open water: the view keeps its height
+    const to = A && A.fit ? { n: A.fit.c, H: A.fit.H, cx: A.fit.rx, cy: A.fit.ry } : { n: p, H: view.H0, cx: view.w / 2 + view.slide, cy: view.gy };
+    const G = glideStart('to', from, to, p, { k0, k1: Math.max(BIRD_LEAST, Math.min(1, view.H0 / to.H)), plate, A, fly: was });
+    if (A) { A.t = S.t; A.T = G.T; }          // the page, the names and the view's rest on the move's clock
+    ghostFade(old, $(first ? 'card' : 'place'), GLIDE_OUT * G.T);
   }
   inkCanvas.addEventListener('pointerup', (e) => {
     endDrag();
     const press = homePress; homePress = null;
-    if (press && S.mode === 'title' && Math.hypot(e.clientX - press[0], e.clientY - press[1]) < 5) {
+    if (press && S.mode === 'title' && !firstVisit && Math.hypot(e.clientX - press[0], e.clientY - press[1]) < 5) {
+      const bx = stage.getBoundingClientRect(), at = unproject(e.clientX - bx.left, e.clientY - bx.top);
+      if (at) { explore(at[0], at[1]); return; }
+    }
+    const fp = flyPress; flyPress = null;          // a click on another location once the bird is down, looking around or not: the bird flies there
+    if (fp && S.mode === 'fly' && S.game === 'free' && !S.paused && bird.down && Math.hypot(e.clientX - fp[0], e.clientY - fp[1]) < 5 && performance.now() - fp[2] < 600) {
       const bx = stage.getBoundingClientRect(), at = unproject(e.clientX - bx.left, e.clientY - bx.top);
       if (at) { explore(at[0], at[1]); return; }
     }
@@ -7454,7 +7622,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   // for the tests: the bird put somewhere by hand. That is no flight, so the view is the bird's own at once (no rest on the last landing's country still being handed back)
   const setBird = (lon, lat, a, down) => { Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down }); S.capFit = null; fitClear(); };
-  window.birdsEye = { explore, howTo, pair: () => view.pair, homeNote: () => { showTripNote(); showKnown(); measure(); }, stackLines: (id) => { const c = PLAY.find((q) => q.id === id); ownName = true; try { return stackForm(c, c.name, 'name', null).lines; } finally { ownName = false; } }, hoverBox: () => hoverBox, slerp, showLeg, legView, STILL_DEG, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, rankedRounds, easiest, flagClue, capClue, capFlagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
+  window.birdsEye = { explore, glide: () => glide, glideP, glideLook, howTo, pair: () => view.pair, homeNote: () => { showTripNote(); showKnown(); measure(); }, stackLines: (id) => { const c = PLAY.find((q) => q.id === id); ownName = true; try { return stackForm(c, c.name, 'name', null).lines; } finally { ownName = false; } }, hoverBox: () => hoverBox, slerp, showLeg, legView, STILL_DEG, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, rankedRounds, easiest, flagClue, capClue, capFlagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     outlines: () => fx.filter((f) => f.lined && f.shownA > 0).map((f) => f.lined.id), OUTLINE, pull, pullBy, steerable, PULL_FULL, PULL_RING, hFor, look: () => gaze, looking, canLook, lookStart, lookEnd, lookAnswer, answerNamed: () => answerNamed, answerRoom: () => gazeName, lookK: gazeK, plate: () => plateSays, plateRoom: (h) => pointerPlate(h, 1, true), hoverNow: () => (hover ? hover.name : null), project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
