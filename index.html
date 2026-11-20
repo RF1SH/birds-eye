@@ -3179,7 +3179,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (t && t.shown) { const it = t.it; return { name: it.kind === 'k' ? it.c.cap[0] : it.c.name, p: pointOf(it), area: it.kind !== 'k', c: it.c, mark: 11.5, sea: it.kind === 's' }; }
     return null;
   }
-  const lookPointed = (x, y) => (S.game === 'study' ? null : pointed(x, y));
+  let gazeName = null;          // the room of the correct location's name as it stands: the pointer on it answers for the answer's country (as on every globe: pointed)
+  const lookPointed = (x, y) => { if (S.game === 'study') return null; const b = gazeName; return b && Math.abs(b.x - x) < b.half && Math.abs(b.y - y) < b.tall ? { x, y, name: b.c.name, c: b.c, on: 'answer' } : pointed(x, y); };
   function lookWheel(e) {
     if (S.paused) return;
     if (!looking()) { if (e.deltaY <= 0 || performance.now() - gazeOver < 400 || !lookStart()) return; }          // scrolling OUT begins it (not the tail of the scroll that has just ended it)
@@ -3221,8 +3222,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (A && A.area && !A.sea && !A.c.tiny) { const fl = flashes.find((q) => q.c === A.c && q.pulses === 0); if (fl) fl.t = Math.min(fl.t, 1); else flash(A.c, 0, 4, null, 0.5); }
   }
   // Drawn over the map while looking around: a ring round the bird, the correct location's name, and what the pointer is on.
+  let answerNamed = false;          // for the tests: the correct location's name is painted (it steps aside for the plate)
   function lookDraw() {
     const a = gazeK();
+    answerNamed = false; gazeName = null;
     if (a <= 0) return;
     const A = lookAnswer(), g = project(unit(bird.lon, bird.lat)), bb = g && birdBox(g);
     // The bird is small on a high view (BIRD_LEAST): a ring round it, in the bird's paper and ink, says where it stands.
@@ -3233,7 +3236,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
       for (const [ink, wd] of [[INK, 1.5 * view.ui + 2], [PAPER, 1.5 * view.ui]]) { ctx.strokeStyle = ink; ctx.lineWidth = wd; ctx.beginPath(); ctx.arc(bb.x, bb.y, r, 0, 7); ctx.stroke(); }
       ctx.restore();
     }
-    // what the pointer is on: not the bird, and not a country that is the answer and wears its name already
+    // what the pointer is on: not the bird. A country that is the answer gets the plate too, and its name steps aside
+    // while the plate is up (the player, 2026-11-20, of every globe: "Yes, there too"; until then the answer got no plate)
     let h = looking() && !drag.on ? hover : null;
     if (h && bb && Math.abs(bb.x - h.x) < bb.half && Math.abs(bb.y - h.y) < bb.up) h = null;
     let named = null;
@@ -3245,9 +3249,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
       const far = g && g[1] < s[1] ? 1 : -1;          // a point's name stands on the side away from the bird, clear of the line to it
       const spots = A.area ? [[0, 0], [0, -16 * q], [0, 16 * q], [0, -30 * q], [0, 30 * q], [half + 10, 0], [-half - 10, 0]] : [[0, far * (m + 12 * q)], [0, -far * (m + 12 * q)], [half + m + 6, 0], [-half - m - 6, 0]];
       for (const d of spots) if (free(s[0] + d[0], s[1] + d[1])) { named = { x: s[0] + d[0], y: s[1] + d[1] }; break; }
-      if (named && h && A.area && h.c === A.c) h = null;
+      if (named && !A.sea) gazeName = { x: named.x, y: named.y, half, tall: 7.5 * q, c: A.c };
+      const own = !!h && (h.on === 'answer' || (A.area && !A.sea && !h.sea && h.c === A.c));
       // the plate stands on clear ground, as on every globe: the answer's name is left out while the plate would cover it
-      if (named && !covers(h && pointerPlate(h, a, true), named.x, named.y, half, 9 * q)) { ctx.globalAlpha = a; text(A.name, named.x, named.y, Object.assign({ size, edge: 3 }, A.sea ? STYLE.sea : {})); ctx.globalAlpha = 1; }
+      answerNamed = !!named && !own && !covers(h && pointerPlate(h, a, true), named.x, named.y, half, 9 * q);
+      if (answerNamed) { ctx.globalAlpha = a; text(A.name, named.x, named.y, Object.assign({ size, edge: 3 }, A.sea ? STYLE.sea : {})); ctx.globalAlpha = 1; }
     }
     if (h) pointerPlate(h, a);
   }
@@ -6613,7 +6619,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     hoverBox = null;
     for (const a of atlasNames) {
       const s = project(a.p);
-      if (paint) a.at = null;          // where the name stands as drawn, and half its width (for the tests)
+      if (paint) a.at = a.box = null;          // at: where the name stands as drawn, and half its width (for the tests); box: its room, painted or not (the pointer on it: pointed)
       if (S.replay && S.mode === 'over' && (a.seq > reached() || (!a.lost && arrived && arrived.j === a.seq))) { a.spot = undefined; continue; }          // named when the line reaches it; while the label over its stop stands, its name waits
       if (!s || dot(a.p, cam.n) < cam.cos0 + 0.08 || (rounds && a.i !== S.focus)) { a.spot = undefined; continue; }          // round the back, too close to the rim to read, or not the round picked
       const name = a.name || a.c.name, size = Math.round((a.lost ? 17 : 15) * view.ui), q = size / 13;
@@ -6628,29 +6634,37 @@ button { font: inherit; color: inherit; cursor: pointer; }
         if (free(s[0] + spots[i][0], s[1] + spots[i][1])) { at = [s[0] + spots[i][0], s[1] + spots[i][1]]; a.spot = i; break; }
       }
       if (!at) { if (!held) a.spot = undefined; continue; }
-      boxes.push({ x: at[0], y: at[1], half });
-      if (paint) todo.push({ a, s, at, half, name, size, q });
+      boxes.push({ x: at[0], y: at[1], half, name: true });
+      if (paint) { a.box = { x: at[0], y: at[1], half, tall: 7.5 * q }; todo.push({ a, s, at, half, name, size, q }); }          // 7.5: half of what two names keep between their middles (free: 15), so no spot is in two names' rooms
     }
     if (!paint) return;
-    // the name under the mouse, drawn last (drawTop); a capital's symbol answers with its own name
-    topHover = hover && (hover.pin || !boxes.some((b) => !b.way && Math.abs(b.x - hover.x) < b.half && Math.abs(b.y - hover.y) < 12)) ? hover : null;
-    const hq = topHover && topHover.pin ? project(topHover.p) : null;
-    hoverBox = hq ? labelOver(topHover.c, topHover.name, hq, !!topHover.c).box : topHover && !topHover.pin && S.mode !== 'fly' ? pointerPlate(topHover, 1, true) : null;
+    // the name under the mouse, drawn last (drawTop); a capital's symbol answers with its own name. The pointer answers
+    // on a name that already stands on the globe too (the player, 2026-11-20, by button: "Yes, there too"; until then
+    // nothing came up there, so no capital). Not on a mark's own box (a round's dots, the label over a stop), as before.
+    topHover = hover && (hover.pin || !boxes.some((b) => !b.way && !b.name && Math.abs(b.x - hover.x) < b.half && Math.abs(b.y - hover.y) < 12)) ? hover : null;
+    const hq = topHover && topHover.pin ? project(topHover.p) : null, plate = topHover && !topHover.pin && S.mode !== 'fly' ? topHover : null;
+    hoverBox = hq ? labelOver(topHover.c, topHover.name, hq, !!topHover.c).box : plate ? pointerPlate(plate, 1, true) : null;
+    // While the plate is up it carries the name of what the pointer is on, so that thing's own standing name is away, wherever
+    // on it the pointer is: a country, a water is named once. (The plate stands over the pointer: with the pointer on the upper
+    // half of a name its room does not reach that name, and "Egypt" would stand right under the plate "Egypt, Cairo".)
+    // And the name the pointer is ON (pointed: a name answers for what it names) is away whatever it names. A city's dot is
+    // a mark, not a name: it stays, as every mark under the plate does.
+    const own = (a) => !!plate && (plate.on === a || (!a.city && (a.c.water ? !!plate.sea && a.c.name === plate.name : !plate.sea && a.c === plate.c)));
     for (const { a, s, at, half, name, size, q } of todo) {
-      if (covers(hoverBox, at[0], at[1], half, 9 * q)) continue;
-      a.at = at; a.half = half;
+      const away = own(a) || covers(hoverBox, at[0], at[1], half, 9 * q);
+      if (!away) { a.at = at; a.half = half; }
       // A city's own dot: a trip's answer paper-white, Study's capital not delivered red. Where a round came down right on
       // the city, the dot of that landing stands for both, so the verdict it wears is not hidden under the city's dot
       // (the player, of a correct landing on Havana: "wondering why havana wasn't green"). The name stands by that dot
       // with no line of its own to it.
       const L = rounds && a.city && S.legs[a.i], came = L && project(L.land), onIt = !!came && Math.hypot(came[0] - s[0], came[1] - s[1]) < 14 * view.ui;
-      if ((at[0] !== s[0] || at[1] !== s[1]) && !onIt) {
+      if (!away && (at[0] !== s[0] || at[1] !== s[1]) && !onIt) {
         ctx.strokeStyle = INK; ctx.lineWidth = view.ui;
         ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(at[0] - Math.sign(at[0] - s[0]) * half * 0.6, at[1] - Math.sign(at[1] - s[1]) * 6 * view.ui); ctx.stroke();
         ctx.beginPath(); ctx.arc(s[0], s[1], 2 * view.ui, 0, 7); ctx.fillStyle = INK; ctx.fill();
       }
       if (a.city && !onIt) { ctx.beginPath(); ctx.arc(s[0], s[1], 4 * view.ui, 0, 7); ctx.fillStyle = a.lost ? BAD : PAPER; ctx.fill(); ctx.strokeStyle = a.lost ? PAPER : INK; ctx.lineWidth = 1.5 * view.ui; ctx.stroke(); }
-      text(name, at[0], at[1], Object.assign({ size, edge: 3 }, a.lost ? { fill: BAD, italic: a.water } : a.water ? STYLE.sea : a.helped ? STYLE.helped : {}));
+      if (!away) text(name, at[0], at[1], Object.assign({ size, edge: 3 }, a.lost ? { fill: BAD, italic: a.water } : a.water ? STYLE.sea : a.helped ? STYLE.helped : {}));
     }
   }
   // The spot each name will have when the turn that has just begun ends: the names are placed for the view as it will be.
@@ -7225,6 +7239,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
         if (q && Math.hypot(q[0] - x, q[1] - y) < 11 * view.mk) return { x: q[0], y: q[1], name: d.city, c: d.c || null, p: d.p, pin: true };
       }
     }
+    // A name that stands on the globe is the handle of what it names, as a label is on any map: the pointer on the name
+    // answers for the name's own country (a city's: the country it is in) or water, wherever the name stands. A results
+    // globe shows the whole earth, and there a round's answer often stands beside its country: until 2026-11-20 the
+    // pointer on the word "Italy" read the ground under the word, "Germany" (4 of 5 rounds of a Day Trip, audit/pd4.py).
+    if (S.mode !== 'fly') for (const a of atlasNames) {
+      const b = a.box;
+      if (b && Math.abs(b.x - x) < b.half && Math.abs(b.y - y) < b.tall) return a.c.water ? { x, y, name: a.c.name, sea: true, w: a.c.index, on: a } : { x, y, name: a.c.name, c: a.c, on: a };
+    }
     const ll = unproject(x, y), r = ll && locationAt(ll[0], ll[1]);
     return r && r.name ? { x, y, name: nameOf(r), c: r.c, sea: r.sea, w: r.w, s: r.s } : null;
   }
@@ -7297,7 +7319,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // for the tests: the bird put somewhere by hand. That is no flight, so the view is the bird's own at once (no rest on the last landing's country still being handed back)
   const setBird = (lon, lat, a, down) => { Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down }); S.capFit = null; fitClear(); };
   window.birdsEye = { stackLines: (id) => { const c = PLAY.find((q) => q.id === id); ownName = true; try { return stackForm(c, c.name, 'name', null).lines; } finally { ownName = false; } }, hoverBox: () => hoverBox, slerp, showLeg, legView, STILL_DEG, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, rankedRounds, easiest, flagClue, capClue, capFlagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
-    outlines: () => fx.filter((f) => f.lined && f.shownA > 0).map((f) => f.lined.id), OUTLINE, pull, pullBy, steerable, PULL_FULL, PULL_RING, hFor, look: () => gaze, looking, canLook, lookStart, lookEnd, lookAnswer, lookK: gazeK, plate: () => plateSays, plateRoom: (h) => pointerPlate(h, 1, true), hoverNow: () => (hover ? hover.name : null), project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
+    outlines: () => fx.filter((f) => f.lined && f.shownA > 0).map((f) => f.lined.id), OUTLINE, pull, pullBy, steerable, PULL_FULL, PULL_RING, hFor, look: () => gaze, looking, canLook, lookStart, lookEnd, lookAnswer, answerNamed: () => answerNamed, answerRoom: () => gazeName, lookK: gazeK, plate: () => plateSays, plateRoom: (h) => pointerPlate(h, 1, true), hoverNow: () => (hover ? hover.name : null), project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
   if (gl) {
