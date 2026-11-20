@@ -414,7 +414,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* The day's three sums: the table's last row, each under its column, under the card's heavy line with the gap the line
    always had from the last round (until 2026-11-19 a line of their own under the table, "Accuracy 743/800" and so on). */
 #daycard .stats tr.gap td { padding: 0; height: 10px; border: 0; }
-#daycard .stats tr.sum td { border-top: var(--b2z) solid var(--ink); padding: 10px 0 0; }
+#daycard .stats tr.sum td { border-top: var(--b2z) solid var(--ink); padding-top: 10px; padding-bottom: 0; }          /* top and bottom only: a sum keeps its column's 10 px of room on the left (the first build took it away, and "743/800" ran into "60/100") */
 #daycard table.day { margin-bottom: 12px; }
 .squares { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 14px; }
 .squares i { width: 22px; height: 22px; border-radius: 3px; background: var(--bad); }
