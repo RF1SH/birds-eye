@@ -2046,11 +2046,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // the lines under a name (one, or a capital and a flag's note), and how far the last one's middle is below the name's
   const subLines = (sub) => (sub ? sub.split('\n') : []);
   const subFall = (o, n) => (n ? o.size + 1 + (n - 1) * (subPx(o) + 1) : 0);
-  function nameplate(c, str, x, y, cls, sub, alpha, size) {
+  function nameplate(c, str, x, y, cls, sub, alpha, size, dry) {
     [str, sub] = disputed(c, str, sub);
     const o = Object.assign({ size: size || namePx(), edge: size ? 3.5 : 3.5 * nameUp() }, STYLE[cls] || STYLE.name);
     if (o.k) o.size = Math.round(o.size * o.k);
-    ctx.globalAlpha = alpha;
+    if (!dry) ctx.globalAlpha = alpha;
     const flag = c && c.flag ? c.flag : null;
     ctx.font = (o.italic ? 'italic ' : '') + (o.weight || 700) + ' ' + o.size + 'px ' + DISPLAY;
     if ('letterSpacing' in ctx) ctx.letterSpacing = o.track || '0.05em';
@@ -2059,6 +2059,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const subs = subLines(sub), step = so.size + 1;
     ctx.font = (so.italic ? 'italic ' : '') + '700 ' + so.size + 'px ' + DISPLAY;
     const sws = subs.map((line) => subWidth(line, so.size)), sw = Math.max(0, ...sws);
+    if (dry) {          // not drawn: the room it would take, as other names keep off it (the shape of labelOver's box)
+      const fall = subFall(o, subs.length), top = y - Math.max(o.size, flag ? fh - fall : 0) / 2, low = y + fall + Math.max(subs.length ? so.size : o.size, flag ? fh - fall : 0) / 2;
+      return { x, y: (top + low) / 2, half: ((flag ? fw + 8 : 0) + Math.max(tw, sw)) / 2 + 4, tall: (low - top) / 2 + 4 };
+    }
     if (!flag) {
       text(str, x, y, o);
       subs.forEach((line, i) => subText(line, x, y + o.size + 1 + i * step, so));
@@ -2072,6 +2076,26 @@ button { font: inherit; color: inherit; cursor: pointer; }
     }
     ctx.globalAlpha = 1;
   }
+  // The plate by the pointer, the same on every globe (the title's, an end screen's, the look-around's): a country's flag,
+  // its name, and its capital under the name (the player, 2026-11-20, of the look-around: "I was going to say flag name
+  // and capital"; of the other globes, by button: "Yes, the capital everywhere"). The capital is left out where it has
+  // the country's own name (Singapore). A water, and a land that is never asked: the name alone. The plate stands over
+  // the pointer, a line higher for each line under the name, so the pointer covers none of it. `dry`: not drawn, the
+  // room it would take.
+  let plateSays = null;          // for the tests: what the plate by the pointer says
+  function pointerPlate(h, alpha, dry) {
+    const c = h.sea ? null : h.c, sub = c && c.cap && c.cap[0] !== c.name ? capLine(c) : null, px = Math.round(17 * view.ui), cls = h.sea ? 'sea' : 'name';
+    const n = subLines(disputed(c, h.name, sub)[1]).length;          // Afghanistan: the note on its flag is a line more
+    let x = h.x, y = h.y - 18 * view.ui - (n ? px + 2 + (n - 1) * (subPx({ size: px }) + 1) : 0);
+    const r = nameplate(c, h.name, x, y, cls, sub, alpha, px, true);
+    // Whole in the window, as a pointer's label is anywhere: moved sideways off the window's edge (a capital's name can
+    // be far wider than its country's: Myanmar's is Naypyidaw), and under the pointer where there is no room over it.
+    const dx = clamp(x, r.half + 2, Math.max(r.half + 2, view.w - r.half - 2)) - x, dy = r.y - r.tall < 0 ? h.y + 26 * view.ui - (r.y - r.tall + 4) : 0;
+    if (dry) return Object.assign(r, { x: r.x + dx, y: r.y + dy });
+    plateSays = { name: h.name, sub };
+    nameplate(c, h.name, x + dx, y + dy, cls, sub, alpha, px);
+  }
+  const covers = (box, x, y, half, up) => !!box && Math.abs(box.x - x) < box.half + half && Math.abs(box.y - y) < box.tall + up;
   const fade = (k) => (k > 0.8 ? (1 - k) / 0.2 : 1);
   // Names shown during a flight keep clear of each other. Each frame they are placed in the order
   // they appeared; one that would overlap an earlier one steps up or down, and only then is it tied
@@ -3209,6 +3233,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
       for (const [ink, wd] of [[INK, 1.5 * view.ui + 2], [PAPER, 1.5 * view.ui]]) { ctx.strokeStyle = ink; ctx.lineWidth = wd; ctx.beginPath(); ctx.arc(bb.x, bb.y, r, 0, 7); ctx.stroke(); }
       ctx.restore();
     }
+    // what the pointer is on: not the bird, and not a country that is the answer and wears its name already
+    let h = looking() && !drag.on ? hover : null;
+    if (h && bb && Math.abs(bb.x - h.x) < bb.half && Math.abs(bb.y - h.y) < bb.up) h = null;
     let named = null;
     if (A && dot(A.p, cam.n) > cam.cos0 + 0.08) {          // in the lettering of a results globe's names
       const s = project(A.p), size = Math.round(17 * view.ui), q = size / 13, m = A.area ? 0 : A.mark * view.mk;
@@ -3218,19 +3245,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
       const far = g && g[1] < s[1] ? 1 : -1;          // a point's name stands on the side away from the bird, clear of the line to it
       const spots = A.area ? [[0, 0], [0, -16 * q], [0, 16 * q], [0, -30 * q], [0, 30 * q], [half + 10, 0], [-half - 10, 0]] : [[0, far * (m + 12 * q)], [0, -far * (m + 12 * q)], [half + m + 6, 0], [-half - m - 6, 0]];
       for (const d of spots) if (free(s[0] + d[0], s[1] + d[1])) { named = { x: s[0] + d[0], y: s[1] + d[1] }; break; }
-      if (named) { ctx.globalAlpha = a; text(A.name, named.x, named.y, Object.assign({ size, edge: 3 }, A.sea ? STYLE.sea : {})); ctx.globalAlpha = 1; }
+      if (named && h && A.area && h.c === A.c) h = null;
+      // the plate stands on clear ground, as on every globe: the answer's name is left out while the plate would cover it
+      if (named && !covers(h && pointerPlate(h, a, true), named.x, named.y, half, 9 * q)) { ctx.globalAlpha = a; text(A.name, named.x, named.y, Object.assign({ size, edge: 3 }, A.sea ? STYLE.sea : {})); ctx.globalAlpha = 1; }
     }
-    lookPlate = null;
-    const h = looking() && !drag.on ? hover : null;
-    if (!h) return;
-    if (bb && Math.abs(bb.x - h.x) < bb.half && Math.abs(bb.y - h.y) < bb.up) return;          // the pointer on the bird
-    if (named && A.area && h.c === A.c) return;          // the answer wears its name already
-    // a country: its capital under its name, left out where the capital has the country's own name (Singapore)
-    const sub = h.c && !h.sea && h.c.cap && h.c.cap[0] !== h.c.name ? capLine(h.c) : null, px = Math.round(17 * view.ui);
-    lookPlate = { name: h.name, sub };
-    nameplate(h.sea ? null : h.c, h.name, h.x, h.y - 18 * view.ui - (sub ? px + 2 : 0), h.sea ? 'sea' : 'name', sub, a, px);
+    if (h) pointerPlate(h, a);
   }
-  let lookPlate = null;          // for the tests: what the pointer's plate says
 
   // ---------- flying a round ----------
   let tab = 'challenge';        // the title card's tab: challenge | study | free. The game opens on the first, Challenge (the player's pick)
@@ -6587,8 +6607,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // "it's just like buried beneath all these other animations and capitals. You need to find a better way to do that,
     // much better way." The label was then drawn over the other MARKS, but over the names too: on Zagreb's symbol
     // "Croatia" stood printed over "Romania". Picked from a picture, today beside proposed, 2026-11-17: "Build it".)
-    const hq = paint && hover && hover.pin ? project(hover.p) : null;
-    hoverBox = hq ? labelOver(hover.c, hover.name, hq, !!hover.c).box : null;
+    // The plate by the pointer has the same rule since it carries the capital's line (2026-11-20): it is twice as tall as
+    // the name alone was. So every name is placed first and painted after, when it is known what the pointer is on.
+    const todo = [];
+    hoverBox = null;
     for (const a of atlasNames) {
       const s = project(a.p);
       if (paint) a.at = null;          // where the name stands as drawn, and half its width (for the tests)
@@ -6596,6 +6618,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       if (!s || dot(a.p, cam.n) < cam.cos0 + 0.08 || (rounds && a.i !== S.focus)) { a.spot = undefined; continue; }          // round the back, too close to the rim to read, or not the round picked
       const name = a.name || a.c.name, size = Math.round((a.lost ? 17 : 15) * view.ui), q = size / 13;
       ctx.font = (a.water ? 'italic 600 ' : '700 ') + size + 'px ' + DISPLAY;
+      if ('letterSpacing' in ctx) ctx.letterSpacing = a.water && !a.lost ? STYLE.sea.track : '0.05em';          // as it will be drawn: else the width is whatever was drawn last
       const half = ctx.measureText(name).width / 2 + 4;
       const free = (x, y) => rimIn({ x, y, half, up: 9 * q, down: 9 * q }) > 0.15 && !boxes.some((b) => Math.abs(b.x - x) < b.half + half && Math.abs(b.y - y) < (b.tall || 15 * q));
       const spots = a.city ? [[0, -14 * q], [0, 14 * q], [half + 8, 0], [-half - 8, 0]] : [[0, 0], [0, -16 * q], [0, 16 * q], [half + 10, 0], [-half - 10, 0], [0, -30 * q], [0, 30 * q]];
@@ -6606,8 +6629,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
       }
       if (!at) { if (!held) a.spot = undefined; continue; }
       boxes.push({ x: at[0], y: at[1], half });
-      if (!paint) continue;
-      if (hoverBox && Math.abs(hoverBox.x - at[0]) < hoverBox.half + half && Math.abs(hoverBox.y - at[1]) < hoverBox.tall + 9 * q) continue;
+      if (paint) todo.push({ a, s, at, half, name, size, q });
+    }
+    if (!paint) return;
+    // the name under the mouse, drawn last (drawTop); a capital's symbol answers with its own name
+    topHover = hover && (hover.pin || !boxes.some((b) => !b.way && Math.abs(b.x - hover.x) < b.half && Math.abs(b.y - hover.y) < 12)) ? hover : null;
+    const hq = topHover && topHover.pin ? project(topHover.p) : null;
+    hoverBox = hq ? labelOver(topHover.c, topHover.name, hq, !!topHover.c).box : topHover && !topHover.pin && S.mode !== 'fly' ? pointerPlate(topHover, 1, true) : null;
+    for (const { a, s, at, half, name, size, q } of todo) {
+      if (covers(hoverBox, at[0], at[1], half, 9 * q)) continue;
       a.at = at; a.half = half;
       // A city's own dot: a trip's answer paper-white, Study's capital not delivered red. Where a round came down right on
       // the city, the dot of that landing stands for both, so the verdict it wears is not hidden under the city's dot
@@ -6640,9 +6670,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const legs = S.mode === 'over' && S.trip && S.legs;
     if (legs) drawLegs();
     const boxes = nameBoxes();
-    placeNames(boxes, true, !!(legs && (atlas.to || S.tour)));
-    // the name under the mouse, drawn last (drawTop); a capital's symbol answers with its own name
-    topHover = hover && (hover.pin || !boxes.some((b) => !b.way && Math.abs(b.x - hover.x) < b.half && Math.abs(b.y - hover.y) < 12)) ? hover : null;
+    placeNames(boxes, true, !!(legs && (atlas.to || S.tour)));          // and what the pointer is on (topHover)
     ctx.globalAlpha = 1;
   }
   // Drawn over every mark of a globe: Study's replayed bird, the label over the stop the line has just reached, and the
@@ -6658,7 +6686,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (arrived) nameplate(arrived.c, arrived.name, arrived.x, arrived.y, 'name', arrived.sub ? arrived.c.name : null, arrived.fade * alpha, arrived.size);
     const h = topHover, q = h && h.pin && project(h.p), l = q && labelOver(h.c, h.name, q, !!h.c);
     if (l) nameplate(h.c, h.name, l.x, l.y, 'name', h.c ? h.c.name : null, alpha, l.size);
-    else if (h && !h.pin) nameplate(h.c, h.name, h.x, h.y - 18 * view.ui, h.sea ? 'sea' : 'name', null, alpha, Math.round(17 * view.ui));
+    else if (h && !h.pin) pointerPlate(h, alpha);
     ctx.globalAlpha = 1;
   }
 
@@ -6682,7 +6710,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     drawZones();
     veiled(true); drawOutlines(); veiled(false);          // under every mark: a capital's symbol on the coast or the border stays whole (the player, of Panama City's in the first picture: "uhhh capital cut off?")
     drawDots();
-    topHover = arrived = null;
+    topHover = arrived = plateSays = null;
     if (S.mode === 'fly') drawDrops();
     if (S.mode !== 'fly' || S.blend < 1) drawAtlas();
     if (S.mode === 'over') drawDrops();          // on Study's end globe a delivered capital's pin stands over the path's dots and over a name's tie, never under them
@@ -7269,7 +7297,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // for the tests: the bird put somewhere by hand. That is no flight, so the view is the bird's own at once (no rest on the last landing's country still being handed back)
   const setBird = (lon, lat, a, down) => { Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down }); S.capFit = null; fitClear(); };
   window.birdsEye = { stackLines: (id) => { const c = PLAY.find((q) => q.id === id); ownName = true; try { return stackForm(c, c.name, 'name', null).lines; } finally { ownName = false; } }, hoverBox: () => hoverBox, slerp, showLeg, legView, STILL_DEG, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, rankedRounds, easiest, flagClue, capClue, capFlagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
-    outlines: () => fx.filter((f) => f.lined && f.shownA > 0).map((f) => f.lined.id), OUTLINE, pull, pullBy, steerable, PULL_FULL, PULL_RING, hFor, look: () => gaze, looking, canLook, lookStart, lookEnd, lookAnswer, lookK: gazeK, lookPlate: () => lookPlate, hoverNow: () => (hover ? hover.name : null), project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
+    outlines: () => fx.filter((f) => f.lined && f.shownA > 0).map((f) => f.lined.id), OUTLINE, pull, pullBy, steerable, PULL_FULL, PULL_RING, hFor, look: () => gaze, looking, canLook, lookStart, lookEnd, lookAnswer, lookK: gazeK, plate: () => plateSays, plateRoom: (h) => pointerPlate(h, 1, true), hoverNow: () => (hover ? hover.name : null), project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
   if (gl) {
