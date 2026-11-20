@@ -506,6 +506,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
   text-shadow: 0 0 1px var(--space), 0 0 2px var(--space), 0 0 2px var(--space), 0 0 3px var(--space), 0 0 3px var(--space); }
 #pause { position: absolute; top: 14px; right: 16px; zoom: var(--ui, 1); width: 38px; height: 38px; padding: 0; display: grid; place-items: center; background: var(--paper); color: var(--ink); border: var(--b2z) solid var(--ink); border-radius: 3px; }
 #pause:hover { background: var(--paper-shade); }
+/* Looking around: the button that brings the view back stands beside the pause button, in its look. The cards around the
+   bird (a fun fact, Free flight's card, the Spot on stamp) are away while the view is; the bar at the bottom stays. */
+#tobird { position: absolute; top: 14px; right: 62px; zoom: var(--ui, 1); width: 38px; height: 38px; padding: 0; display: grid; place-items: center; background: var(--paper); color: var(--ink); border: var(--b2z) solid var(--ink); border-radius: 3px; }
+#tobird:hover { background: var(--paper-shade); }
+#stage.looking #ink { cursor: grab; }
+#stage.looking.dragging #ink { cursor: grabbing; }
+#place { transition: opacity .2s; }
+#stage.looking #funfact, #stage.looking #place, #stage.looking #spoton { opacity: 0 !important; pointer-events: none; transition: opacity .2s; }
 #nogl { position: absolute; inset: auto 16px 16px; margin: 0; padding: 12px 14px; background: var(--paper); border: 2px solid var(--ink); border-radius: 3px; }
 /* a round left for another window: the globe is hidden until you are back (the stopwatch runs on) */
 #stage.held #globe, #stage.held #ink { visibility: hidden; }
@@ -726,6 +734,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   <button class="alt" id="skip" type="button" hidden>Skip to the end</button>
   <p id="skip-note" hidden>Click to carry on</p>
   <button id="pause" type="button" aria-label="Pause (P)" title="Pause (P)" hidden><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M8.5 5v14M15.5 5v14" stroke="currentColor" stroke-width="4" fill="none"/></svg></button>
+  <button id="tobird" type="button" aria-label="Back to the bird" title="Back to the bird" hidden><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 2.5v3.5M12 18v3.5M2.5 12h3.5M18 12h3.5"/></svg></button>
   <p id="nogl" hidden>This browser cannot draw the globe (it needs WebGL 2). A recent Chrome, Edge, Firefox or Safari can.</p>
 </div>
 <div id="faq-page" hidden>
@@ -3082,6 +3091,147 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (L.fast && S.trip && S.trip.wait) S.trip.after = Math.min(S.trip.after, Math.max(S.trip.least, S.t));       // a round's result: the button is ready when the view is back
   }
 
+  // ---------- looking around ----------
+  // Once the bird is down and no clock runs, the map is the player's. (The player, 2026-11-14: "we should find a way to
+  // where the user can zoom out from where they are. And when they zoom out, it's almost like the home screen where
+  // you can rotate it. But you know, you have your bird there and stuff ... it still shows where the correct location
+  // is that you should have landed. But it gets rid of all the cards around you when you zoom out, and then you can
+  // just like explore like where the place you should have landed is. And then if you hover over something else, it
+  // can show you like the basic information about that place.") Scrolling out lifts the view off the bird, as far as
+  // the whole globe: drag or the arrow keys turn it, scrolling zooms toward the pointer, and the pointer names what it
+  // is on (flag, name and capital: their pick, 2026-11-20). The bird stands where it came down, with a ring round it
+  // while it is small; the correct location keeps its mark and wears its name; the landing's names, flags, bold
+  // borders, capitals' symbols and cards are away, and the bar at the bottom stays (their pick). Scrolling back in to
+  // where the view was, or the button beside the pause button, brings the view back. (Theirs, of a trial page whose
+  // button also began it: "There shouldn't be a button to zoom out, just to recenter and zoom back in. So you can begin
+  // by scrolling only, but you can return by using the button or scrolling back in.") Space goes on as it always does:
+  // the next location in Day Trip and Ranked; in Study and Free flight, held, the view comes back and the bird takes
+  // off (their rule of 2026-11-18 for a view that is not on the bird). Never while a round's clock runs, never in the
+  // tutorial. In Study the pointer names nothing: a postcard is always in hand, and a name would say where it goes
+  // (their pick). PLAN 67.
+  // gaze: the look-around's own camera, begun at the camera as it stands, so nothing jumps.
+  let gaze = null, veil = 1, veilAsked = 1, gazeOver = -1e9;
+  const toBird = $('tobird');
+  const looking = () => !!gaze && !gaze.leaving;
+  const canLook = () => S.mode === 'fly' && !S.paused && bird.down && S.blend >= 1 && (!S.trip || (S.trip.wait && !S.trip.count && !S.trip.tutor && !S.trip.lesson && !!S.trip.reveal));
+  const gazeWhole = () => hFor(0.46 * Math.min(view.w, view.h - view.deck));          // the whole globe in the room over the bar, as the title's
+  // How much of the look-around is there, 0 to 1: the landing's names fade as it comes, and are back when the view is nearly home.
+  const gazeK = () => (!gaze ? 0 : gaze.leaving ? (gaze.T ? 1 - smooth(clamp(((S.t - gaze.t1) / gaze.T - 0.6) / 0.4, 0, 1)) : 1) : smooth(clamp((S.t - gaze.t0) / 0.25, 0, 1)));
+  // The veil: while the view is away, what a landing put on the map (its names and flags, its bold borders, Free
+  // flight's map of the landing) is drawn fainter by this factor, down to nothing. Each of those sets the ink canvas's
+  // own opacity as it draws, in some sixty places, so the factor is put on that one property instead of into each of
+  // them: what was asked for is kept (veilAsked), what is set is that times the veil. With no veil it is the canvas's own.
+  {
+    const d = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'globalAlpha');
+    if (d && d.get && d.set) Object.defineProperty(ctx, 'globalAlpha', { configurable: true, get() { return veil === 1 ? d.get.call(this) : veilAsked; }, set(v) { veilAsked = v; d.set.call(this, veil === 1 ? v : v * veil); } });
+  }
+  function veiled(on) { veil = on ? 1 - gazeK() : 1; ctx.globalAlpha = 1; }
+  function lookStart() {
+    if (looking() || !canLook()) return false;
+    placeCamera();
+    const ll = lonLat(cam.n);
+    gaze = { lon: ll[0], lat: clamp(ll[1], -80, 80), H: cam.H, cx0: cam.cx, cy0: cam.cy, t0: S.t, leaving: false, own: null };
+    S.look = null; pull.at = null;          // the view is the player's now: one the game had sent away does not come back by itself
+    stage.classList.add('looking');
+    return true;
+  }
+  function lookEnd(now) {          // now: at once, with no way back (a flight begins or ends)
+    const O = gaze;
+    if (!O) return;
+    hover = mouse = null; drag.on = false; stage.classList.remove('dragging');
+    if (now) { gaze = null; stage.classList.remove('looking'); return; }
+    if (O.leaving) return;
+    placeCamera();
+    Object.assign(O, { leaving: true, t1: S.t, n1: cam.n.slice(), h1: Math.log(cam.H), cx1: cam.cx, cy1: cam.cy, T: null, rise: 0 });
+    gazeOver = performance.now();
+    const A = lookAnswer(), fl = A && flashes.find((q) => q.c === A.c && q.pulses === 0);
+    if (fl) fl.t = Math.max(fl.t, fl.secs * 0.8);          // the answer's light goes with the look-around
+  }
+  // The correct location, where one is shown: a round's answer; in Study the postcard's, once the way is shown.
+  function lookAnswer() {
+    const T = S.trip;
+    if (S.game === 'trip' && T && T.reveal && T.rounds[T.i]) { const R = T.rounds[T.i], v = T.reveal; return { name: R.name, p: v.to, area: v.area, c: R.c, mark: v.cap ? 11.5 : 8.5 }; }
+    const t = S.game === 'study' && S.tickets[0];
+    if (t && t.shown) { const it = t.it; return { name: it.kind === 'k' ? it.c.cap[0] : it.c.name, p: pointOf(it), area: it.kind !== 'k', c: it.c, mark: 11.5, sea: it.kind === 's' }; }
+    return null;
+  }
+  const lookPointed = (x, y) => (S.game === 'study' ? null : pointed(x, y));
+  function lookWheel(e) {
+    if (S.paused) return;
+    if (!looking()) { if (e.deltaY <= 0 || performance.now() - gazeOver < 400 || !lookStart()) return; }          // scrolling OUT begins it (not the tail of the scroll that has just ended it)
+    e.preventDefault();
+    const O = gaze, box = stage.getBoundingClientRect(), x = e.clientX - box.left, y = e.clientY - box.top;
+    S.idle = 0; hover = null;
+    placeCamera();
+    const at = unproject(x, y);
+    O.H = clamp(O.H * Math.exp(e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), view.H0, gazeWhole());
+    for (let i = 0; i < 3 && at; i++) {          // the place under the pointer stays under it, as on any map, while the pointer is well inside the globe: scrolling out ends on a globe that still faces where you were
+      placeCamera();
+      if (Math.hypot(x - cam.cx, y - cam.cy) > 0.85 * cam.rho) break;
+      const q = projectLL(at[0], at[1]), k = cam.H / view.F / RAD;
+      if (!q) break;
+      O.lat = clamp(O.lat + (y - q[1]) * k, -80, 80);
+      O.lon = wrapLon(O.lon - ((x - q[0]) * k) / Math.max(0.2, Math.cos(O.lat * RAD)));
+    }
+    // Scrolling back in brings the view back: down at the height of the game's own view, with the bird on the screen.
+    // Zoomed in on somewhere else (the bird out of the window), scrolling stops at the lowest view.
+    if (e.deltaY < 0 && O.own && O.H <= O.own.H * 1.03) {
+      placeCamera();
+      const q = project(unit(bird.lon, bird.lat));
+      if (q && q[0] > 20 && q[0] < view.w - 20 && q[1] > 20 && q[1] < view.h - view.deck - 20) lookEnd();
+    }
+  }
+  function lookTick(dt) {
+    if (gaze && (S.mode !== 'fly' || !bird.down)) lookEnd(true);
+    const on = looking(), show = on && !S.paused;
+    if (toBird.hidden === show) toBird.hidden = !show;
+    if (!show) return;
+    const O = gaze, ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0), iy = (keys.up ? 1 : 0) - (keys.down ? 1 : 0);
+    if (ix || iy) {          // the arrow keys turn the globe, about 520 px a second on the screen
+      const k = 520 * view.ui * (O.H / view.F) / RAD * dt;
+      O.lat = clamp(O.lat + iy * k, -80, 80);
+      O.lon = wrapLon(O.lon + (ix * k) / Math.max(0.2, Math.cos(O.lat * RAD)));
+      S.idle = 0;
+    }
+    const A = lookAnswer();          // a country that is the answer stays lit while you look
+    if (A && A.area && !A.sea && !A.c.tiny) { const fl = flashes.find((q) => q.c === A.c && q.pulses === 0); if (fl) fl.t = Math.min(fl.t, 1); else flash(A.c, 0, 4, null, 0.5); }
+  }
+  // Drawn over the map while looking around: a ring round the bird, the correct location's name, and what the pointer is on.
+  function lookDraw() {
+    const a = gazeK();
+    if (a <= 0) return;
+    const A = lookAnswer(), g = project(unit(bird.lon, bird.lat)), bb = g && birdBox(g);
+    // The bird is small on a high view (BIRD_LEAST): a ring round it, in the bird's paper and ink, says where it stands.
+    const small = bb ? a * clamp((0.8 - onMap()) / 0.3, 0, 1) * rimIn(bb) : 0;
+    if (small > 0) {
+      const r = Math.max(bb.half, bb.up) + 5 * view.ui;
+      ctx.save(); ctx.globalAlpha = small;
+      for (const [ink, wd] of [[INK, 1.5 * view.ui + 2], [PAPER, 1.5 * view.ui]]) { ctx.strokeStyle = ink; ctx.lineWidth = wd; ctx.beginPath(); ctx.arc(bb.x, bb.y, r, 0, 7); ctx.stroke(); }
+      ctx.restore();
+    }
+    let named = null;
+    if (A && dot(A.p, cam.n) > cam.cos0 + 0.08) {          // in the lettering of a results globe's names
+      const s = project(A.p), size = Math.round(17 * view.ui), q = size / 13, m = A.area ? 0 : A.mark * view.mk;
+      ctx.font = (A.sea ? 'italic 600 ' : '700 ') + size + 'px ' + DISPLAY;
+      const half = ctx.measureText(A.name).width / 2 + 4;
+      const free = (x, y) => rimIn({ x, y, half, up: 9 * q, down: 9 * q }) > 0.15 && !(bb && Math.abs(bb.x - x) < bb.half + half && Math.abs(bb.y - y) < bb.up + 9 * q);
+      const far = g && g[1] < s[1] ? 1 : -1;          // a point's name stands on the side away from the bird, clear of the line to it
+      const spots = A.area ? [[0, 0], [0, -16 * q], [0, 16 * q], [0, -30 * q], [0, 30 * q], [half + 10, 0], [-half - 10, 0]] : [[0, far * (m + 12 * q)], [0, -far * (m + 12 * q)], [half + m + 6, 0], [-half - m - 6, 0]];
+      for (const d of spots) if (free(s[0] + d[0], s[1] + d[1])) { named = { x: s[0] + d[0], y: s[1] + d[1] }; break; }
+      if (named) { ctx.globalAlpha = a; text(A.name, named.x, named.y, Object.assign({ size, edge: 3 }, A.sea ? STYLE.sea : {})); ctx.globalAlpha = 1; }
+    }
+    lookPlate = null;
+    const h = looking() && !drag.on ? hover : null;
+    if (!h) return;
+    if (bb && Math.abs(bb.x - h.x) < bb.half && Math.abs(bb.y - h.y) < bb.up) return;          // the pointer on the bird
+    if (named && A.area && h.c === A.c) return;          // the answer wears its name already
+    // a country: its capital under its name, left out where the capital has the country's own name (Singapore)
+    const sub = h.c && !h.sea && h.c.cap && h.c.cap[0] !== h.c.name ? capLine(h.c) : null, px = Math.round(17 * view.ui);
+    lookPlate = { name: h.name, sub };
+    nameplate(h.sea ? null : h.c, h.name, h.x, h.y - 18 * view.ui - (sub ? px + 2 : 0), h.sea ? 'sea' : 'name', sub, a, px);
+  }
+  let lookPlate = null;          // for the tests: what the pointer's plate says
+
   // ---------- flying a round ----------
   let tab = 'challenge';        // the title card's tab: challenge | study | free. The game opens on the first, Challenge (the player's pick)
   let runKind = 'day';          // on the challenge tab: today's trip, or an endless run
@@ -3092,6 +3242,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, capAt: null, capAlso: null, capFit: null, named: null, around: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), sawCap: new Set(), newC: 0, sawN: 0, intro: null, began: null, replay: null });
     S.log = new Map();
     S.drops = [];
+    lookEnd(true);
     fitClear();          // no rest of the view left over from the flight before, and no way back from one (the clock starts at 0 again: fitClear)
     // around: Free flight's last landing with the view fitted to its country. It was kept over Home, so the next Free flight's view
     // went to that country and left the bird, which stood where the new flight began (the player, 2026-11-18, of a
@@ -4079,7 +4230,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // Press and pull steers when a flight can go on: not while the view is away from the bird, not between two rounds
   // (what gates the flap, less the energy). Then the ring is drawn too; a ring that steers nothing is not shown. A
   // pause ends a pull (setPaused), and on a pause a press plants no ring.
-  const steerable = () => S.mode === 'fly' && !S.look && S.blend >= 1 && !(S.trip && S.trip.wait && !lessonFlies(S.trip));
+  const steerable = () => S.mode === 'fly' && !gaze && !S.look && S.blend >= 1 && !(S.trip && S.trip.wait && !lessonFlies(S.trip));
   // The pull as the keys' steering is: [east, north], up to 1 long. It has no slow start, as a tap of a key has: the
   // pull is as long as the hand makes it (flown so by the player on the trial page).
   function pullBy() {
@@ -4437,6 +4588,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function tripNext() {
     const T = S.trip;
     if (!T || !T.ready) return;
+    lookEnd();          // the Next location button, pressed while looking around
     T.ready = false;
     if (T.tutor) { goHome(); return; }          // Space and Enter press the card's first button, as on every card
     if (tripMore(T)) tripCount(T.i + 1); else tripEnd();
@@ -5277,6 +5429,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     abandon(true);
     const from = S.mode === 'fly' ? [bird.lon, bird.lat] : [atlas.lon, atlas.lat];
     S.mode = 'title'; S.paused = false; S.look = null; atlas.zoom = 1;
+    lookEnd(true);
     S.route = null; S.legs = null; S.replay = null;           // the flight path ends with its results screen
     holdOff();
     runKind = 'day';
@@ -5423,7 +5576,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // Flapping is the only thing that costs energy. With none left, you can only glide down.
     // No flying until the view has come down on the bird (S.blend), in any mode.
     const held = rested();          // one held press: no take-off until the view is back on the bird
-    const flap = keys.flap && !flapSpent && !S.look && S.energy > 0 && S.blend >= 1 && !(S.trip && S.trip.wait && !lessonFlies(S.trip)) && !(held && S.t < held.takeAt);
+    const flap = keys.flap && !flapSpent && !S.look && S.energy > 0 && S.blend >= 1 && !(S.trip && S.trip.wait && !lessonFlies(S.trip)) && !(held && S.t < held.takeAt) && !gaze;          // nor until a look-around's view is back
     if (flap) {
       S.energy = Math.max(0, S.energy - BURN * dt);
       if (bird.down) { bird.down = false; bird.va = CLIMB * 0.45; }
@@ -5535,6 +5688,25 @@ button { font: inherit; color: inherit; cursor: pointer; }
       if (L.at) { cx = lerp(cx, L.at.rx, k); cy = lerp(cy, L.at.ry, k); }          // a view fitted to a country: its own middle on the screen (lookTo)
       logH = lerp(logH, Math.max(logH, Math.log(L.H)), smooth(clamp(k * 3, 0, 1))) + (moving ? L.rise * Math.sin(Math.PI * k) : 0);
     }
+    if (gaze && !gaze.leaving) {          // looking around: the player's own view, its middle in the middle of the room over the bar
+      const O = gaze, e = smooth(clamp((S.t - O.t0) / 0.4, 0, 1));
+      O.own = { n, H: Math.exp(logH) };          // the game's own view meanwhile: scrolling back in to it ends the look-around (lookWheel)
+      O.H = clamp(O.H, view.H0, gazeWhole());
+      aim(unit(O.lon, O.lat), O.H, lerp(O.cx0, view.w / 2, e), lerp(O.cy0, (view.h - view.deck) / 2, e));
+      return;
+    }
+    if (gaze) {          // back to the game's own view: the turn first, while the view is high, then down
+      const O = gaze;
+      if (O.T === null) {
+        const ang = Math.acos(clamp(dot(O.n1, n), -1, 1));
+        O.T = clamp(0.45 + 0.4 * ang / (Math.PI / 2) + 0.1 * Math.abs(O.h1 - logH), 0.45, 1.1);
+        O.rise = Math.max(0, Math.log(clamp(ang * 1.1, view.H0, gazeWhole())) - Math.max(O.h1, logH));
+      }
+      const p = clamp((S.t - O.t1) / O.T, 0, 1), pn = smooth(clamp(p / 0.7, 0, 1)), ph = smooth(p);
+      n = slerp(O.n1, n, pn); logH = lerp(O.h1, logH, ph) + O.rise * Math.sin(Math.PI * p); cx = lerp(O.cx1, cx, ph); cy = lerp(O.cy1, cy, ph);
+      if (p >= 0.6) stage.classList.remove('looking');          // the cards around the bird are back when the view is nearly home
+      if (p >= 1) gaze = null;
+    }
     aim(n, Math.exp(logH), cx, cy);
   }
 
@@ -5636,7 +5808,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       const A = S[key], age = S.t - A.t;
       if (A.left === undefined && !bird.down) A.left = Math.max(age, 1.2);
       const a = A.left === undefined ? 1 : clamp(1 - (age - A.left) / 0.35, 0, 1), s = project(A.p);
-      if (s && a > 0) { ctx.globalAlpha = a * rimDot(s, 10 * view.mk); starAt(s[0], s[1], 6 * big, view.mk); ctx.globalAlpha = 1; }
+      if (s && a > 0) { ctx.globalAlpha = a * (1 - gazeK()) * rimDot(s, 10 * view.mk); starAt(s[0], s[1], 6 * big, view.mk); ctx.globalAlpha = 1; }          // away with the landing's names while the player looks around
       if (a <= 0) S[key] = null;
     }
     for (const d of S.drops) {
@@ -5811,7 +5983,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // 2026-11-15, told as the one thing that differs from "it should still maintain its like relative size"), and after
   // a take-off it grows back to its flying size in BIRD_GROW seconds.
   const BIRD_LEAST = 0.4, BIRD_GROW = 0.4;
-  const groundScale = () => Math.max(S.game === 'free' || S.capFit ? BIRD_LEAST : 0, Math.min(1, view.H0 / cam.H));
+  const groundScale = () => Math.max(S.game === 'free' || S.capFit || gaze ? BIRD_LEAST : 0, Math.min(1, view.H0 / cam.H));
   const onMap = () => (S.mode !== 'fly' ? 1 : bird.down ? groundScale() : fitv.s0 < 1 && S.t - fitv.t0 < BIRD_GROW ? lerp(fitv.s0, 1, arrive((S.t - fitv.t0) / BIRD_GROW)) : 1);
   // The room the bird takes on the screen in a flight, with its energy ring: names keep clear of it.
   function birdBox(g) {
@@ -6494,12 +6666,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
     placeCamera();
     if (frameNo++ % 3 === 0) {
       const fly = S.mode === 'fly';
-      if (!fly && mouse) hover = pointed(mouse[0], mouse[1]);          // the globe turns under a resting mouse: the name and the light stay true
-      const at = fly ? (bird.down ? null : locationAt(bird.lon, bird.lat)) : hover;
+      if (looking()) { if (mouse && !drag.on) hover = lookPointed(mouse[0], mouse[1]); }          // looking around: as on a globe that is not in a flight
+      else if (!fly && mouse) hover = pointed(mouse[0], mouse[1]);          // the globe turns under a resting mouse: the name and the light stay true
+      const at = looking() ? hover : fly ? (bird.down ? null : locationAt(bird.lon, bird.lat)) : hover;
       under = at ? at.c || null : null;
       // a water is lit where its name shows: by the mouse, and under the bird in Free flight. Not in a round: the map
       // does not show where one sea ends and the next begins, and Study asks for seas.
-      wet = at && at.sea && (!fly || (S.game === 'free' && !S.look)) ? at : null;
+      wet = at && at.sea && (!fly || looking() || (S.game === 'free' && !S.look)) ? at : null;
     }
     if (gl) drawGlobe(under && !under.tiny ? under : null, wet, under && under.zone ? under.zone : null);
     const d = view.dpr;
@@ -6507,22 +6680,28 @@ button { font: inherit; color: inherit; cursor: pointer; }
     ctx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
     ctx.setTransform(d, 0, 0, d, 0, 0);
     drawZones();
-    drawOutlines();          // under every mark: a capital's symbol on the coast or the border stays whole (the player, of Panama City's in the first picture: "uhhh capital cut off?")
+    veiled(true); drawOutlines(); veiled(false);          // under every mark: a capital's symbol on the coast or the border stays whole (the player, of Panama City's in the first picture: "uhhh capital cut off?")
     drawDots();
     topHover = arrived = null;
     if (S.mode === 'fly') drawDrops();
     if (S.mode !== 'fly' || S.blend < 1) drawAtlas();
     if (S.mode === 'over') drawDrops();          // on Study's end globe a delivered capital's pin stands over the path's dots and over a name's tie, never under them
     drawTop();
+    veiled(true);          // a landing's names and flags are away while the player looks around (veiled)
     for (const f of fx) if (!f.top) f.draw(Math.min(1, f.t / f.secs));
+    veiled(false);
     if (S.mode === 'fly') drawRoute();
     // Every mark on the map lies under the bird, in every game: Free flight's map of the landing (the wash, the border, the
     // cities' marks) and a Day Trip's or Ranked's answer (its circle, the line to it, a capital's symbol or a city's dot),
     // as Study's capitals always did (drawDrops, above). The bird stands on the ground it came down on. PLAN 131.
+    veiled(true);
     if (S.mode === 'fly' && S.game === 'free' && S.around && bird.down) drawAround(false);
+    veiled(false);
     if (S.trip && S.trip.reveal && S.mode === 'fly') drawReveal();
     if (S.mode === 'fly') drawBird();          // no bird outside a flight (until 2026-11-13 one faded out above the globe for a second after Home or a flight's end: "a bird appears and fades away on top of the globe on the home page")
+    veiled(true);
     if (S.mode === 'fly' && S.game === 'free') { drawBelow(); if (S.around && bird.down) drawAround(true); }
+    veiled(false);
     if (S.mode === 'fly') drawPull();
     placed.length = 0;
     if (S.mode === 'fly') { const g = project(unit(bird.lon, bird.lat)); if (g) placed.push(birdBox(g)); }
@@ -6536,8 +6715,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // Study's landing in a country shows its capital (markCapital): every name keeps off that symbol as names keep off
     // Day Trip's answer. The name under the bird has already taken the bird's other side for it (underY).
     for (const A of [S.capAt, S.capAlso]) if (A && S.mode === 'fly') { const s = project(A.p), m = 11.5 * view.mk; if (s) placed.push({ x: s[0], y: s[1], half: m, up: m, down: m, cap: true }); }
+    veiled(true);
     for (const f of fx) if (f.top) f.draw(Math.min(1, f.t / f.secs));
-    if (S.mode === 'fly') { drawRouteKm(); drawHud(); }
+    veiled(false);
+    if (S.mode === 'fly') { drawRouteKm(); drawHud(); lookDraw(); }
   }
   // Free flight: the name (and flag) of what is under the bird's shadow, just below it.
   let below = null;
@@ -6584,6 +6765,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const ms = now - before, dt = Math.min(0.05, ms / 1000);
     before = now;
     if (!S.paused && !heldAt) step(dt);
+    lookTick(dt);
     const canPause = S.mode === 'fly' && !S.paused && !inRound();      // the pause button: there whenever pausing is allowed
     if (pauseBtn.hidden === canPause) pauseBtn.hidden = !canPause;
     if (heldAt && S.trip) showClock(S.t - S.trip.t0 + (now - heldAt) / 1000);       // held: the stopwatch is seen to run on
@@ -6612,6 +6794,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       return;
     }
     if (k === 'e' && !e.repeat && S.paused && !$('end').hidden) { endFlight(); e.preventDefault(); return; }          // E ends a flight only where the pause card offers it
+    if ((k === ' ' || k === 'Enter') && !e.repeat && looking() && !S.paused) lookEnd();          // looking around: the view comes back, and the same press goes on (the next location, or held, the take-off)
     if (k === 'ArrowLeft' || k === 'a') keys.left = true;
     else if (k === 'ArrowRight' || k === 'd') keys.right = true;
     else if (k === 'ArrowUp' || k === 'w') keys.up = true;
@@ -6644,6 +6827,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
   const pauseBtn = $('pause');
   pauseBtn.addEventListener('click', () => setPaused(true));
+  toBird.addEventListener('click', () => { lookEnd(); toBird.blur(); stage.focus({ preventScroll: true }); });          // so Space still goes on
   $('go').addEventListener('click', takeOff);
   // The title card: a tab for each mode, and Study's choices of what and where.
   const tabs = [...document.querySelectorAll('.seg button')];
@@ -6955,6 +7139,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // On the title and results screens: drag to turn the globe, and point at a place for its name.
   const drag = { on: false, x: 0, y: 0 };
   inkCanvas.addEventListener('pointerdown', (e) => {
+    if (S.mode === 'fly' && looking()) {          // looking around: the drag turns the globe
+      if (e.button !== 0 || S.paused) return;
+      drag.on = true; drag.x = e.clientX; drag.y = e.clientY; S.idle = 0; hover = null;
+      stage.classList.add('dragging');
+      try { inkCanvas.setPointerCapture(e.pointerId); } catch (err) { /* the drag still works inside the page */ }
+      e.preventDefault();
+      return;
+    }
     if (S.mode === 'fly') {          // press and pull: the ring stands where the button went down
       if (e.button !== 0 || e.pointerType === 'touch' || S.paused || !steerable()) return;
       const box = stage.getBoundingClientRect();
@@ -6972,6 +7164,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
   });
   inkCanvas.addEventListener('pointermove', (e) => {
     const box = stage.getBoundingClientRect(), x = e.clientX - box.left, y = e.clientY - box.top;
+    if (S.mode === 'fly' && looking()) {
+      S.idle = 0;
+      if (drag.on) {
+        const O = gaze, k = cam.H / view.F / RAD;
+        O.lat = clamp(O.lat + (e.clientY - drag.y) * k, -80, 80);
+        O.lon = wrapLon(O.lon - ((e.clientX - drag.x) * k) / Math.max(0.2, Math.cos(O.lat * RAD)));
+        drag.x = e.clientX; drag.y = e.clientY; hover = mouse = null;
+        return;
+      }
+      mouse = [x, y]; hover = lookPointed(x, y);
+      return;
+    }
     if (S.mode === 'fly') { hover = mouse = null; if (pull.at) { pull.x = x; pull.y = y; S.idle = 0; } return; }
     if (drag.on) {
       const k = cam.H / view.F / RAD;
@@ -7001,7 +7205,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // the place under the pointer stays under it. As near as the lowest view of a flight, as far as the whole globe.
   // (The player: "Should be able to zoom in on the Home Screen?")
   inkCanvas.addEventListener('wheel', (e) => {
-    if (S.mode === 'fly') return;
+    if (S.mode === 'fly') { lookWheel(e); return; }          // in a flight: looking around, once the bird is down
     e.preventDefault();
     const box = stage.getBoundingClientRect(), x = e.clientX - box.left, y = e.clientY - box.top, at = unproject(x, y);
     const whole = S.mode === 'title' || !S.log.size ? view.Htitle : view.H1;
@@ -7065,7 +7269,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // for the tests: the bird put somewhere by hand. That is no flight, so the view is the bird's own at once (no rest on the last landing's country still being handed back)
   const setBird = (lon, lat, a, down) => { Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down }); S.capFit = null; fitClear(); };
   window.birdsEye = { stackLines: (id) => { const c = PLAY.find((q) => q.id === id); ownName = true; try { return stackForm(c, c.name, 'name', null).lines; } finally { ownName = false; } }, hoverBox: () => hoverBox, slerp, showLeg, legView, STILL_DEG, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, rankedRounds, easiest, flagClue, capClue, capFlagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
-    outlines: () => fx.filter((f) => f.lined && f.shownA > 0).map((f) => f.lined.id), OUTLINE, pull, pullBy, steerable, PULL_FULL, PULL_RING, project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
+    outlines: () => fx.filter((f) => f.lined && f.shownA > 0).map((f) => f.lined.id), OUTLINE, pull, pullBy, steerable, PULL_FULL, PULL_RING, hFor, look: () => gaze, looking, canLook, lookStart, lookEnd, lookAnswer, lookK: gazeK, lookPlate: () => lookPlate, hoverNow: () => (hover ? hover.name : null), project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
   if (gl) {
