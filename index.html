@@ -5974,10 +5974,41 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const side = wrapLon(to[0] - atlas.from[0]);
     atlas.way = wayOf([atlas.from, [atlas.from[0] + side, to[1]]], to, false); atlas.secs = Math.max(1.3, Math.abs(side) / 90);
   }
+  // A round that is all in view holds still (the player, 2026-11-19: "if the entire flight path can fit in the window and
+  // it's shown like relatively clearly and it can be centered, then you don't need to do the animation where you like
+  // shift the globe from the origin to the end, because the user can already see it all. Only in the long flight paths
+  // where, if it starts at the origin, you can't see the end. Or if the origin / end is kind of obscured because they're
+  // so far to the edge of the earth"). The round is everything the globe draws of it: where it started, every point of
+  // the line the bird really flew (a flight "all over the place" is measured as flown, their question the same day),
+  // where the shortest route ends, the landing and the answer's name. The globe's middle goes to the middle of the
+  // smallest circle that holds all of that, kept between 45 S and 60 N as every view of this globe is. It holds still
+  // there when the farthest point is at most STILL_DEG degrees from the middle (their pick from a picture of three
+  // flights, 8,450, 9,988 and 12,230 km: "Left and middle both look fine to me"; the middle one measures 45.4 degrees,
+  // so the limit is 46: at 45 the flight they approved would have turned) and the answer's name has its room by the
+  // game's own rule for a name (placeNames): nearer the rim a name finds none. Any other round turns from its start
+  // to its landing, as before.
+  const STILL_DEG = 46;
+  function legView(L) {
+    const P = [L.from, L.to, L.land, L.ans, ...L.pts.map((q) => q[0])];
+    let c = norm(P.reduce((a, p) => [a[0] + p[0], a[1] + p[1], a[2] + p[2]], [1e-9, 0, 0]));
+    for (let i = 1; i <= 300; i++) {          // toward the farthest point, by less each time: the middle of the smallest circle
+      let far = P[0], least = 2;
+      for (const p of P) { const d = dot(c, p); if (d < least) { least = d; far = p; } }
+      c = norm([c[0] + (far[0] - c[0]) / (i + 1), c[1] + (far[1] - c[1]) / (i + 1), c[2] + (far[2] - c[2]) / (i + 1)]);
+    }
+    const spot = globeSpot(c), m = unit(...spot);
+    return { spot, far: Math.acos(clamp(Math.min(...P.map((p) => dot(m, p))), -1, 1)) / RAD };
+  }
   function showLeg(i) {
     const L = S.legs[i];
     S.focus = i; atlas.idle = 0; atlas.zoom = 1;
     holdOff();
+    const V = legView(L);
+    if (V.far <= STILL_DEG) {
+      settleNames(V.spot);          // the names as they will stand on the still globe
+      const a = atlasNames.find((q) => q.i === i);
+      if (!a || a.fix !== undefined) { turnTo(V.spot); S.tour = null; return; }
+    }
     turnTo(globeSpot(L.from));
     S.tour = { to: globeSpot(L.land), rest: TOUR_REST };
     settleNames(S.tour.to);
@@ -7026,7 +7057,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   // for the tests: the bird put somewhere by hand. That is no flight, so the view is the bird's own at once (no rest on the last landing's country still being handed back)
   const setBird = (lon, lat, a, down) => { Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down }); S.capFit = null; fitClear(); };
-  window.birdsEye = { stackLines: (id) => { const c = PLAY.find((q) => q.id === id); ownName = true; try { return stackForm(c, c.name, 'name', null).lines; } finally { ownName = false; } }, hoverBox: () => hoverBox, slerp, showLeg, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, rankedRounds, easiest, flagClue, capClue, capFlagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
+  window.birdsEye = { stackLines: (id) => { const c = PLAY.find((q) => q.id === id); ownName = true; try { return stackForm(c, c.name, 'name', null).lines; } finally { ownName = false; } }, hoverBox: () => hoverBox, slerp, showLeg, legView, STILL_DEG, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, rankedRounds, easiest, flagClue, capClue, capFlagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     outlines: () => fx.filter((f) => f.lined && f.shownA > 0).map((f) => f.lined.id), OUTLINE, pull, pullBy, steerable, PULL_FULL, PULL_RING, project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
