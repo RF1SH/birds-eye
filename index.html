@@ -83,10 +83,11 @@ body {
   grid-row: 1;
   justify-self: start;
   align-self: center;
-  width: min(380px, 100%);
-  padding: 20px 22px 18px;
+  width: min(400px, 100%);
+  padding: 22px 24px 18px;
   pointer-events: auto;
 }
+#card:has(> #card-pause:not([hidden])) { width: min(380px, 100%); padding: 20px 22px 18px; }          /* the pause card: the size it has always had */
 #card h1 {
   margin: 0;          /* the white under it is the row's (#aids) */
   font: italic 800 clamp(50px, 6.5vh, 64px)/.86 var(--display);
@@ -97,11 +98,6 @@ body {
 #card h1 .logo { width: .95em; height: .95em; margin-left: .12em; vertical-align: -.08em; overflow: visible; }
 #card h2 { margin: 0 0 12px; padding-right: 40px; font: 700 34px/1 var(--display); }
 #card .hook { margin: 0 0 16px; }
-.seg { display: grid; grid-template-columns: repeat(3, 1fr); border: var(--b2z) solid var(--ink); border-radius: 3px; margin: 0 0 16px; }
-.seg button { border: 0; background: var(--paper); padding: 7px 4px 8px; font: 700 18px/1 var(--display); letter-spacing: .02em; }
-.seg button + button { border-left: var(--b2z) solid var(--ink); }
-.seg button:hover { background: var(--paper-shade); }
-.seg button[aria-selected="true"] { background: var(--ink); color: var(--paper); }
 /* Study's choices. What is asked: check boxes (any mix). Where: squared buttons (World, or any mix of regions). */
 .checks { display: flex; justify-content: space-between; margin: 0 0 13px; }
 .checks button { display: inline-flex; align-items: center; gap: 7px; padding: 3px 0; border: 0; background: none; font: 700 18px/1 var(--display); letter-spacing: .02em; }
@@ -130,9 +126,33 @@ kbd.space { min-width: 88px; }
 .keys dd.either { display: flex; align-items: center; gap: 14px; }
 .keys .mouse { display: flex; flex-direction: column; align-items: center; gap: 2px; font: 700 13px/1.1 var(--text); white-space: nowrap; }          /* 2: with its words the mouse is never taller than the arrow keys, so the card is as tall as it was */
 .keys .mouse svg { flex: none; width: 26px; height: 38px; stroke: var(--ink); stroke-width: var(--b2z); }          /* the outline of the card's heavier border, whole screen pixels in every window (as in the picture the player picked) */
-/* How to play must fit a window 600 px high. The Challenge card has one row more than Study's (619 tall), so in a
-   window under 650 px high every How to play card is set a little closer: the same words at the same size. */
-@media (max-height: 650px) { .how { row-gap: 7px; margin-bottom: 10px; } .keys { margin-bottom: 10px; } }
+/* In a window under 650 px high How to play's rows are set a little closer: the same words at the same size. */
+@media (max-height: 650px) { .how { row-gap: 7px; } }
+/* How to play: one page for every game, a paper sheet over the page as the FAQ is. On top what every game shares, then
+   a column a game (the player's picks of 2026-11-20 from pictures HOWTO-redesign, HOWTO-mockups and HOWTO-pictures;
+   PLAN 75). Until then a card for each of the title card's three tabs, in the title card's place. */
+#how-page { position: fixed; inset: 0; z-index: 20; overflow: auto; display: flex; padding: 14px 16px; background: var(--space); }
+#how-page[hidden] { display: none; }
+#how { zoom: var(--ui, 1); flex: none; margin: auto; width: min(1120px, 100%); padding: 20px 30px 26px; background: var(--paper); border: var(--b2z) solid var(--ink); border-radius: 3px; }
+#how .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+#how h2 { margin: 0; font: 700 34px/1 var(--display); }
+#how .cols { display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 30px; }
+#how .shared { align-items: start; padding-bottom: 20px; margin-bottom: 18px; border-bottom: var(--b1z) solid var(--paper-shade); }
+#how .shared .keys { align-self: center; }
+#how h3 { margin: 0 0 14px; font: 700 24px/1 var(--display); }
+#how .how, #how .keys { margin: 0; }
+/* From a flight's pause card: the common top and the column of the game being flown, one column wide (the player, the
+   same day: "whichever game mode you're in at that point, then that specific how to play should show"). Free flight has
+   no postcard and no energy: those two lines are not on its page. */
+#how[data-only] { width: min(451px, 100%); padding: 18px 22px 20px; }
+#how[data-only] .top { margin-bottom: 14px; }
+#how[data-only] .cols { grid-template-columns: 1fr; row-gap: 8px; }
+#how[data-only] .how { row-gap: 8px; }
+#how[data-only] .shared { padding-bottom: 0; margin-bottom: 16px; border-bottom: 0; }
+#how[data-only] .shared .keys { margin-bottom: 6px; }
+#how[data-only] h3 { margin-bottom: 10px; }
+#how[data-only="trip"] section[data-for]:not([data-for="trip"]), #how[data-only="study"] section[data-for]:not([data-for="study"]),
+#how[data-only="free"] section[data-for]:not([data-for="free"]), #how[data-only="free"] .no-free { display: none; }
 kbd {
   display: inline-block;
   min-width: 26px;
@@ -148,7 +168,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   padding: 7px 20px 9px;
   border: var(--b2z) solid var(--ink);
   border-radius: 3px;
-  background: var(--sea-deep);      /* blue, the stripe's: the button that starts or carries on a game. What is picked (a tab, a region, a check) is ink */
+  background: var(--sea-deep);      /* blue, the stripe's: the button that starts or carries on a game. What is picked (a region, a check) is ink */
   color: var(--paper);
   font: 700 24px/1 var(--display);
   letter-spacing: .02em;
@@ -173,12 +193,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
    the sound mark (the player's own layout and final pick, 2026-11-18: "i don't see why title can't always be one line",
    "what about under title on the left?", "replace the words 'How to play' back with the (?) symbol"; pictures
    HOWTO-word-question and HOWTO-row-question, PLAN 35c). Until then the title took two lines in a tall window and one
-   in a short one, with the marks at the card's top right. The row is above the tabs, so it holds still on every tab.
+   in a short one, with the marks at the card's top right. Nothing above the row changes, so it holds still.
    The ? starts on the card's left edge (its ring is 5 px inside its box). Between two marks stand 20 px, ink to ink;
    over the row and under it 13 px, the white that stood between the title and the tabs. The row is 32 px tall
    whatever is in it: on a first visit it holds the sound mark alone. */
 #aids { display: flex; align-items: center; height: 32px; margin: 7px 0 8px -5px; }
-#sound, #howto-open { flex: none; width: 32px; height: 32px; padding: 4px; border: 0; border-radius: 3px; background: none; color: var(--ink-soft); }
+#sound, #howto-open, #pause-how { flex: none; width: 32px; height: 32px; padding: 4px; border: 0; border-radius: 3px; background: none; color: var(--ink-soft); }
 #aids #sound { margin-left: 8px; }
 #card.first #aids #sound { margin-left: -2px; }          /* alone in the row: its own ink on the card's left edge */
 /* The word "FAQ" between the two marks (the player's final pick of the row, 2026-11-18; PLAN 35c): the row's ink and its
@@ -187,8 +207,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #aids #faq-open + #sound { margin-left: 6px; }
 #card.first #faq-open { display: none; }
 #card > #sound { position: absolute; top: 10px; right: 10px; }          /* a card with no title (How to play, the pause card): at its top right, where it has always been */
-#sound:hover, #howto-open:hover, #faq-open:hover { color: var(--ink); background: var(--paper-shade); }
-#sound svg, #howto-open svg { display: block; width: 24px; height: 24px; }
+#pause-how { position: absolute; top: 10px; right: 50px; }          /* the pause card's way to How to play, left of the sound mark: 8 px between the two, as in the title card's row */
+#sound:hover, #howto-open:hover, #pause-how:hover, #faq-open:hover { color: var(--ink); background: var(--paper-shade); }
+#sound svg, #howto-open svg, #pause-how svg { display: block; width: 24px; height: 24px; }
 #sound .wave { display: var(--waves, inline); }
 #sound .cross { display: var(--cross, none); }
 #sound.off { --waves: none; --cross: inline; }
@@ -274,13 +295,36 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #tally span { font-size: 13px; color: var(--ink-soft); }
 
 /* Day Trip */
-/* the Challenge tab: a box for each mode (like the NYT Games cards): its name, its long-run number on the right, what it is, its button */
-.mode { padding: 12px 14px 14px; border: var(--b1z) solid var(--paper-shade); border-radius: 3px; }
-.mode + .mode { margin-top: 10px; }
-.mode-head { margin: 0 0 4px; font: 700 24px/1 var(--display); }
+/* The home card: today's trip leads it, every other game is one line under it. No tabs, no boxes (the player's picks of
+   2026-11-20 from picture HOME-redesign: "Build it", "I like the one list idea"; PLAN 75). Until then three tabs, the
+   first holding a box for Day Trip and one for Ranked. */
+#home-day { margin-top: 6px; }
+#card #home-day h2 { margin: 0 0 7px; padding: 0; }
+#card #home-day .hook { margin: 0 0 14px; }
+#home-day .go { font-size: 26px; padding: 9px 26px 11px; }
+#home-games { margin: 22px 0 -14px; }          /* -14: the last line's own 13 px stand under it, 4 over the card's edge */
+.game { display: grid; grid-template-columns: 1fr auto auto; align-items: center; column-gap: 14px; padding: 12px 0 13px; border-top: var(--b1z) solid var(--paper-shade); }
+/* One shape for both lines: first the game's name, the player's own number and the button; under them what the game
+   is (Ranked: its description; Study: the box of what is picked). So a number stands beside its game's button in every
+   game, in one lettering, as the streak stands beside Day Trip's, and a description never shares a line with a number
+   (the player, 2026-11-20, of "Best" set under "Ranked" in the streak's lettering: "should that go before the take
+   off button instead of under ranked?"). Until then Ranked's description stood beside its number and broke in two at a
+   best of 10,000. */
+.game h3 { grid-column: 1; grid-row: 1; margin: 0; font: 700 24px/1 var(--display); }
+.game .mode-stat { grid-column: 2; grid-row: 1; }
+.game .go { grid-column: 3; grid-row: 1; font-size: 20px; padding: 7px 14px 9px; min-width: 96px; }
+#card .game .hook { grid-column: 1 / -1; grid-row: 2; margin: 2px 0 0; }          /* 2: as far under its name as Study's box is under Study's, by their ink */
 .mode-stat { font: 500 20px/1 var(--display); color: var(--ink); white-space: nowrap; }
-#card .mode .hook { margin: 0 0 12px; }
-.mode .go, .mode .alt { font-size: 20px; padding: 7px 14px 9px; }
+/* Study's line: what is picked stands in a box with an arrow; a click opens the choices right under it and the card
+   grows at its foot (the player, 2026-11-20: "I like the idea of the expandable list ... in the home card ... it's
+   like hard to tell that that's even an option"; their pick: "A box with an arrow"). */
+#study-what { grid-column: 1 / -1; grid-row: 2; display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 10px 0 0; padding: 7px 10px 8px; border: var(--b1z) solid var(--ink); border-radius: 3px; background: var(--paper); color: var(--ink); font: inherit; text-align: left; }
+#study-what:hover { background: var(--paper-shade); }
+#study-what svg { flex: none; width: 14px; height: 14px; }
+#study-what[aria-expanded="true"] svg { transform: rotate(180deg); }
+#study-pick { grid-column: 1 / -1; grid-row: 3; padding-top: 14px; }
+#study-pick .regions { margin-bottom: 3px; }
+#card #study-pick #known { margin: 11px 0 0; }
 .tripbox { display: grid; justify-items: center; align-content: center; padding: 6px 16px; }
 .tripbox span { font-size: 13px; color: var(--ink-soft); }
 .tripbox .row5 { display: flex; gap: 5px; margin-bottom: 6px; }
@@ -324,7 +368,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #console.lesson #tickets { display: none; }          /* no postcard yet: the bar stands in the middle */
 #console.lesson #status { min-height: calc(68px + 2 * var(--b2z)); }        /* as tall as the countdown's postcard that comes next (its two lines, its padding, its border), so nothing moves when it does */
 /* a first visit: the title and two buttons, nothing else */
-#card.first .seg, #card.first #howto-open, #card.first #pane-study, #card.first #pane-free, #card.first #pane-soon { display: none; }
+#card.first #howto-open, #card.first #home-day, #card.first #home-games { display: none; }
 .ticket.ask .addr { min-width: 170px; }
 /* The small line says what to find. 14 px (11.5 until 2026-11-15; the player: "the font is too small, so some people may miss it and just see the
    flag and go to that country and not realize that you were actually asking for the capital"). The count's line is the same, so all cards stay alike. */
@@ -443,7 +487,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #daycard .scroll { max-height: calc(100vh / var(--ui, 1) - 260px); overflow-y: auto; margin: 0 -10px 12px; padding: 0 10px; }          /* 10 px each side: the room of a picked row's shade */
 
 
-/* Free flight: what you have landed on */
+/* Free flight: what you have landed on. The page and the pause card stand in one spot: while the pause card is up the
+   page is out of sight under it and the map holds still. (Until 2026-11-20 the two stood side by side and the page
+   squeezed the pause card to half its width; a flight that begins with a click on the home globe begins with a page.) */
+#card, #place { grid-column: 1; }
+#card:not([hidden]) ~ #place { visibility: hidden; }
 #place { --u: clamp(1px, min(100vw, 160vh) / 1000, 1.75px);
   grid-row: 1; justify-self: start; align-self: center; width: min(calc(360 * var(--u)), 100%); padding: calc(20 * var(--u)) calc(22 * var(--u)) calc(18 * var(--u));
   background: var(--paper); border: var(--b2) solid var(--ink); border-radius: 3px; pointer-events: auto; }
@@ -637,70 +685,32 @@ button { font: inherit; color: inherit; cursor: pointer; }
         <h1>Bird's <span class="eye">Eye<svg class="logo" viewBox="-27 -27 54 54" aria-hidden="true"><use href="#i-bird" transform="rotate(-18)"/></svg></span></h1>
         <div id="aids"><button id="howto-open" type="button" aria-label="How to play" title="How to play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></button><button id="faq-open" type="button">FAQ</button><button id="sound" type="button" aria-label="Sound on (M)" title="Sound (M)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path class="wave" d="M15.5 9a4.2 4.2 0 0 1 0 6"/><path class="wave" d="M18 6.5a7.7 7.7 0 0 1 0 11"/><path class="cross" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button></div>
         <div class="row" id="first-row" hidden><button class="go" id="go-tutor" type="button">Start tutorial</button><button class="alt" id="first-skip" type="button">Skip</button></div>
-        <div class="seg" role="tablist" aria-label="Mode">
-          <button type="button" role="tab" data-mode="challenge" aria-selected="true">Challenge</button><button type="button" role="tab" data-mode="study" aria-selected="false">Study</button><button type="button" role="tab" data-mode="free" aria-selected="false">Free flight</button>
-        </div>
-        <div id="pane-study" hidden>
-          <div class="checks" id="kinds" role="group" aria-label="Locations"><button type="button" data-k="c">Countries</button><button type="button" data-k="k">Capitals</button><button type="button" data-k="f">Flags</button><button type="button" data-k="s">Seas</button></div>
-          <div class="regions" id="where" role="group" aria-label="Where"><button type="button" data-r="World">World</button><button type="button" data-r="Africa">Africa</button><button type="button" data-r="Americas">Americas</button><button type="button" data-r="Asia">Asia</button><button type="button" data-r="Europe">Europe</button><button type="button" data-r="Oceania">Oceania</button></div>
-          <div class="row"><button class="go" id="go" type="button">Take off</button><span class="mode-stat" id="kept" hidden></span></div>
-          <p class="aside" id="known" style="margin: 14px 0 0" hidden></p>
-        </div>
-        <div id="pane-free" hidden>
-          <p class="hook">Fly anywhere. Land to read about the location.</p>
-          <div class="row"><button class="go" id="go-free" type="button">Take off</button></div>
-        </div>
-        <div id="pane-soon">
-          <section class="mode">
-            <h3 class="mode-head">Day Trip</h3>
-            <p class="hook">A five-location daily challenge.</p>
-            <div class="row"><button class="go" id="go-trip" type="button">Start today's trip</button><button class="alt" id="see-trip" type="button" hidden>See today's trip</button><span class="mode-stat" id="trip-streak" hidden></span></div>
+        <section id="home-day">
+          <h2>Day Trip</h2>
+          <p class="hook" id="home-hook">A five-location daily challenge</p>
+          <div class="row"><button class="go" id="go-trip" type="button">Take off</button><button class="go" id="see-trip" type="button" hidden>See today's trip</button><span class="mode-stat" id="trip-streak" hidden></span></div>
+        </section>
+        <div id="home-games">
+          <section class="game">
+            <h3>Ranked</h3>
+            <p class="hook" id="ranked-hook">Show your knowledge</p>
+            <span class="mode-stat" id="endless-best" hidden></span><button class="go" id="go-endless" type="button">Take off</button>
           </section>
-          <section class="mode">
-            <h3 class="mode-head">Ranked</h3>
-            <p class="hook">Go for a high score.</p>
-            <div class="row"><button class="go" id="go-endless" type="button">Play ranked</button><span class="mode-stat" id="endless-best" hidden></span></div>
+          <section class="game" id="game-study">
+            <h3>Study</h3>
+            <span class="mode-stat" id="kept" hidden></span><button class="go" id="go" type="button">Take off</button>
+            <button id="study-what" type="button" aria-expanded="false" aria-controls="study-pick"><span id="study-says"></span><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 5 L7 9.5 L11.5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <div id="study-pick" hidden>
+              <div class="checks" id="kinds" role="group" aria-label="Locations"><button type="button" data-k="c">Countries</button><button type="button" data-k="k">Capitals</button><button type="button" data-k="f">Flags</button><button type="button" data-k="s">Seas</button></div>
+              <div class="regions" id="where" role="group" aria-label="Where"><button type="button" data-r="World">World</button><button type="button" data-r="Africa">Africa</button><button type="button" data-r="Americas">Americas</button><button type="button" data-r="Asia">Asia</button><button type="button" data-r="Europe">Europe</button><button type="button" data-r="Oceania">Oceania</button></div>
+              <p class="aside" id="known" hidden></p>
+            </div>
           </section>
         </div>
-      </div>
-      <div id="card-howto" hidden>
-        <h2>How to play</h2>
-        <dl class="keys">
-          <dt><span class="arrows"><kbd class="up">&uarr;</kbd><kbd>&larr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd></span></dt><dd class="either"><span>or</span><span class="mouse"><svg viewBox="0 0 26 38" role="img" aria-label="the mouse:"><rect x="1.5" y="1.5" width="23" height="35" rx="11.5" fill="var(--paper)"/><path d="M1.5 15 V13 A11.5 11.5 0 0 1 13 1.5 V15 Z" fill="var(--ink)"/><path d="M1.5 15 H24.5 M13 1.5 V15" fill="none"/></svg><span>press and pull</span></span><span>to navigate</span></dd>
-          <dt><kbd class="space">Space</kbd></dt><dd>to fly up</dd>
-        </dl>
-        <div class="how" data-for="study">
-          <div class="ill"><span class="mini">Brazil<svg viewBox="0 0 30 36" aria-hidden="true"><use href="#i-stamp"/></svg></span></div>
-          <p>Each postcard names a location or shows its flag. Fly there and land on it to deliver the postcard.</p>
-          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><path d="M2 42 Q28 30 54 42" fill="var(--sea)" stroke="var(--sea-line)"/><ellipse cx="28" cy="36" rx="6" ry="2.3" fill="rgba(19,38,59,.3)"/><path d="M28 33 L28 17" stroke="var(--ink-soft)" stroke-width="1.4" stroke-dasharray="2 3"/><use href="#i-bird" transform="translate(28 10) rotate(-90) scale(.42)"/><path d="M44 22 L44 8 M40 12 L44 7 L48 12" stroke="var(--ink)" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          <p>Fly up to see more of the world and fly faster. Let go to glide down.</p>
-          <div class="ill"><svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="15" fill="var(--paper)" stroke="var(--ink)" stroke-width="2"/><circle cx="22" cy="22" r="10.5" fill="none" stroke="var(--paper-shade)" stroke-width="6"/><path d="M22 11.5 A10.5 10.5 0 1 1 11.6 23.4" fill="none" stroke="var(--good)" stroke-width="6"/></svg></div>
-          <p>Flying up uses energy. Each delivery replenishes some energy.</p>
-          <div class="ill"><svg width="48" height="44" viewBox="-17 -22 48 44" aria-hidden="true"><path d="M16,0 L-9,-8.5 L-4,0 L-9,8.5 Z" transform="scale(1.4)" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
-          <p>Three incorrect landings in a row will reveal the destination.</p>
-        </div>
-        <div class="how" data-for="challenge" hidden>
-          <div class="ill"><span class="mini">Brazil<svg viewBox="0 0 30 36" aria-hidden="true"><use href="#i-stamp"/></svg></span></div>
-          <p>Each postcard names a location or shows its flag. You have one attempt to land there.</p>
-          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><path d="M2 42 Q28 30 54 42" fill="var(--sea)" stroke="var(--sea-line)"/><ellipse cx="28" cy="36" rx="6" ry="2.3" fill="rgba(19,38,59,.3)"/><path d="M28 33 L28 17" stroke="var(--ink-soft)" stroke-width="1.4" stroke-dasharray="2 3"/><use href="#i-bird" transform="translate(28 10) rotate(-90) scale(.42)"/><path d="M44 22 L44 8 M40 12 L44 7 L48 12" stroke="var(--ink)" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          <p>Fly up to see more of the world and fly faster. Let go to glide down.</p>
-          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><circle cx="24" cy="22" r="19.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/><circle cx="24" cy="22" r="12.5" fill="none" stroke="var(--ink)" stroke-width="1.5"/><circle cx="24" cy="22" r="5.5" fill="var(--good)" stroke="var(--ink)" stroke-width="1.5"/><use href="#i-bird" transform="translate(39.5 27.5) scale(.42)"/></svg></div>
-          <p>The closer you land, the more points.</p>
-          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><text x="28" y="19" text-anchor="middle" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" font-size="16" fill="var(--ink)">3.9 sec</text><rect x="1" y="26" width="54" height="4.4" rx="1.6" fill="var(--paper-shade)"/><path d="M2.6 26 H17 V30.4 H2.6 A1.6 1.6 0 0 1 1 28.8 V27.6 A1.6 1.6 0 0 1 2.6 26 Z" fill="var(--good)"/><rect x="27.4" y="24.2" width="1.2" height="8" fill="var(--ink)"/></svg></div>
-          <p>Land before the timer's halfway mark for full speed points.</p>
-          <div class="ill"><svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="15" fill="var(--paper)" stroke="var(--ink)" stroke-width="2"/><circle cx="22" cy="22" r="10.5" fill="none" stroke="var(--paper-shade)" stroke-width="6"/><path d="M22 11.5 A10.5 10.5 0 1 1 11.6 23.4" fill="none" stroke="var(--good)" stroke-width="6"/></svg></div>
-          <p>Flying up uses energy. The less you use, the more points.</p>
-        </div>
-        <div class="how" data-for="free" hidden>
-          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><path d="M2 42 Q28 30 54 42" fill="var(--sea)" stroke="var(--sea-line)"/><ellipse cx="28" cy="36" rx="6" ry="2.3" fill="rgba(19,38,59,.3)"/><path d="M28 33 L28 17" stroke="var(--ink-soft)" stroke-width="1.4" stroke-dasharray="2 3"/><use href="#i-bird" transform="translate(28 10) rotate(-90) scale(.42)"/><path d="M44 22 L44 8 M40 12 L44 7 L48 12" stroke="var(--ink)" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          <p>Fly up to see more of the world and fly faster. Let go to glide down.</p>
-          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><rect x="6.6" y="2.6" width="42.8" height="38.8" rx="2" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.2"/><image href="flags/br.svg" x="11" y="7" width="15" height="10.5" preserveAspectRatio="none"/><text x="11" y="27.5" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" font-size="10" fill="var(--ink)">Brazil</text><path d="M11.5 32.5 H44 M11.5 36.5 H35" stroke="var(--paper-shade)" stroke-width="2" stroke-linecap="round"/></svg></div>
-          <p>Land on a country to learn more about it.</p>
-        </div>
-        <div class="row"><button class="go" id="go2" type="button">Take off</button><button class="alt" id="howto-back" type="button">Back <kbd>Esc</kbd></button></div>
       </div>
       <div id="card-pause" hidden>
         <h2 id="pause-head">Paused</h2>
+        <button id="pause-how" type="button" aria-label="How to play" title="How to play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></button>
         <div class="row"><button class="go" id="resume" type="button">Carry on</button><button class="alt" id="end" type="button" hidden>End flight <kbd>E</kbd></button></div>
         <div class="row" style="margin-top: 12px"><button class="alt" id="restart" type="button">Restart <kbd>R</kbd></button><button class="alt" id="home" type="button">Home <kbd>H</kbd></button></div>
       </div>
@@ -736,6 +746,66 @@ button { font: inherit; color: inherit; cursor: pointer; }
   <button id="pause" type="button" aria-label="Pause (P)" title="Pause (P)" hidden><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M8.5 5v14M15.5 5v14" stroke="currentColor" stroke-width="4" fill="none"/></svg></button>
   <button id="tobird" type="button" aria-label="Back to the bird" title="Back to the bird" hidden><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 2.5v3.5M12 18v3.5M2.5 12h3.5M18 12h3.5"/></svg></button>
   <p id="nogl" hidden>This browser cannot draw the globe (it needs WebGL 2). A recent Chrome, Edge, Firefox or Safari can.</p>
+</div>
+<div id="how-page" hidden>
+  <div id="how">
+    <div class="top"><h2>How to play</h2><div class="row"><button class="go" id="how-tutor" type="button">Tutorial</button><button class="alt" id="how-back" type="button">Back <kbd>Esc</kbd></button></div></div>
+    <div class="cols shared">
+      <dl class="keys">
+        <dt><span class="arrows"><kbd class="up">&uarr;</kbd><kbd>&larr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd></span></dt><dd class="either"><span>or</span><span class="mouse"><svg viewBox="0 0 26 38" role="img" aria-label="the mouse:"><rect x="1.5" y="1.5" width="23" height="35" rx="11.5" fill="var(--paper)"/><path d="M1.5 15 V13 A11.5 11.5 0 0 1 13 1.5 V15 Z" fill="var(--ink)"/><path d="M1.5 15 H24.5 M13 1.5 V15" fill="none"/></svg><span>press and pull</span></span><span>to navigate</span></dd>
+        <dt><kbd class="space">Space</kbd></dt><dd>to fly up</dd>
+      </dl>
+      <section>
+        <div class="how">
+          <div class="ill no-free"><span class="mini">Brazil<svg viewBox="0 0 30 36" aria-hidden="true"><use href="#i-stamp"/></svg></span></div>
+          <p class="no-free">Each postcard names a location or shows its flag.</p>
+          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><path d="M2 42 Q28 30 54 42" fill="var(--sea)" stroke="var(--sea-line)"/><ellipse cx="28" cy="36" rx="6" ry="2.3" fill="rgba(19,38,59,.3)"/><path d="M28 33 L28 17" stroke="var(--ink-soft)" stroke-width="1.4" stroke-dasharray="2 3"/><use href="#i-bird" transform="translate(28 10) rotate(-90) scale(.42)"/><path d="M44 22 L44 8 M40 12 L44 7 L48 12" stroke="var(--ink)" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <p>Fly up to see more of the world and fly faster. Let go to glide down.</p>
+        </div>
+      </section>
+      <section class="no-free">
+        <div class="how">
+          <div class="ill"><svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="15" fill="var(--paper)" stroke="var(--ink)" stroke-width="2"/><circle cx="22" cy="22" r="10.5" fill="none" stroke="var(--paper-shade)" stroke-width="6"/><path d="M22 11.5 A10.5 10.5 0 1 1 11.6 23.4" fill="none" stroke="var(--good)" stroke-width="6"/></svg></div>
+          <p>Flying up uses energy.</p>
+        </div>
+      </section>
+    </div>
+    <div class="cols">
+      <section data-for="trip">
+        <h3>Day Trip and Ranked</h3>
+        <div class="how">
+          <div class="ill"><svg width="56" height="44" viewBox="0 2 56 44" aria-hidden="true"><path d="M2 42 Q28 30 54 42" fill="var(--sea)" stroke="var(--sea-line)"/><ellipse cx="28" cy="36" rx="6" ry="2.3" fill="rgba(19,38,59,.3)"/><path d="M28 33 L28 22" stroke="var(--ink-soft)" stroke-width="1.4" stroke-dasharray="2 3"/><use href="#i-bird" transform="translate(28 14) rotate(-90) scale(.42)"/><path d="M44 7 L44 21 M40 17 L44 22 L48 17" stroke="var(--ink)" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <p>You have one attempt to land on the location.</p>
+          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><circle cx="24" cy="22" r="19.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/><circle cx="24" cy="22" r="12.5" fill="none" stroke="var(--ink)" stroke-width="1.5"/><circle cx="24" cy="22" r="5.5" fill="var(--good)" stroke="var(--ink)" stroke-width="1.5"/><use href="#i-bird" transform="translate(39.5 27.5) scale(.42)"/></svg></div>
+          <p>The closer you land, the more points.</p>
+          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><text x="28" y="19" text-anchor="middle" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" font-size="16" fill="var(--ink)">3.9 sec</text><rect x="1" y="26" width="54" height="4.4" rx="1.6" fill="var(--paper-shade)"/><path d="M2.6 26 H17 V30.4 H2.6 A1.6 1.6 0 0 1 1 28.8 V27.6 A1.6 1.6 0 0 1 2.6 26 Z" fill="var(--good)"/><rect x="27.4" y="24.2" width="1.2" height="8" fill="var(--ink)"/></svg></div>
+          <p>Land before the timer's halfway mark for full speed points.</p>
+          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><circle cx="19.5" cy="12" r="8.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/><circle cx="19.5" cy="12" r="5.8" fill="none" stroke="var(--paper-shade)" stroke-width="3.6"/><path d="M19.5 6.2 A5.8 5.8 0 1 1 13.80 10.91" fill="none" stroke="var(--good)" stroke-width="3.6"/><text x="47" y="17.6" text-anchor="end" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" fill="var(--ink)" font-size="16">10</text><circle cx="19.5" cy="32" r="8.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/><circle cx="19.5" cy="32" r="5.8" fill="none" stroke="var(--paper-shade)" stroke-width="3.6"/><path d="M19.5 26.2 A5.8 5.8 0 0 1 25.30 32.00" fill="none" stroke="var(--orange)" stroke-width="3.6"/><text x="47" y="37.6" text-anchor="end" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" fill="var(--ink)" font-size="16">5</text></svg></div>
+          <p>The less energy you use, the more points.</p>
+        </div>
+      </section>
+      <section data-for="study">
+        <h3>Study</h3>
+        <div class="how">
+          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><g transform="translate(-3.3 2) rotate(-8 28 20)"><g fill="none" stroke="var(--ink)" stroke-width="1.6" stroke-linecap="round"><circle cx="18" cy="20" r="11"/><circle cx="18" cy="20" r="8" stroke-width=".9"/><path d="M30 10 q3.2 -3 6.4 0 t6.4 0 t6.4 0 t6.4 0"/><path d="M30 17 q3.2 -3 6.4 0 t6.4 0 t6.4 0 t6.4 0"/><path d="M30 24 q3.2 -3 6.4 0 t6.4 0 t6.4 0 t6.4 0"/><path d="M30 31 q3.2 -3 6.4 0 t6.4 0 t6.4 0 t6.4 0"/><path d="M13.6 20.4l3.1 3.1 5.7-6.5" stroke-width="2"/></g></g></svg></div>
+          <p>Land on the location to deliver the postcard.</p>
+          <div class="ill"><svg width="60" height="44" viewBox="0 0 60 44" aria-hidden="true"><circle cx="12.6" cy="22" r="10.4" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.6"/><circle cx="12.6" cy="22" r="7.2" fill="none" stroke="var(--paper-shade)" stroke-width="4.2"/><path d="M12.6 14.8 A7.2 7.2 0 0 1 19.67 20.65" fill="none" stroke="var(--orange)" stroke-width="4.2"/><path d="M26.6 22 H33.2 M29.200000000000003 18 L33.800000000000004 22 L29.200000000000003 26" stroke="var(--ink)" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="47.4" cy="22" r="10.4" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.6"/><circle cx="47.4" cy="22" r="7.2" fill="none" stroke="var(--paper-shade)" stroke-width="4.2"/><path d="M47.4 14.8 A7.2 7.2 0 1 1 42.47 27.25" fill="none" stroke="var(--good)" stroke-width="4.2"/></svg></div>
+          <p>Each delivery replenishes some energy.</p>
+          <div class="ill"><svg width="48" height="44" viewBox="-17 -22 48 44" aria-hidden="true"><path d="M16,0 L-9,-8.5 L-4,0 L-9,8.5 Z" transform="scale(1.4)" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+          <p>Three incorrect landings in a row will reveal the destination.</p>
+        </div>
+      </section>
+      <section data-for="free">
+        <h3>Explore</h3>
+        <div class="how">
+          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><rect x="6.6" y="2.6" width="42.8" height="38.8" rx="2" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.2"/><image href="flags/br.svg" x="11" y="7" width="15" height="10.5" preserveAspectRatio="none"/><text x="11" y="27.5" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" font-size="10" fill="var(--ink)">Brazil</text><path d="M11.5 32.5 H44 M11.5 36.5 H35" stroke="var(--paper-shade)" stroke-width="2" stroke-linecap="round"/></svg></div>
+          <p>On the home page, click any location on the globe to learn more about it.</p>
+          <div class="ill"><svg width="64" height="44" viewBox="0 0 64 44" aria-hidden="true"><use href="#i-bird" transform="translate(13 22) rotate(-18) scale(.52)"/><text x="33.5" y="26" text-anchor="middle" font-family="B612, Verdana, sans-serif" font-size="11" fill="var(--ink)">or</text><path d="M46 11 L46 29.5 L50.6 25.4 L54.2 33.2 L57.4 31.7 L53.9 24.1 L60 24.1 Z" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+          <p>Continue to explore by either flying or clicking another location.</p>
+        </div>
+      </section>
+    </div>
+  </div>
 </div>
 <div id="faq-page" hidden>
   <div id="faq">
@@ -900,8 +970,22 @@ button { font: inherit; color: inherit; cursor: pointer; }
     view.H0 = (view.F * GROUND_KM) / (view.ref * R_KM);
     view.H1 = hFor(0.47 * Math.min(w - dayRight, avail));
     view.gy = Math.round(avail / 2 + 18);                                 // where the ground under the bird is drawn
+    // The home card and the globe stand as one pair in the middle of the window (the player's pick of 2026-11-20 from
+    // picture HOME-redesign). Until then the card stood at the window's left edge and the globe in the middle of the rest.
+    view.pair = null;
+    {
+      const cd = $('card');
+      cd.style.marginLeft = '0px';
+      if (S.mode === 'title' && w > 900 && !cd.hidden) {
+        const r0 = cd.getBoundingClientRect(), cw = r0.width, pad = r0.left - box.left, rmax = 0.46 * avail;
+        const gap = clamp(w - 2 * pad - cw - 2 * rmax, 40, 0.058 * w), rho = Math.min(rmax, (w - 2 * pad - cw - gap) / 2), x0 = Math.max(pad, (w - cw - gap - 2 * rho) / 2);
+        cd.style.marginLeft = ((x0 - pad) / view.ui).toFixed(2) + 'px';
+        view.pair = { cx: x0 + cw + gap + rho, rho, gap, x0 };
+      }
+    }
     const card = $('card').getBoundingClientRect(), left = card.width && w > 900 ? card.right - box.left : 0;
     view.tx = (left + w) / 2; view.ty = avail / 2;                        // the middle of the free space, for the title globe
+    if (view.pair) view.tx = view.pair.cx;
     // Free flight: while the card for where you came down is up, the map slides over to the middle of the space beside it
     const place = $('place');
     view.slide = !place.hidden && w > 900 ? (place.getBoundingClientRect().right - box.left) / 2 : 0;
@@ -909,23 +993,24 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // room for it and is centered in the space above it.
     view.keyRoom = !day.hidden && S.legs ? KEY_ROOM * view.ui : 0;
     view.Htitle = hFor(0.46 * Math.min(w - Math.max(left, dayRight), avail - view.keyRoom));
+    if (view.pair) view.Htitle = hFor(view.pair.rho);
     if (gl) gl.viewport(0, 0, glCanvas.width, glCanvas.height);
     if (typeof placeSleepFact === 'function') placeSleepFact();
     steadyCard();
   }
-  // The title card keeps its top still when you switch tabs: it sits where the tallest tab's card would
-  // be centered, and a shorter tab's card is shorter at the bottom, so the tabs never move under the mouse.
+  // The home card keeps its top still when Study's choices open: it grows at its foot, so nothing above the choices
+  // moves under the mouse. It sits where the closed card is centered; in a window too short for the open card under
+  // that spot, the card (closed too) sits as much higher as the open one needs to stay 16 px inside the window.
   function steadyCard() {
-    const card = $('card');
+    const card = $('card'), pick = $('study-pick');
     card.style.transform = '';
     if (card.hidden || $('card-title').hidden || stage.clientWidth <= 560) return;
-    const panes = ['pane-study', 'pane-free', 'pane-soon'].map($), shown = panes.find((el) => !el.hidden);
-    if (!shown) return;
-    const now = shown.getBoundingClientRect().height;
-    let most = now;
-    for (const el of panes) if (el.hidden) { el.hidden = false; most = Math.max(most, el.getBoundingClientRect().height); el.hidden = true; }
-    const up = Math.min((most - now) / 2, card.getBoundingClientRect().top - stage.getBoundingClientRect().top - 16);
-    if (up > 0) card.style.transform = 'translateY(' + (-up / view.ui).toFixed(1) + 'px)';
+    const was = pick.hidden, box = stage.getBoundingClientRect();
+    pick.hidden = true; const shut = card.getBoundingClientRect();
+    pick.hidden = false; const open = card.getBoundingClientRect().height;
+    pick.hidden = was;
+    const lift = clamp(shut.top + open + 16 - box.bottom, 0, Math.max(0, shut.top - box.top - 16)), by = (was ? 0 : (open - shut.height) / 2) - lift;
+    if (by) card.style.transform = 'translateY(' + (by / view.ui).toFixed(1) + 'px)';
   }
 
   function aim(n, H, cx, cy) {
@@ -3259,13 +3344,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
 
   // ---------- flying a round ----------
-  let tab = 'challenge';        // the title card's tab: challenge | study | free. The game opens on the first, Challenge (the player's pick)
-  let runKind = 'day';          // on the challenge tab: today's trip, or an endless run
-  function takeOff() {
-    if (tab === 'challenge' && runKind === 'day' && tripDone()) return;          // one trip a day (one begun is carried on)
-    S.game = tab === 'challenge' ? 'trip' : tab;
+  let studyOpen = false;        // Study's choices are open on the home card: then the home globe shows where Study asks (showWhere)
+  let runKind = 'day';          // a trip's kind: today's trip (day), Ranked (endless), the tutorial (tutor)
+  // game: trip (today's trip, Ranked or the tutorial: runKind), study, free. Each button of the home card names its own.
+  function takeOff(game) {
+    if (game === 'trip' && runKind === 'day' && tripDone()) return;          // one trip a day (one begun is carried on)
+    S.game = game;
     Object.assign(S, { mode: 'fly', paused: false, t: 0, energy: TANK, n: 0, streak: 0, bestStreak: 0, firstTry: 0, fresh: 0, route: null, legs: null, tickets: [], last: null,
-      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, capAt: null, capAlso: null, capFit: null, named: null, around: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), sawCap: new Set(), newC: 0, sawN: 0, intro: null, began: null, replay: null });
+      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, capAt: null, capAlso: null, capFit: null, named: null, around: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), sawCap: new Set(), newC: 0, sawN: 0, intro: null, began: null, replay: null, arrive: false });
     S.log = new Map();
     S.drops = [];
     lookEnd(true);
@@ -3287,7 +3373,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     keys.flap = false;
     hover = mouse = null;
     $('card').hidden = true;
-    $('card-pause').hidden = true; $('card-howto').hidden = true; $('card-title').hidden = false;
+    $('card-pause').hidden = true; $('card-title').hidden = false;
+    studyShut();          // the home card comes back as it opens; the sand is this flight's own from here on
     $('debrief').hidden = true;
     $('console').hidden = S.game === 'free';
     $('place').hidden = true; $('daycard').hidden = true; hideFunFact();
@@ -3330,7 +3417,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // start that named where the bird stood: "no name, because if it starts out zoomed out, you should generally know
   // where you are. and it would get confusing with the name. it should start out like day trip imo"). Study's first
   // postcard comes the moment the view is down.
-  // A Study flight is kept: left for Home, or with the window closed, it is carried on from the Study tab as it stood
+  // A Study flight is kept: left for Home, or with the window closed, it is carried on from the home card's Study line as it stood
   // (the player, 2026-11-12: "Should be able to save and return home in case you want to do different modes during a
   // study session. But can't have multiple sturdy sessions at once"). One flight: it is kept from its first delivery
   // until it ends, on the end screen or by Restart. Written after every landing, on leaving and when the page goes.
@@ -4353,7 +4440,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const spareLeft = (spent, cheap) => { const x = clamp(1 - Math.max(0, spent - cheap - ENERGY_ROOM) / ENERGY_WASTE, 0, 1); return x * x * x; };
   // ---------- the tutorial ----------
   // A first visit opens on the title and two buttons, Start tutorial and Skip (the player's pick, 2026-11-13: "Two
-  // buttons"); the tutorial can be flown later from the Challenge tab's How to play card. It is a Day Trip round that
+  // buttons"); the tutorial can be flown later from How to play's Tutorial button. It is a Day Trip round that
   // keeps nothing. First the keys, one line at a time in the bar, each gone once its thing has been done: hold Space,
   // use the arrows, let go. (The arrows come before letting go because they do nothing on the ground.) Down again, the
   // rule of a round and a button to go on; then one location, Australia, the country real players find most often,
@@ -4479,9 +4566,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   function startTutor() {
     endFirst();
-    if (tab !== 'challenge') showMode('challenge');
     runKind = 'tutor';
-    takeOff();
+    takeOff('trip');
   }
   function tripStart(kind) {
     const T = S.trip = kind === 'endless' ? { endless: true, start: TRIP_START, rounds: [], used: new Set() } : kind === 'tutor' ? { tutor: true, start: TUTOR_START, rounds: [], used: new Set() } : tripOf(today());
@@ -4978,7 +5064,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   // A Ranked flight is kept as a Study flight is (the player, 2026-11-13: "That should also be true of like the ranked
   // and day trip runs. They should also be able to go home and resume later, right?"): left for Home between
-  // locations, or with the window closed, it is carried on from the Challenge tab, whose button then reads "Carry on".
+  // locations, or with the window closed, it is carried on from the home card, whose button then reads "Carry on".
   // Kept from its first landing until it ends: out of energy, End flight on the pause card, or Restart. Written when
   // a clue appears (open), after every landing, on Home and when the page goes. (Until then Home ended a Ranked
   // flight and its points counted: an option of the builder's that the player had picked on 2026-11-12.)
@@ -5064,8 +5150,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     return n;
   }
   const streakText = (n) => 'Streak: ' + n + (n === 1 ? ' day' : ' days');
-  // The Challenge tab: before today's trip, "Start today's trip"; one begun and left, "Carry on today's trip";
-  // after it, "See today's trip". The streak beside the button, Ranked's best beside its own.
+  // The home card's first part is today's trip: before it "Take off"; one begun and left, "Carry
+  // on"; after it the day's score and "See today's trip". The streak beside the button, Ranked's best beside its own.
   function showTripNote() {
     // Today's trip from before the day's five changed (they do when the lists are built anew): flown to its end, it
     // stays as it was flown; left part-way, or with a round that can no longer be read, it is free to fly again.
@@ -5074,7 +5160,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     tripSettle();
     const begun = save.trips[today()], done = tripDone(), streak = tripStreak();
     $('go-trip').hidden = done;
-    $('go-trip').textContent = begun && !done ? "Carry on today's trip" : "Start today's trip";
+    $('go-trip').textContent = begun && !done ? 'Carry on' : 'Take off';
+    $('home-hook').textContent = done ? "Today's score: " + save.trips[today()].score.toLocaleString('en') + ' of 1,000 points' : 'A five-location daily challenge';          // a description of one sentence has no period (the player, 2026-11-20: "none of the descriptions need punctuation.. unless more than 1 sentence")
     $('see-trip').hidden = !done;
     $('trip-streak').hidden = !streak;
     $('trip-streak').textContent = streakText(streak);
@@ -5083,7 +5170,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // the current points. maybe just leave it blank. and then when you finish and return, it continues showing the
     // best"; "It should still say carry on. It just shouldn't say your current score, like to the right of it").
     rankedSettle();
-    $('go-endless').textContent = save.ranked ? 'Carry on' : 'Play ranked';
+    $('go-endless').textContent = save.ranked ? 'Carry on' : 'Take off';
+    // Ranked's description is for a newcomer: it stands under "Ranked" until a Ranked game has been started or finished,
+    // then the line is the name, the best and the button (the player, 2026-11-20: "try it without the description after
+    // starting/finishing a ranked round"; their pick from picture RANKED-played)
+    $('ranked-hook').hidden = !!(save.rankedFlown || save.endless || save.ranked);
     $('endless-best').hidden = !save.endless || !!save.ranked;
     $('endless-best').textContent = 'Best: ' + save.endless.toLocaleString('en');
   }
@@ -5096,7 +5187,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     showResults(T, [bird.lon, bird.lat]);
     sfx.over();
   }
-  // today's trip again, from the Challenge tab, as it was saved
+  // today's trip again, from the home card, as it was saved
   function seeTrip() {
     const saved = save.trips[today()];
     if (!saved) return;
@@ -5104,6 +5195,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     T.results = saved.rounds.map((r, i) => Object.assign({ p: T.rounds[i].p }, r));
     T.score = saved.score; T.done = true;
     S.trip = T; S.game = 'trip';
+    studyShut();
     $('card').hidden = true;
     showResults(T, [atlas.lon, atlas.lat]);
   }
@@ -5162,7 +5254,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const b = e.target.closest('button'), T = S.trip;
     if (!b || !T) return;
     if (b.id === 'trip-home') goHome();
-    else if (b.id === 'trip-again') { runKind = 'endless'; takeOff(); }
+    else if (b.id === 'trip-again') { runKind = 'endless'; takeOff('trip'); }
     else if (b.id === 'trip-share') shareTrip(T, b);
     else if (b.id === 'trip-stats') { rankedStats(T); S.rowOn = undefined; measure(); $('trip-back').focus({ preventScroll: true }); }
     else if (b.id === 'trip-back') { rankedOverview(T); S.rowOn = undefined; measure(); $('trip-stats').focus({ preventScroll: true }); }
@@ -5447,7 +5539,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     delete save.flight;          // Restart is a new flight: the one left is not kept
     S.paused = false;
     $('card-pause').hidden = true; $('card-title').hidden = false;
-    takeOff();
+    takeOff(S.game);
   }
   // Back to the title: the globe stays where you were and starts turning again.
   function goHome() {
@@ -5472,7 +5564,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     [atlas.lon, atlas.lat] = from;
     showWhere();
     measure();
-    $(tab === 'study' ? 'go' : tab === 'free' ? 'go-free' : $('go-trip').hidden ? 'see-trip' : 'go-trip').focus({ preventScroll: true });          // the open tab's own button
+    $($('go-trip').hidden ? 'see-trip' : 'go-trip').focus({ preventScroll: true });          // the card's leading button
   }
 
   // Day Trip and Ranked: no pausing while a round's stopwatch runs. A pause there stopped the clock with the clue
@@ -5538,7 +5630,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function step(dt) {
     const flying = S.mode === 'fly';
     S.t += dt;
-    const sand = S.mode === 'title' ? tab === 'study' : S.game === 'study';       // Study's choice shows on its title tab, through its flight and on its end screen
+    const sand = S.mode === 'title' ? studyOpen : S.game === 'study';       // Study's choice shows while its choices are open on the home card, through its flight and on its end screen
     for (let i = 0; i < sanded.length; i++) sanded[i] += ((sand ? outside[i] : 0) - sanded[i]) * Math.min(1, dt * 7);
     const intro = flying && (S.trip ? S.trip.intro : S.intro);
     if (intro) {
@@ -5547,6 +5639,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     }
     S.blend = intro && intro.t < 0 ? Math.max(0, S.blend - dt / TUTOR_LEAD) : intro && intro.t < INTRO_TURN + INTRO_HOLD ? 0 : clamp(S.blend + (flying ? dt / INTRO_ZOOM : -dt / 1.3), 0, 1);
     if (flying && S.intro && S.blend >= 1) S.intro = null;          // the view is down
+    if (S.arrive && flying && !S.intro) { S.arrive = false; if (bird.down) showPlace(locationAt(bird.lon, bird.lat)); }          // a click on the home globe: the location's page opens as a landing opens it, unless the bird has flown on
     for (let i = fx.length - 1; i >= 0; i--) { fx[i].t += dt; if (fx[i].t >= fx[i].secs) fx.splice(i, 1); }
     for (let i = flashes.length - 1; i >= 0; i--) { flashes[i].t += dt; if (flashes[i].t >= flashes[i].secs) flashes.splice(i, 1); }
     bird.squash = Math.max(0, bird.squash - dt / 0.18);
@@ -6820,13 +6913,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // ---------- controls ----------
   function start() {
     if (S.mode === 'over' && performance.now() - S.landedAt < 1200) return false;
-    if (S.mode !== 'fly') { if (firstVisit) startTutor(); else takeOff(); return true; }          // on a first visit the card's first button is Start tutorial
+    if (S.mode === 'over') { takeOff(S.game); return true; }          // an end screen: the same game again
+    if (S.mode !== 'fly') { if (firstVisit) startTutor(); else if (tripDone()) seeTrip(); else { runKind = 'day'; takeOff('trip'); } return true; }          // the home card's leading button: Start tutorial on a first visit, else today's trip
     if (S.paused) { setPaused(false); return true; }
     return false;
   }
   window.addEventListener('keydown', (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (faqOn) { if (e.key === 'Escape') { faqClose(); e.preventDefault(); } return; }          // the FAQ is over the game: Esc is its Back, and no key reaches the game under it
+    if (howOn) { if (e.key === 'Escape') { howTo(false); e.preventDefault(); } return; }          // How to play is over the game too
     release();                // a key means you are back
     S.idle = 0;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
@@ -6848,7 +6943,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
       if (S.mode === 'fly' && !S.paused) keys.flap = true; else if (!e.repeat) start();
     }
     else if (k === 'Enter') { if (e.target instanceof HTMLButtonElement) return; if (!e.repeat) start(); }
-    else if (k === 'Escape' && !$('card-howto').hidden) howTo(false);
     else if (k === 'p' || k === 'Escape') { if (!e.repeat) setPaused(!S.paused); }
     else if (k === 'm') { if (!e.repeat) toggleSound(); return; }
     else return;
@@ -6870,20 +6964,22 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const pauseBtn = $('pause');
   pauseBtn.addEventListener('click', () => setPaused(true));
   toBird.addEventListener('click', () => { lookEnd(); toBird.blur(); stage.focus({ preventScroll: true }); });          // so Space still goes on
-  $('go').addEventListener('click', takeOff);
-  // The title card: a tab for each mode, and Study's choices of what and where.
-  const tabs = [...document.querySelectorAll('.seg button')];
-  function showMode(mode) {
-    for (const b of tabs) b.setAttribute('aria-selected', String(b.dataset.mode === mode));
-    tab = mode;
-    showWhere();
-    $('pane-study').hidden = mode !== 'study'; $('pane-free').hidden = mode !== 'free'; $('pane-soon').hidden = mode !== 'challenge';
-    measure();
-  }
-  for (const b of tabs) b.addEventListener('click', () => { showMode(b.dataset.mode); b.blur(); });
+  $('go').addEventListener('click', () => takeOff('study'));
+  // Study's choices of what and where: one line on the home card says what is picked, in a box with an arrow. A click
+  // opens the choices right under it; the card grows at its foot and nothing above moves (steadyCard). While they are
+  // open the home globe shows where Study asks. (The player's picks of 2026-11-20, PLAN 75; until then Study had a tab.)
+  const studyShut = () => { studyOpen = false; $('study-pick').hidden = true; $('study-what').setAttribute('aria-expanded', 'false'); showWhere(); };
+  $('study-what').addEventListener('click', () => {
+    studyOpen = !studyOpen; $('study-pick').hidden = !studyOpen; $('study-what').setAttribute('aria-expanded', String(studyOpen));
+    showWhere(); measure(); $('study-what').blur();          // so Space still takes off
+  });
   function showStudy() {
     for (const b of document.querySelectorAll('#kinds button')) b.setAttribute('aria-pressed', String(save.study.kinds.includes(b.dataset.k)));
     for (const b of document.querySelectorAll('#where button[data-r]')) b.setAttribute('aria-pressed', String(save.study.where.includes(b.dataset.r)));
+    // what Study asks, as one line: "Everything in the world", "Countries and capitals of Africa and Asia"
+    const names = { c: 'countries', k: 'capitals', f: 'flags', s: 'seas' }, list = (a) => (a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]);
+    const says = (save.study.kinds.length === 4 ? 'everything in ' : list(save.study.kinds.map((k) => names[k])) + ' of ') + (save.study.where.includes('World') ? 'the world' : list(save.study.where.map((r) => (r === 'Americas' ? 'the Americas' : r))));
+    $('study-says').textContent = says[0].toUpperCase() + says.slice(1);
   }
   for (const b of document.querySelectorAll('#kinds button')) b.addEventListener('click', () => {
     const k = b.dataset.k, on = save.study.kinds.includes(k);
@@ -6909,7 +7005,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const REGION_VIEW = { Africa: [17, 3], Americas: [-78, 14], Asia: [85, 28], Europe: [15, 50], Oceania: [150, -20] };
   const FIT = 50;                      // a region whose middle is further than this from the middle of them all does not fit
   function showWhere(clicked, now) {
-    const where = save.study.where, all = tab !== 'study' || where.includes('World');
+    const where = save.study.where, all = !(S.mode === 'title' ? studyOpen : S.game === 'study') || where.includes('World');
     const picked = (c, rs) => (c.rg || []).some((r) => rs.includes(r));
     for (let i = 0; i < PLAY.length; i++) outside[i] = all || picked(PLAY[i], where) ? 0 : 1;
     if (now) sanded.set(outside);
@@ -6929,34 +7025,40 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   showStudy();
   showWhere(null, true);
-  $('go2').addEventListener('click', () => { if (tab === 'challenge') startTutor(); else takeOff(); });
   $('go-tutor').addEventListener('click', startTutor);
   $('first-skip').addEventListener('click', () => { endFirst(); $('go-trip').focus({ preventScroll: true }); });
   $('tutor-continue').addEventListener('click', () => { tutorGo(); stage.focus({ preventScroll: true }); });
   $('tutor-skip-btn').addEventListener('click', goHome);
   showFirst();
-  $('go-free').addEventListener('click', takeOff);
-  $('go-trip').addEventListener('click', () => { runKind = 'day'; takeOff(); });
-  $('go-endless').addEventListener('click', () => { runKind = 'endless'; takeOff(); });
+  $('go-trip').addEventListener('click', () => { runKind = 'day'; takeOff('trip'); });
+  $('go-endless').addEventListener('click', () => { runKind = 'endless'; if (!save.rankedFlown) { save.rankedFlown = true; persist(); } takeOff('trip'); });
   $('see-trip').addEventListener('click', seeTrip);
   showTripNote();
-  // How to play is the card of the tab you are on (the player, 2026-11-13: "the how to play button should change for
-  // each tab"). Study's card is the player's own, line for line. A card's first button is its tab's own: Take off, or
-  // Carry on for a kept Study flight. The Challenge card has no Take off: that tab holds two games, so a button there
-  // could not say which one it starts (the player, the same day: "there's two different modes that you could have
-  // chosen from, so how would it know which one to take off?"). Its first button is Tutorial, which says what it
-  // starts: the way back to the tutorial for someone who skipped it.
-  function howTo(on) {
+  // How to play is one page for every game: a paper sheet over the page, as the FAQ is. On top what every game shares
+  // (the controls, the postcard, flying up, energy), then a column a game: Day Trip and Ranked, Study, Explore (the
+  // player's picks of 2026-11-20 from pictures HOWTO-redesign, HOWTO-mockups and HOWTO-pictures; "Explore" and its two
+  // lines are their own words). From a flight's pause card it is the common top and the column of the game being
+  // flown, one column wide (the player: "each pause screen should have a question mark that you can click on, and
+  // whichever game mode you're in at that point, then that specific how to play should show"). Its Tutorial button is
+  // the way back to the tutorial for someone who skipped it; not in a flight. Until then: a card for each of the title
+  // card's three tabs (the player, 2026-11-13: "the how to play button should change for each tab").
+  let howOn = false, howFrom = null;
+  function howTo(on, from) {
+    if (on === howOn) return;
+    howOn = on;
     if (on) {
-      for (const el of document.querySelectorAll('#card-howto .how')) el.hidden = el.dataset.for !== tab;
-      $('go2').textContent = tab === 'challenge' ? 'Tutorial' : $(tab === 'study' ? 'go' : 'go-free').textContent;
+      howFrom = from || null;
+      if (S.mode === 'fly') $('how').dataset.only = S.game; else delete $('how').dataset.only;
+      $('how-tutor').hidden = S.mode === 'fly';
     }
-    $('card-title').hidden = on; $('card-howto').hidden = !on;
-    measure();
-    $(on ? 'howto-back' : 'howto-open').focus({ preventScroll: true });
+    $('how-page').hidden = !on;
+    if (on) { $('how-page').scrollTop = 0; $('how-back').focus({ preventScroll: true }); }
+    else (howFrom && howFrom.offsetParent ? howFrom : stage).focus({ preventScroll: true });
   }
-  $('howto-open').addEventListener('click', () => howTo(true));
-  $('howto-back').addEventListener('click', () => howTo(false));
+  $('howto-open').addEventListener('click', () => howTo(true, $('howto-open')));
+  $('pause-how').addEventListener('click', () => howTo(true, $('pause-how')));
+  $('how-back').addEventListener('click', () => howTo(false));
+  $('how-tutor').addEventListener('click', () => { howTo(false); startTutor(); });
   // ---------- the FAQ ----------
   // A sheet over the game's page at the address #faq (and #faq-x for one answer), opened by the word "FAQ" in the title
   // card's row; Back, Esc and the browser's own Back close it. Every question is a row; the first stands open; a click
@@ -7199,6 +7301,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       return;
     }
     drag.on = true; drag.x = e.clientX; drag.y = e.clientY;
+    homePress = S.mode === 'title' && e.button === 0 ? [e.clientX, e.clientY] : null;
     if (!holdGlobe([e.clientX, e.clientY])) { atlas.to = null; atlas.secs = 0; S.tour = null; atlas.back = null; if (S.replay) S.replay.free = true; }          // turning a globe by hand ends a turn it was making, unless it is an end globe's (it pauses)
     atlas.idle = 0;
     stage.classList.add('dragging');
@@ -7271,8 +7374,26 @@ button { font: inherit; color: inherit; cursor: pointer; }
       atlas.lon = wrapLon(atlas.lon - ((x - s[0]) * k) / Math.max(0.2, Math.cos(atlas.lat * RAD)));
     }
   }, { passive: false });
+  // A click on the home globe (not a drag): Free flight, the bird standing where the click was. The view comes down on
+  // it as on every flight's start and the location's page opens as a landing opens it; Space flies on from there.
+  // (The player, 2026-11-20: "Maybe the home screen should become basically free flight mode ... if you double click
+  // on a country, then maybe it shows what free flight would show"; their picks from picture HOME-redesign: one click,
+  // and no tab or line for Free flight: "It can almost even be like an Easter egg". PLAN 76.) Until then Free flight
+  // was the title card's third tab and began where the globe was looking.
+  let homePress = null;
+  function explore(lon, lat) {
+    takeOff('free');
+    Object.assign(bird, { lon, lat: clamp(lat, -75, 80) }); bird.at = locationAt(bird.lon, bird.lat).key;
+    startView();
+    S.arrive = true;          // the page opens when the view is down (step)
+  }
   inkCanvas.addEventListener('pointerup', (e) => {
     endDrag();
+    const press = homePress; homePress = null;
+    if (press && S.mode === 'title' && Math.hypot(e.clientX - press[0], e.clientY - press[1]) < 5) {
+      const bx = stage.getBoundingClientRect(), at = unproject(e.clientX - bx.left, e.clientY - bx.top);
+      if (at) { explore(at[0], at[1]); return; }
+    }
     const h = globeHold.down;
     globeHold.down = null;
     if (h && h[2] && Math.hypot(e.clientX - h[0], e.clientY - h[1]) < 5 && !zoomedIn()) resumeGlobe();          // a click on a paused end globe: it goes on (zoomed in, not yet)
@@ -7297,9 +7418,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
   new MutationObserver(seatSound).observe($('card-title'), { attributes: true, attributeFilter: ['hidden'] });
   seatSound();
 
-  // The title globe carries the names of the countries you already know cold: those in Study's pick of where,
-  // since a name on a country drawn as sand would read as one in play.
-  function titleNames() { atlasNames = PLAY.filter((c, i) => !outside[i] && memOf(c.where).box >= COLD).map((c) => ({ c, p: c.u })); }
+  // The home globe carries no names (the player, 2026-11-20: "Maybe don't need to show mastered countries on Home Screen
+  // globe? Bc it's kinda unclear rn why certain countries are showing"). Until then: the countries known cold, a
+  // leftover of the first plan's atlas.
+  function titleNames() { atlasNames = []; }
   function showKnown() {
     const cold = PLAY.filter((c) => memOf(c.where).box >= COLD);
     titleNames();
@@ -7318,7 +7440,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   // for the tests: the bird put somewhere by hand. That is no flight, so the view is the bird's own at once (no rest on the last landing's country still being handed back)
   const setBird = (lon, lat, a, down) => { Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down }); S.capFit = null; fitClear(); };
-  window.birdsEye = { stackLines: (id) => { const c = PLAY.find((q) => q.id === id); ownName = true; try { return stackForm(c, c.name, 'name', null).lines; } finally { ownName = false; } }, hoverBox: () => hoverBox, slerp, showLeg, legView, STILL_DEG, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, rankedRounds, easiest, flagClue, capClue, capFlagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
+  window.birdsEye = { explore, howTo, pair: () => view.pair, homeNote: () => { showTripNote(); showKnown(); measure(); }, stackLines: (id) => { const c = PLAY.find((q) => q.id === id); ownName = true; try { return stackForm(c, c.name, 'name', null).lines; } finally { ownName = false; } }, hoverBox: () => hoverBox, slerp, showLeg, legView, STILL_DEG, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, rankedRounds, easiest, flagClue, capClue, capFlagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     outlines: () => fx.filter((f) => f.lined && f.shownA > 0).map((f) => f.lined.id), OUTLINE, pull, pullBy, steerable, PULL_FULL, PULL_RING, hFor, look: () => gaze, looking, canLook, lookStart, lookEnd, lookAnswer, answerNamed: () => answerNamed, answerRoom: () => gazeName, lookK: gazeK, plate: () => plateSays, plateRoom: (h) => pointerPlate(h, 1, true), hoverNow: () => (hover ? hover.name : null), project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
