@@ -359,6 +359,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ticket.result:has(.why) .plus, .ticket.result:has(.why) .next, .ticket.result:has(.why) .two { grid-row: 1 / span 3; }
 #daycard { width: min(660px, 100%); }
 #daycard tr.on td { background: var(--paper-shade); }
+/* The shade of the picked row reaches 10 px past the row's first and last words on each side, the room the row has
+   above and below its words (the player, 2026-11-19: "can you make the side borders of the shading wider. it's like
+   right next to the edge ... before 5 and after 300"). The words stay in line with the other rows': the shade grows
+   outward, as a shadow of the row's two end cells. The shade under the mouse does the same. */
+#daycard tr.on td:first-child { box-shadow: -10px 0 0 var(--paper-shade); }
+#daycard tr.on td:last-child { box-shadow: 10px 0 0 var(--paper-shade); }
 #daycard [data-i] { cursor: pointer; }
 .squares i.on { outline: 2px solid var(--ink); outline-offset: 2px; }
 /* Under the mouse, a round that can be picked wears the picked look at half strength: a row the shade halfway from the
@@ -368,6 +374,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
    HOVER-question. The full shade, which every light button wears under the mouse, would show two rows alike.) */
 @media (hover: hover) {
   #daycard tr[data-i]:not(.on):hover td { background: color-mix(in srgb, var(--paper-shade) 50%, var(--paper)); }
+  #daycard tr[data-i]:not(.on):hover td:first-child { box-shadow: -10px 0 0 color-mix(in srgb, var(--paper-shade) 50%, var(--paper)); }
+  #daycard tr[data-i]:not(.on):hover td:last-child { box-shadow: 10px 0 0 color-mix(in srgb, var(--paper-shade) 50%, var(--paper)); }
   .squares i[data-i]:not(.on):hover { outline: 2px solid color-mix(in srgb, var(--ink) 45%, var(--paper)); outline-offset: 2px; }
 }
 #daycard.wide { width: min(780px, 100%); }
@@ -403,8 +411,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #daycard td.you .km { white-space: nowrap; }
 #daycard td.pts { text-align: right; font: 700 20px/1 var(--display); font-variant-numeric: tabular-nums; width: 60px; }
 #daycard tr.head td.pts { font: 400 13px/1 var(--text); }
-#daycard .sum { margin: 10px 0 12px; padding-top: 10px; border-top: var(--b2z) solid var(--ink); display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--ink-soft); }
-#daycard .sum b { color: var(--ink); }
+/* The day's three sums: the table's last row, each under its column, under the card's heavy line with the gap the line
+   always had from the last round (until 2026-11-19 a line of their own under the table, "Accuracy 743/800" and so on). */
+#daycard .stats tr.gap td { padding: 0; height: 10px; border: 0; }
+#daycard .stats tr.sum td { border-top: var(--b2z) solid var(--ink); padding: 10px 0 0; }
+#daycard table.day { margin-bottom: 12px; }
 .squares { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 14px; }
 .squares i { width: 22px; height: 22px; border-radius: 3px; background: var(--bad); }
 .squares i.right, .squares i.spot { background: var(--good); }
@@ -414,10 +425,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .tiles div { display: grid; }
 .tiles b { font: 700 40px/1 var(--display); font-variant-numeric: tabular-nums; }
 .tiles span { font-size: 13px; line-height: 1.2; color: var(--ink-soft); }
-#daycard .scroll { max-height: calc(100vh / var(--ui, 1) - 260px); overflow-y: auto; margin: 0 -6px 12px 0; padding-right: 6px; }
+#daycard .scroll { max-height: calc(100vh / var(--ui, 1) - 260px); overflow-y: auto; margin: 0 -10px 12px; padding: 0 10px; }          /* 10 px each side: the room of a picked row's shade */
 #daycard td.num small { display: inline; font-size: 1em; color: var(--ink-soft); }
 #daycard .stats td.pts { padding-left: 16px; width: auto; white-space: nowrap; }
-#daycard .stats td.num { text-align: right; font-variant-numeric: tabular-nums; padding-left: 10px; white-space: nowrap; }
+/* A part of a round: the number the player got in bold, its maximum gray after it, as the points beside it and the
+   day's sums (the player's pick by button, 2026-11-19: "Every number bold"). The time is no part: plain. */
+#daycard .stats td.num { text-align: right; font-variant-numeric: tabular-nums; padding-left: 10px; white-space: nowrap; font-weight: 700; }
+#daycard .stats td.num small, #daycard .stats td.time, #daycard .stats tr.head td.num { font-weight: 400; }
 #daycard .stats td.asked { width: 32%; }          /* a fixed share, so the table stays inside its card whatever the names (until 2026-11-15 long names pushed the Points column past it) */
 #daycard .stats tr.head td.num { text-align: right; }
 
@@ -4741,11 +4755,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const was = wasOf(R);
     return '<td class="asked"><span class="big">' + clueOf(R) + '</span>' + (was ? '<span class="was">' + esc(was) + '</span>' : '') + '</td>';
   }
+  // A round's row, on Day Trip's card and in Ranked's Flight stats alike: its three parts each out of its maximum, the
+  // time, the points. (The player, 2026-11-19, of Day Trip's card, which had the points alone and the parts only as the
+  // day's sums: "wondering why I didn't get full points, and I can't go back and see whether it was based on accuracy
+  // or speed or energy use".) A round with no landing (not reached, or left with its clue showing) has no time.
   function statsRow(T, i) {
-    const R = T.rounds[i], r = T.results[i];
-    return '<tr' + (r.path ? ' data-i="' + i + '"' : '') + '><td class="n">' + (i + 1) + '</td>' + givenCell(R) + youCell(r, R) +
-      '<td class="num">' + out(r.closeness, accMax(T, R)) + '</td><td class="num">' + out(r.right ? r.speed : NOT_EARNED, partMax(T, R)) + '</td><td class="num">' + r.secs.toFixed(1) + ' sec</td>' +
-      '<td class="num">' + out(r.right ? r.energy || 0 : NOT_EARNED, partMax(T, R)) + '</td><td class="pts">' + out(r.pts, roundWorth(T, R)) + '</td></tr>';
+    const R = T.rounds[i], r = T.results[i], flown = r && r.at !== 'Not finished';
+    return '<tr' + (r && r.path ? ' data-i="' + i + '"' : '') + '><td class="n">' + (i + 1) + '</td>' + givenCell(R) + youCell(r, R) +
+      '<td class="num">' + out(r ? r.closeness : 0, accMax(T, R)) + '</td><td class="num">' + out(r && r.right ? r.speed : NOT_EARNED, partMax(T, R)) + '</td><td class="num time">' + (flown ? r.secs.toFixed(1) + ' sec' : '') + '</td>' +
+      '<td class="num">' + out(r && r.right ? r.energy || 0 : NOT_EARNED, partMax(T, R)) + '</td><td class="pts">' + out(r ? r.pts : 0, roundWorth(T, R)) + '</td></tr>';
   }
   function rankedStats(T) {
     const rows = T.results.map((r, i) => statsRow(T, i)).join('');
@@ -4928,10 +4946,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     // (a trip saved before energy use was scored a round: its energy points are what its other parts leave of the score)
     const sums = T.results.reduce((a, r) => [a[0] + r.closeness, a[1] + r.speed], [0, 0]), streak = tripStreak();
     sums.push(T.score - sums[0] - sums[1]);
+    $('daycard').classList.add('wide');          // the rows of Flight stats: the card as wide as Flight stats
     $('daycard').innerHTML = '<div class="top"><div><h2>Day Trip</h2><div class="date">' + tripDate(T) + '</div>' + (streak ? '<div class="streak" style="margin-top: 8px">' + streakText(streak) + '</div>' : '') + '</div>' +
       '<div class="score">' + num(T.score) + '<small>/1,000</small></div></div>' +
-      '<table>' + TRIP_HEAD + T.rounds.map((R, i) => tripRow(T, i)).join('') + '</table>' +
-      '<div class="sum"><span>Accuracy <b>' + sums[0] + '</b>/800</span><span>Speed <b>' + sums[1] + '</b>/100</span><span>Energy use <b>' + sums[2] + '</b>/100</span></div>' +
+      '<table class="stats day">' + STATS_HEAD + T.rounds.map((R, i) => statsRow(T, i)).join('') + '<tr class="gap"><td colspan="8"></td></tr>' +
+      '<tr class="sum"><td></td><td></td><td></td><td class="num">' + out(sums[0], 800) + '</td><td class="num">' + out(sums[1], 100) + '</td><td></td><td class="num">' + out(sums[2], 100) + '</td><td></td></tr></table>' +
       '<div class="row"><button class="go" id="trip-share" type="button">Share</button><button class="alt" id="trip-home" type="button">Home <kbd>H</kbd></button></div>';
   }
   function shareTrip(T, btn) {
@@ -4978,12 +4997,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const at = !r.right && r.at && r.at !== R.c.name ? '<b class="at">' + esc(r.at) + '</b>' : '';
     const km = area && r.right ? '' : '<span class="km">' + exactKm(r.d) + '</span> away';
     return cell(r.right ? '<span class="tick right">\u2713</span>' : X, [at && km ? at + ',' : at, km].filter(Boolean));
-  }
-  const TRIP_HEAD = '<tr class="head"><td></td><td>Given</td><td>You</td><td class="pts">Points</td></tr>';
-  function tripRow(T, i) {
-    const R = T.rounds[i], r = T.results[i];
-    return '<tr' + (r && r.path ? ' data-i="' + i + '"' : '') + '><td class="n">' + (i + 1) + '</td>' + givenCell(R) + youCell(r, R) +
-      '<td class="pts">' + out(r ? r.pts : 0, roundWorth(T, R)) + '</td></tr>';
   }
   // green correct, red wrong (or not reached), a row of `per`
   function shareSquares(results, per) {
