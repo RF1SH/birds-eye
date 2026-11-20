@@ -315,6 +315,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .game .go { grid-column: 3; grid-row: 1; font-size: 20px; padding: 7px 14px 9px; min-width: 96px; }
 #card .game .hook { grid-column: 1 / -1; grid-row: 2; margin: 2px 0 0; }          /* 2: as far under its name as Study's box is under Study's, by their ink */
 .mode-stat { font: 500 20px/1 var(--display); color: var(--ink); white-space: nowrap; }
+/* Once today's trip is flown the day's score stands over the streak, beside "See today's trip", both in the streak's
+   lettering: a player's own numbers wear one lettering and stand beside their game's button, and none is bigger than its
+   game's name (the player, 2026-11-20, of the score at 44 px on the "Day Trip" line: "number bigger than the day trip
+   letters is crazy"; their pick from picture SCORE-line-2: "2: beside the button"; of that too: "still not great, but we
+   can save the redesign for later": PLAN 80, 81). Until then the score was a sentence in the description's spot ("Today's
+   score: 348 of 1,000 points"; the player: "wtf is this design laziness"). The two lines stand in the button's height by
+   their ink: as far from the button's top to the number's top as from the streak's baseline to the button's foot. */
+.day-stats { display: grid; row-gap: 4px; }
+#home-score:not([hidden]) + #trip-streak { margin-bottom: 2px; }
+#home-score small { font: inherit; color: var(--ink-soft); }
 /* Study's line: what is picked stands in a box with an arrow; a click opens the choices right under it and the card
    grows at its foot (the player, 2026-11-20: "I like the idea of the expandable list ... in the home card ... it's
    like hard to tell that that's even an option"; their pick: "A box with an arrow"). */
@@ -688,7 +698,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
         <section id="home-day">
           <h2>Day Trip</h2>
           <p class="hook" id="home-hook">A five-location daily challenge</p>
-          <div class="row"><button class="go" id="go-trip" type="button">Take off</button><button class="go" id="see-trip" type="button" hidden>See today's trip</button><span class="mode-stat" id="trip-streak" hidden></span></div>
+          <div class="row"><button class="go" id="go-trip" type="button">Take off</button><button class="go" id="see-trip" type="button" hidden>See today's trip</button><div class="day-stats"><span class="mode-stat" id="home-score" hidden></span><span class="mode-stat" id="trip-streak" hidden></span></div></div>
         </section>
         <div id="home-games">
           <section class="game">
@@ -5151,7 +5161,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   const streakText = (n) => 'Streak: ' + n + (n === 1 ? ' day' : ' days');
   // The home card's first part is today's trip: before it "Take off"; one begun and left, "Carry
-  // on"; after it the day's score and "See today's trip". The streak beside the button, Ranked's best beside its own.
+  // on"; after it "See today's trip" with the day's score over the streak beside it. The streak beside the button,
+  // Ranked's best beside its own.
   function showTripNote() {
     // Today's trip from before the day's five changed (they do when the lists are built anew): flown to its end, it
     // stays as it was flown; left part-way, or with a round that can no longer be read, it is free to fly again.
@@ -5161,7 +5172,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const begun = save.trips[today()], done = tripDone(), streak = tripStreak();
     $('go-trip').hidden = done;
     $('go-trip').textContent = begun && !done ? 'Carry on' : 'Take off';
-    $('home-hook').textContent = done ? "Today's score: " + save.trips[today()].score.toLocaleString('en') + ' of 1,000 points' : 'A five-location daily challenge';          // a description of one sentence has no period (the player, 2026-11-20: "none of the descriptions need punctuation.. unless more than 1 sentence")
+    // (the description under "Day Trip" is the same before and after the trip; a description of one sentence has no
+    // period: the player, 2026-11-20: "none of the descriptions need punctuation.. unless more than 1 sentence")
+    $('home-score').hidden = !done;
+    $('home-score').innerHTML = done ? num(save.trips[today()].score) + '<small>/1,000</small>' : '';
     $('see-trip').hidden = !done;
     $('trip-streak').hidden = !streak;
     $('trip-streak').textContent = streakText(streak);
