@@ -434,6 +434,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #daycard .stats td.num small, #daycard .stats td.time, #daycard .stats tr.head td.num { font-weight: 400; }
 #daycard .stats td.asked { width: 32%; }          /* a fixed share, so the table stays inside its card whatever the names (until 2026-11-15 long names pushed the Points column past it) */
 #daycard .stats tr.head td.num { text-align: right; }
+/* The Time label stands over the middle of its numbers: they end in a word ("3.3 sec"), so a label that ended where they
+   end stood over "sec" and close to "Energy use". Every other label ends where its numbers end. (The player,
+   2026-11-19: "can we center the time label for the column"; their pick from a picture of three cards, "A: Time centered",
+   over every label centered.) */
+#daycard .stats tr.head td.time { text-align: center; }
+#daycard .stats td.time { width: 1px; }          /* as wide as its widest number and no wider: spare room in the table goes to other columns, or the label would stand off its numbers' middle by half of it (3 px on a card with no wrapped row) */
 
 
 /* Free flight: what you have landed on */
@@ -4741,7 +4747,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       '<div class="row"><button class="go" id="trip-again" type="button">Play again</button><button class="alt" id="trip-stats" type="button">Flight stats</button><button class="alt" id="trip-share" type="button">Share</button><button class="alt" id="trip-home" type="button">Home <kbd>H</kbd></button></div>';
   }
   // every leg: what was given, where you came down, and each part of the points
-  const STATS_HEAD = '<tr class="head"><td></td><td>Given</td><td>You</td><td class="num">Accuracy</td><td class="num">Speed</td><td class="num">Time</td><td class="num">Energy use</td><td class="pts">Points</td></tr>';
+  const STATS_HEAD = '<tr class="head"><td></td><td>Given</td><td>You</td><td class="num">Accuracy</td><td class="num">Speed</td><td class="num time">Time</td><td class="num">Energy use</td><td class="pts">Points</td></tr>';
   const out = (n, of) => (typeof n === 'number' ? num(n) : n) + '<small>/' + num(of) + '</small>';
   // A round's row on the day card and in Flight stats. Given: the clue in bold as the postcard gave it (a name, a flag,
   // [symbol] name, [symbol] of [flag]), then in gray what it did not say: the flag's country, "Vilnius, Lithuania" for
