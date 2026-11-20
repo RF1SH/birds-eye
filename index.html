@@ -2783,10 +2783,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // of the country too small to show an inside (under 4 line widths across: an islet) gets none: it would be a blot.
   // Drawn under every mark on the map (a capital's symbol, a tiny country's dot, the landing's dot), the bird and
   // every name: a border is the ground, a mark stands on it.
-  const OUTLINE = 3.5;
+  // A point of the outline nearer than OUTLINE_STEP px (times the marks' scale) to the last point drawn is left out
+  // (what map libraries do: Leaflet's smoothFactor, 1 px). The line is traced again in every frame the view moves, and the
+  // country you are shown the way to in Study wears it through the whole flight to it: Canada's 8,654 points seen from
+  // the top are 3,100 then, a frame of that flight takes 3.2 ms in place of 6.3 (0.7 without the line; Russia 2.5 in
+  // place of 4.3), and of fourteen countries' borders at rest and from the top no pixel moves by 3 px, at most 8 in a
+  // picture by 2 (audit/ft1.py, audit/od1.py; PLAN, THE WHOLE LIST 46).
+  const OUTLINE = 3.5, OUTLINE_STEP = 1;
   const outlined = (f, c) => { if (c && c.fine && !c.tiny) f.lined = c; return f; };
   function drawOutlines() {
-    const lw = OUTLINE * view.mk, key = [cam.n[0], cam.n[1], cam.n[2], cam.H, cam.cx, cam.cy, view.w, view.h].join();
+    const lw = OUTLINE * view.mk, near2 = (OUTLINE_STEP * view.mk) ** 2, key = [cam.n[0], cam.n[1], cam.n[2], cam.H, cam.cx, cam.cy, view.w, view.h].join();
     for (const f of fx) {
       if (!f.lined || !(f.shownA > 0)) continue;
       if (f.lineKey !== key) {          // traced again only when the view has moved
@@ -2798,8 +2804,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
           // a piece partly round the back of the globe: each stretch in sight is a line of its own, never closed by a
           // chord across the map (begun just after a hidden point, so no stretch runs through the ring's first point)
           const n = pts.length, gap = pts.findIndex((q) => !q);
-          let pen = false;
-          for (let k = 1; k <= n; k++) { const q = pts[(gap + k + n) % n]; if (!q) { pen = false; continue; } if (pen) f.line.lineTo(q[0], q[1]); else { f.line.moveTo(q[0], q[1]); pen = true; } }
+          let pen = false, lx = 0, ly = 0;
+          for (let k = 1; k <= n; k++) {
+            const q = pts[(gap + k + n) % n];
+            if (!q) { pen = false; continue; }
+            if (pen) { if ((q[0] - lx) ** 2 + (q[1] - ly) ** 2 < near2) continue; f.line.lineTo(q[0], q[1]); } else { f.line.moveTo(q[0], q[1]); pen = true; }
+            lx = q[0]; ly = q[1];
+          }
           if (gap < 0) f.line.closePath();
         }
       }
@@ -2901,7 +2912,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const c = t.it.c, p = pointOf(t.it), here = () => S.mode === 'fly' && S.tickets.includes(t);
     if (t.label) t.label.secs = 0;
     if (t.it.kind === 'k') t.label = label(c, c.cap[0], p, 'name', 0, c.name, OVER, here);
-    else t.label = label(c.water ? null : c, c.name, p, c.water ? 'sea' : 'name', 0, null, c.water ? () => 22 + namePx() / 2 : c.tiny ? OVER : ONIT, here);          // a country: on it, never beside it (liveSpot)
+    // a country: on it, never beside it (liveSpot), and with the bold border for as long as its name stands, until its
+    // postcard is delivered (the player, by button from a picture of Belgium shown the way with and without it: "Add
+    // the border". PLAN, THE WHOLE LIST 46). Not a sea; a country drawn as a dot has its dot's ring (outlined)
+    else t.label = outlined(label(c.water ? null : c, c.name, p, c.water ? 'sea' : 'name', 0, null, c.water ? () => 22 + namePx() / 2 : c.tiny ? OVER : ONIT, here), c.water ? null : c);
   }
   function countAgainst(t) {
     t.misses++;
