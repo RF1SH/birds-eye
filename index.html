@@ -453,6 +453,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #stage.side #daycard { width: min(660px, calc(52vw / var(--ui, 1))); }          /* never wider: the globe beside the card keeps its room (from 2026-11-19 to 11-20 a card of 780 px took 68% of a 1440 x 900 window and left the globe 10% of it) */
 #daycard { padding: 20px 22px 18px; background: var(--paper); border: var(--b2z) solid var(--ink); border-radius: 3px; pointer-events: auto; }
 #daycard .top { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px; }
+/* Day Trip's card: the name over the date on the left, the score on the right with its baseline on the date's (in a browser
+   that does not know `last baseline`: its foot on the date's foot); 18 px to the day's bars. The streak is in the foot's row. */
+#daycard .top.day { display: grid; grid-template-columns: 1fr auto; margin-bottom: 18px; }
+#daycard .top.day h2 { grid-area: 1 / 1; }
+#daycard .top.day .date { grid-area: 2 / 1; align-self: end; align-self: last baseline; }
+#daycard .top.day .score { grid-area: 1 / 2 / 3 / 3; align-self: end; align-self: last baseline; }
+#daycard > .row .streak { margin-left: auto; }
 #daycard h2 { margin: 0; font: 700 34px/1 var(--display); }
 #daycard .date { font-size: 13px; color: var(--ink-soft); margin-top: 3px; }
 #daycard .score { text-align: right; font: 700 54px/.9 var(--display); font-variant-numeric: tabular-nums; }
@@ -5494,11 +5501,15 @@ html #card.ghost ~ #place { visibility: visible; }
     // (a trip saved before energy use was scored a round: its energy points are what its other parts leave of the score)
     const sums = T.results.reduce((a, r) => [a[0] + r.closeness, a[1] + r.speed], [0, 0]), streak = tripStreak();
     sums.push(T.score - sums[0] - sums[1]);
-    $('daycard').innerHTML = '<div class="top"><div><h2>Day Trip</h2><div class="date">' + tripDate(T) + '</div>' + (streak ? '<div class="streak" style="margin-top: 8px">' + streakText(streak) + '</div>' : '') + '</div>' +
-      '<div class="score">' + num(T.score) + '<small>/1,000</small></div></div>' +
+    // The top holds what the trip is and its score: the name with the date under it, and the score on the date's line. The streak
+    // stands at the card's foot, at the right end of the row of Share and Home, as it stands beside the button on the home card
+    // (the player's pick of 2026-11-21 from picture TOP-options, "A: streak at the foot"; of the top before, the name, the date
+    // and the streak stacked on the left in three letterings with the score beside the last two: "The end score and the date and
+    // the streak all seem disorganized up there"; PLAN 91).
+    $('daycard').innerHTML = '<div class="top day"><h2>Day Trip</h2><div class="score">' + num(T.score) + '<small>/1,000</small></div><div class="date">' + tripDate(T) + '</div></div>' +
       partsOf(sums[0], sums[1], sums[2], 800, 100, '') +
       '<table class="day">' + TRIP_HEAD + T.rounds.map((R, i) => statsRow(T, i)).join('') + '</table>' +
-      '<div class="row"><button class="go" id="trip-share" type="button">Share</button><button class="alt" id="trip-home" type="button">Home <kbd>H</kbd></button></div>';
+      '<div class="row"><button class="go" id="trip-share" type="button">Share</button><button class="alt" id="trip-home" type="button">Home <kbd>H</kbd></button>' + (streak ? '<span class="streak">' + streakText(streak) + '</span>' : '') + '</div>';
   }
   function shareTrip(T, btn) {
     // what a friend needs to find the game is its address, last; a streak is worth a line from the second day
