@@ -3961,16 +3961,29 @@ html #card.ghost ~ #place { visibility: visible; }
     const named = (b, M) => hit(b, M) || (body && over(b, body));          // no room for a name
     const tinies = dotsShow() < 1 ? [] : TINY.map((t) => ({ t, s: project(t.u) })).filter((q) => q.s && !hit(about(q.s, 6 * k), 0));          // (from higher up their dots are faint or not drawn: drawDots)
     const items = [];
-    if (A.c.cap) items.push({ p: unit(A.c.cap[1], A.c.cap[2]), name: A.c.cap[0], cap: true, n: -1 });
+    // every capital of the country, each with the capital's symbol and its name in the capital's lettering (capsOf: South
+    // Africa's three; the player, 2026-11-20: "if it's only one of three capitals, it should show the others too"; their
+    // rule: a capital always wears its symbol), then the cities (freeCities: none of them a capital of the country)
+    for (const q of capsOf(A.c)) items.push({ p: unit(q[1], q[2]), name: q[0], cap: true, n: -1 });
     A.list.forEach((x, n) => items.push({ p: unit(x.lon, x.lat), name: x.name, n }));
+    for (const it of items) it.s = project(it.p);
+    // Two capitals too close for a symbol each (Porto-Novo and Cotonou, Mbabane and Lobamba, Sri Jayawardenepura Kotte and
+    // Colombo) stand side by side, as at a landing (capSpot): each moved the same way along the line between the two until
+    // the map between their rims is as wide as between a symbol's rim and its name here. off: how far a symbol stands
+    // from its own spot on the map, in the layout's px (drawAround).
+    const capR = 9 * k + 4.4, capNeed = capR + 22 * k, capsOn = items.filter((it) => it.cap && it.s);
+    for (const it of capsOn) {
+      const o = capsOn.filter((b) => b !== it).sort((a, b) => Math.hypot(a.s[0] - it.s[0], a.s[1] - it.s[1]) - Math.hypot(b.s[0] - it.s[0], b.s[1] - it.s[1]))[0];
+      const dx = o ? it.s[0] - o.s[0] : 0, dy = o ? it.s[1] - o.s[1] : 0, d = Math.hypot(dx, dy);
+      if (o && d < capNeed && d > 0.01) it.off = [dx * (capNeed - d) / 2 / d, dy * (capNeed - d) / 2 / d];
+    }
+    for (const it of capsOn) if (it.off) it.s = [it.s[0] + it.off[0], it.s[1] + it.off[1]];
     for (const it of items) {          // where each would stand; one off the screen or under the card is not tried
-      it.s = project(it.p);
       it.dot = it.s && about(it.s, (it.cap ? 12 : 7) * k);
       if (it.dot && hit(it.dot, 14)) it.dot = null;
     }
     L.tried = items.length; L.out = [];          // for the tests: how many were tried, and which found no room
-    const cap = items.find((it) => it.cap && it.dot), dots = [];
-    if (cap) dots.push(cap.dot);
+    const stars = items.filter((it) => it.cap && it.dot), dots = stars.map((it) => it.dot);
     for (const q of tinies) dots.push(q.dot = about(q.s, 11 * k));          // (a capital's star may stand on one: Rome's on Vatican City's)
     boxes.push(...dots);
     // A name must read as its own dot's: every other dot stands clearly farther from it than its own does (Chicago's
@@ -4071,7 +4084,7 @@ html #card.ghost ~ #place { visibility: visible; }
     const nearCos = Math.cos(NEAR_DOT_KM / R_KM);
     for (const { t, s, dot: own } of tinies) {
       if (t === A.c || !edge.some((q) => dot(q, t.u) >= nearCos)) continue;
-      if (cap && Math.hypot(cap.s[0] - s[0], cap.s[1] - s[1]) < 22 * k) continue;
+      if (stars.some((cap) => Math.hypot(cap.s[0] - s[0], cap.s[1] - s[1]) < 22 * k)) continue;
       const px = Math.round(small * 0.8), label = t.name.toUpperCase(), g2 = 17 * k;
       ctx.font = '700 ' + px + 'px ' + DISPLAY;
       if ('letterSpacing' in ctx) ctx.letterSpacing = '0.12em';
@@ -4330,7 +4343,7 @@ html #card.ghost ~ #place { visibility: visible; }
       for (const { it } of L.cities) {
         const q = project(it.p);
         if (!q) continue;
-        if (it.cap) starAt(q[0], q[1], 9 * k * z);
+        if (it.cap) starAt(q[0] + (it.off ? it.off[0] * z : 0), q[1] + (it.off ? it.off[1] * z : 0), 9 * k * z);          // (off: one of two capitals side by side)
         else { ctx.beginPath(); ctx.arc(q[0], q[1], 6 * k * z, 0, 7); ctx.fillStyle = PAPER; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.stroke(); }
       }
     } else {
@@ -4342,7 +4355,7 @@ html #card.ghost ~ #place { visibility: visible; }
       }
       for (const { it, sz, at } of L.cities) {
         const q = project(it.p);
-        if (q && at) text(it.name, q[0] + at.dx * z, q[1] + at.dy * z, { size: sz * z, align: 'left', edge: 4.5 });
+        if (q && at) text(it.name, q[0] + ((it.off ? it.off[0] : 0) + at.dx) * z, q[1] + ((it.off ? it.off[1] : 0) + at.dy) * z, { size: sz * z, align: 'left', edge: 4.5 });
       }
     }
     ctx.restore();
@@ -4386,7 +4399,9 @@ html #card.ghost ~ #place { visibility: visible; }
     });
     return at;
   }
-  const freeCities = (c, lon, lat) => ((FREE[c.id] || [])[Math.max(0, partAt(c, lon, lat) - 1)] || []).map(([name, x, y]) => ({ name, lon: x, lat: y }));
+  // (never one of the country's capitals: Cape Town and Bloemfontein, La Paz, Bujumbura and Abidjan are in the data's list as
+  // cities, and on the map each is a capital with the capital's symbol: capsOf)
+  const freeCities = (c, lon, lat) => ((FREE[c.id] || [])[Math.max(0, partAt(c, lon, lat) - 1)] || []).filter(([name]) => !capsOf(c).some((q) => q[0] === name)).map(([name, x, y]) => ({ name, lon: x, lat: y }));
   // How hard every location is, for every way it is asked (D.hard, made by tools/build_hard.py from every source of
   // real players' numbers together): [p, x]. p: of 1,000 plays by people who play geography quizzes, how many land
   // it. x: ten times what its round is worth in Ranked, in rounds of 100: 1, and 1 more each time half as many plays
