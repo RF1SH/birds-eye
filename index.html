@@ -493,11 +493,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #daycard > .parts { margin: 4px 0 18px 22px; }          /* 22 px: the width of the rounds' numbers */
 /* One line between the day's three bars and the rounds (the player, 2026-11-20: "there should be a subtle line/divider
    between the overview and the flight stats. like above "given" and below "energy use" . it's confusing"; of the
-   rounds' own hairline drawn there: "Make divider a bit more prominent"; PLAN 79). The four gray words "Accuracy",
-   "Speed", "Energy use" and "Given" stand on one left edge in one lettering, and "Given" read as a fourth label. The
-   line is the table's top, a step darker than the hairline between two rounds (the tone of a flag's border), and
-   "Given" stands in the middle between the two. Day Trip's card alone: Flight stats has no bars over its rows. */
-#daycard table.day tr.head td { border-top: var(--b1z) solid rgba(19,38,59,.3); padding-top: 5px; }
+   rounds' own hairline drawn there: "Make divider a bit more prominent"; of ink at 30%, the tone of a flag's border:
+   "Stronger"; PLAN 79, 91). The four gray words "Accuracy", "Speed", "Energy use" and "Given" stand on one left edge in
+   one lettering, and "Given" read as a fourth label. The line is the table's top, as thick as the hairline between two
+   rounds, in the gray of the card's labels (the color of the word "Given" under it), and "Given" stands in the middle
+   between the two. Day Trip's card alone: Flight stats has no bars over its rows. */
+#daycard table.day tr.head td { border-top: var(--b1z) solid var(--ink-soft); padding-top: 5px; }
 #daycard .parts .lab, #daycard .parts .val { line-height: 19px; height: 19px; }          /* one height for every line: the X of a part not earned comes from another font and made its line 1 px taller */
 #daycard .parts .lab { color: var(--ink-soft); white-space: nowrap; }
 #daycard .parts .bar { display: block; height: 8px; background: var(--paper-shade); }
