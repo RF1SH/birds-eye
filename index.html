@@ -2348,6 +2348,11 @@ html #card.ghost ~ #place { visibility: visible; }
   // Pretoria, it said like one of three capitals in South Africa"; until then a note typed for South Africa and Bolivia
   // alone, Bolivia's "the government sits in La Paz").
   const capNote = (c) => { const n = capsOf(c).length; return n > 1 ? ' (one of ' + (['', '', 'two', 'three'][n] || n) + ' capitals)' : ''; };
+  // A city that is one of its country's capitals (capsOf). A round asks such a city as a CITY, by its name alone, and on
+  // the map it wears the capital's symbol, at the answer as everywhere (the player's pick of 2026-11-20, "Find the city,
+  // star on map", over "Find the capital" and "Never asked": Cape Town in Ranked; Bloemfontein, Bujumbura and Abidjan in
+  // Ranked and in Day Trip's round 5). Seterra's map quizzes do the same: one capital a country, Cape Town among the cities.
+  const capCity = (c, name) => capsOf(c).some((q) => q[0] === name);
   function capList(c) {
     const L = capsOf(c).map((q) => ({ name: q[0], p: unit(q[1], q[2]) }));
     for (const A of L) A.near = L.filter((B) => B !== A).sort((a, b) => dot(b.p, A.p) - dot(a.p, A.p))[0] || null;
@@ -4372,7 +4377,7 @@ html #card.ghost ~ #place { visibility: visible; }
 
   // ---------- Day Trip ----------
   // Five locations a day, the same for everyone: a country by name, a country by its flag, a capital by
-  // name, the capital of a country shown by its flag, and a city that is not a capital, by its name alone.
+  // name, the capital of a country shown by its flag, and a city that no capital round asks, by its name alone.
   // One landing each. Before each location a 3-2-1, then a stopwatch runs until you land. The five climb
   // from easy to hard and are worth 100, 150, 200, 250 and 300: accuracy 8 tenths of the round (always,
   // falling with the distance) and, when the landing is correct, speed a tenth (against a fair time for
@@ -4409,7 +4414,7 @@ html #card.ghost ~ #place { visibility: visible; }
   }
   // (never one of the country's capitals: Cape Town and Bloemfontein, La Paz, Bujumbura and Abidjan are in the data's list as
   // cities, and on the map each is a capital with the capital's symbol: capsOf)
-  const freeCities = (c, lon, lat) => ((FREE[c.id] || [])[Math.max(0, partAt(c, lon, lat) - 1)] || []).filter(([name]) => !capsOf(c).some((q) => q[0] === name)).map(([name, x, y]) => ({ name, lon: x, lat: y }));
+  const freeCities = (c, lon, lat) => ((FREE[c.id] || [])[Math.max(0, partAt(c, lon, lat) - 1)] || []).filter(([name]) => !capCity(c, name)).map(([name, x, y]) => ({ name, lon: x, lat: y }));
   // How hard every location is, for every way it is asked (D.hard, made by tools/build_hard.py from every source of
   // real players' numbers together): [p, x]. p: of 1,000 plays by people who play geography quizzes, how many land
   // it. x: ten times what its round is worth in Ranked, in rounds of 100: 1, and 1 more each time half as many plays
@@ -5045,7 +5050,7 @@ html #card.ghost ~ #place { visibility: visible; }
     const scored = landingScore(T, R, lon, lat, took, used), { right, d, tier, closeness, speed, energy, pts } = scored;
     T.score += pts;
     T.results.push({ kind: R.kind, name: R.name, country: R.c.name, a2: R.c.a2, pop: R.city ? R.city.pop : 0, right, tier, d: Math.round(d * 10) / 10, closeness, speed, energy, used: Math.round(used * 100) / 100, secs: Math.round(took * 10) / 10, pts, p: R.p });
-    Object.assign(T, { wait: true, ready: false, reveal: { from: p, to: R.p, km: countryRound ? 0 : ringKm(R), right, area: countryRound, cap: R.kind === 'capital' || R.kind === 'capflag' } });
+    Object.assign(T, { wait: true, ready: false, reveal: { from: p, to: R.p, km: countryRound ? 0 : ringKm(R), right, area: countryRound, cap: R.kind === 'capital' || R.kind === 'capflag' || (R.kind === 'city' && capCity(R.c, R.name)) } });
     T.results[T.results.length - 1].at = here.name || 'Open ocean';
     Object.assign(T.results[T.results.length - 1], { path: (T.trk || []).concat([[lon, lat, 0]]), from: T.from.slice(), goal: T.goal.slice(), land: [lon, lat] }); T.trk = null;
     // Ranked: a correct landing gives back what the flight cost, up to the cheapest flight and 1 more (ENERGY_BACK: the
@@ -5136,7 +5141,7 @@ html #card.ghost ~ #place { visibility: visible; }
     const named = label(R.c, R.name, at, 'name', GROUND, sub, how);
     named.row = row;
     if (how.on) fx.splice(first, 0, fx.pop());
-    if (countryRound) outlined(named, R.c); else pinSide(named, R.c, R.name, R.p, 'name', sub, (R.kind === 'city' ? 8.5 : 11.5) * view.mk);          // a country asked: its border (a capital's name names the city); a capital or a city: its name where it has room by its pin
+    if (countryRound) outlined(named, R.c); else pinSide(named, R.c, R.name, R.p, 'name', sub, (T.reveal.cap ? 11.5 : 8.5) * view.mk);          // a country asked: its border (a capital's name names the city); a capital or a city: its name where it has room by its pin
     T.after = S.t + Math.max(1.2, (!countryRound ? away : caps.secs === null ? lookAt(R.p) : caps.secs) + 0.3);          // a country asked: the view rests (tripCaps), or goes to the answer and comes back
   }
   // The line from where you came down to the answer, and the circle that counted. A country has neither: anywhere in it
@@ -5149,7 +5154,8 @@ html #card.ghost ~ #place { visibility: visible; }
     if (v.km) reach(v.to, v.km, 1, col);
     arc(v.from, v.to, PAPER, 4 * view.mk); arc(v.from, v.to, INK, 2 * view.mk, [6 * view.mk, 6 * view.mk]);
     const s = project(v.to);
-    // A capital wears the capital's symbol at its spot, as in Study and Free flight; a city, a plain dot. (Until 2026-11-15
+    // A capital wears the capital's symbol at its spot, as in Study and Free flight; a city, a plain dot; a city that is
+    // one of its country's capitals (capCity: Cape Town, asked as a city), the symbol. (Until 2026-11-15
     // a capital had the plain dot too: the first build of Day Trip, never looked at again. The player: "we have the
     // capital symbol there when it's listed on the second line underneath the country, so wanted to be consistent",
     // and of a picture of it: "definitely the symbol on the map".)
