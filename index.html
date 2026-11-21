@@ -3553,9 +3553,9 @@ html #card.ghost ~ #place { visibility: visible; }
     // The bird is small on a high view (BIRD_LEAST): a ring round it, in the bird's paper and ink, says where it stands.
     const small = bb ? a * clamp((0.8 - onMap()) / 0.3, 0, 1) * rimIn(bb) : 0;
     if (small > 0) {
-      const r = Math.max(bb.half, bb.up) + 5 * view.ui;
+      const R = birdRing(g);          // centered on the bird, the energy ring inside it
       ctx.save(); ctx.globalAlpha = small;
-      for (const [ink, wd] of [[INK, 1.5 * view.ui + 2], [PAPER, 1.5 * view.ui]]) { ctx.strokeStyle = ink; ctx.lineWidth = wd; ctx.beginPath(); ctx.arc(bb.x, bb.y, r, 0, 7); ctx.stroke(); }
+      for (const [ink, wd] of [[INK, 1.5 * view.ui + 2], [PAPER, 1.5 * view.ui]]) { ctx.strokeStyle = ink; ctx.lineWidth = wd; ctx.beginPath(); ctx.arc(R.x, R.y, R.r, 0, 7); ctx.stroke(); }
       ctx.restore();
     }
     // what the pointer is on: not the bird. A country that is the answer gets the plate too, and its name steps aside
@@ -6437,6 +6437,17 @@ html #card.ghost ~ #place { visibility: visible; }
     const top = y - r - pad, bottom = y + Math.max(r, ring && 13 * size + ring) + pad;
     return { x: (left + right) / 2, y: (top + bottom) / 2, half: (right - left) / 2, up: (bottom - top) / 2, down: (bottom - top) / 2, bird: true };
   }
+  // The look-around's ring round the small bird. Its middle is the bird's own middle, and it is as wide as it takes to
+  // hold the energy ring (drawn 30 and 13 of the bird's size right of and under the bird: drawBirdAt) with as much bare
+  // map between the two as there was: 6 px of the cards' scale past the energy ring's far edge. (The player, 2026-11-21:
+  // "the ring around the bird should be around the bird, not around the midpoint of the bird and the energy ring,
+  // because it just looks off center. The bird should be in the center." Until then it was drawn round the middle of
+  // birdBox, the room of the bird WITH its energy ring: 2.4 to 5.6 px right of the bird's middle. PLAN, THE WHOLE LIST 96.)
+  function birdRing(g) {
+    const k = onMap(), size = birdSize() * k, ring = S.game === 'free' ? 0 : 11 * Math.max(1, 0.95 * view.ui) * k;
+    const reach = ring ? Math.hypot(30, 13) * size + ring : 26 * size;          // a game with no energy ring: the bird's own room
+    return { x: g[0], y: g[1] - birdLift() * k, r: reach + 6 * view.ui };
+  }
   let seen = 1;         // how much of the bird is drawn: less as its place nears the globe's rim
   // A bird on its way to a later click (glide.fly) is drawn flying: in a low arc along the shortest line, its wings beating,
   // folding as it comes down. (The player, 2026-11-20: "they can still like zoom out, drag, scroll around, and then click on
@@ -7847,7 +7858,7 @@ html #card.ghost ~ #place { visibility: visible; }
   // for the tests: the bird put somewhere by hand. That is no flight, so the view is the bird's own at once (no rest on the last landing's country still being handed back)
   const setBird = (lon, lat, a, down) => { Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down }); S.capFit = null; fitClear(); };
   window.birdsEye = { explore, glide: () => glide, glideP, glideLook, howTo, pair: () => view.pair, homeNote: () => { showTripNote(); showKnown(); measure(); }, stackLines: (id) => { const c = PLAY.find((q) => q.id === id); ownName = true; try { return stackForm(c, c.name, 'name', null).lines; } finally { ownName = false; } }, hoverBox: () => hoverBox, slerp, showLeg, legView, STILL_DEG, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, rankedRounds, easiest, flagClue, capClue, capFlagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
-    outlines: () => fx.filter((f) => f.lined && f.shownA > 0).map((f) => f.lined.id), OUTLINE, pull, pullBy, steerable, PULL_FULL, PULL_RING, hFor, look: () => gaze, looking, canLook, lookStart, lookEnd, lookAnswer, answerNamed: () => answerNamed, answerRoom: () => gazeName, lookK: gazeK, plate: () => plateSays, capLineOf: (id) => capLine(PLAY.find((c) => c.id === id)), plateRoom: (h) => pointerPlate(h, 1, true), hoverNow: () => (hover ? hover.name : null), project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
+    outlines: () => fx.filter((f) => f.lined && f.shownA > 0).map((f) => f.lined.id), OUTLINE, pull, pullBy, steerable, PULL_FULL, PULL_RING, hFor, look: () => gaze, looking, canLook, lookStart, lookEnd, lookAnswer, answerNamed: () => answerNamed, birdRing: () => { const g = project(unit(bird.lon, bird.lat)); return g && birdRing(g); }, answerRoom: () => gazeName, lookK: gazeK, plate: () => plateSays, capLineOf: (id) => capLine(PLAY.find((c) => c.id === id)), plateRoom: (h) => pointerPlate(h, 1, true), hoverNow: () => (hover ? hover.name : null), project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
   if (gl) {
