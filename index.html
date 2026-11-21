@@ -6624,11 +6624,21 @@ html #card.ghost ~ #place { visibility: visible; }
   // there when the farthest point is at most STILL_DEG degrees from the middle (their pick from a picture of three
   // flights, 8,450, 9,988 and 12,230 km: "Left and middle both look fine to me"; the middle one measures 45.4 degrees,
   // so the limit is 46: at 45 the flight they approved would have turned) and the answer's name has its room by the
-  // game's own rule for a name (placeNames): nearer the rim a name finds none. Any other round turns from its start
-  // to its landing, as before.
+  // game's own rule for a name (placeNames): nearer the rim a name finds none.
+  // A round that is NOT all in view, with the line really flown in view, holds still too, on the middle of the flown line
+  // (the player, 2026-11-21, of a Ranked round that asked Tanzania from Sydney and came down in the Indian Ocean, which
+  // turned, beside a longer flight from Panama City to Amsterdam, which held still: "I prefer the one that doesn't play the
+  // animation ... it's a shorter path, it's easier to display on the screen. And, you know, you aren't displaying the
+  // shortest route, you're displaying whatever was flown. So was it confused because the shortest route's actually very
+  // long?" It was: the shortest route's end and the answer were counted, 11,500 km from the start; the flown line alone
+  // measures 32 degrees. Their words of 2026-11-19 name the flight path: counting the answer was the builder's.) The
+  // dotted line then runs on toward an answer that may stand at the rim or behind it, without its name. (Tried the same
+  // day and dropped: the middle moved toward the answer as far as the flown line stays inside the limit. On their round
+  // the answer came from 81 to 65 degrees from the middle and still found no room for its name, and the flight stood at
+  // the limit.) Any other round turns from its start to its landing, as before.
   const STILL_DEG = 46;
-  function legView(L) {
-    const P = [L.from, L.to, L.land, L.ans, ...L.pts.map((q) => q[0])];
+  function legView(L, flown) {
+    const P = flown ? [L.from, L.land, ...L.pts.map((q) => q[0])] : [L.from, L.to, L.land, L.ans, ...L.pts.map((q) => q[0])];
     let c = norm(P.reduce((a, p) => [a[0] + p[0], a[1] + p[1], a[2] + p[2]], [1e-9, 0, 0]));
     for (let i = 1; i <= 300; i++) {          // toward the farthest point, by less each time: the middle of the smallest circle
       let far = P[0], least = 2;
@@ -6647,6 +6657,11 @@ html #card.ghost ~ #place { visibility: visible; }
       settleNames(V.spot);          // the names as they will stand on the still globe
       const a = atlasNames.find((q) => q.i === i);
       if (!a || a.fix !== undefined) { turnTo(V.spot); S.tour = null; return; }
+    } else {
+      const F = legView(L, true);          // the line really flown, alone
+      if (F.far <= STILL_DEG) {
+        settleNames(F.spot); turnTo(F.spot); S.tour = null; return;
+      }
     }
     turnTo(globeSpot(L.from));
     S.tour = { to: globeSpot(L.land), rest: TOUR_REST };
