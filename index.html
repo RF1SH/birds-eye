@@ -497,9 +497,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #daycard .scroll { max-height: calc(100vh / var(--ui, 1) - 260px); overflow-y: auto; margin: 0 -10px 12px; padding: 0 10px; }          /* 10 px each side: the room of a picked row's shade */
 
 
-/* Free flight: what you have landed on. The page and the pause card stand in one spot: while the pause card is up the
-   page is out of sight under it and the map holds still. (Until 2026-11-20 the two stood side by side and the page
-   squeezed the pause card to half its width; a flight that begins with a click on the home globe begins with a page.) */
+/* Free flight: what you have landed on. The page and the card stand in one spot: while a card is up the page is out of
+   sight under it and the map holds still. (Explore has no pause card since 2026-11-20, so this holds only for a card
+   that is on its way out; before that day's first build the two stood side by side and the page squeezed the pause
+   card to half its width.) */
 #card, #place { grid-column: 1; }
 #card:not([hidden]) ~ #place { visibility: hidden; }
 #place { --u: clamp(1px, min(100vw, 160vh) / 1000, 1.75px);
@@ -562,12 +563,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
    background's navy, which cannot be seen on the dark and keeps the words readable over the map when it is zoomed in */
 #skip-note { position: absolute; z-index: 6; zoom: var(--ui, 1); margin: 0; font: 400 14px/1 var(--text); letter-spacing: .02em; color: var(--paper); white-space: nowrap; pointer-events: none;
   text-shadow: 0 0 1px var(--space), 0 0 2px var(--space), 0 0 2px var(--space), 0 0 3px var(--space), 0 0 3px var(--space); }
-#pause { position: absolute; top: 14px; right: 16px; zoom: var(--ui, 1); width: 38px; height: 38px; padding: 0; display: grid; place-items: center; background: var(--paper); color: var(--ink); border: var(--b2z) solid var(--ink); border-radius: 3px; }
-#pause:hover { background: var(--paper-shade); }
-/* Looking around: the button that brings the view back stands beside the pause button, in its look. The cards around the
-   bird (a fun fact, Free flight's card, the Spot on stamp) are away while the view is; the bar at the bottom stays. */
-#tobird { position: absolute; top: 14px; right: 62px; zoom: var(--ui, 1); width: 38px; height: 38px; padding: 0; display: grid; place-items: center; background: var(--paper); color: var(--ink); border: var(--b2z) solid var(--ink); border-radius: 3px; }
-#tobird:hover { background: var(--paper-shade); }
+/* The corner: one row at the top right of every flight, each button paper with an ink edge. The pause button; in Explore,
+   which has no pause, the ?, the sound mark and Home in its place. Looking around: the button that brings the view back
+   stands at the row's left, in the same look. The cards around the bird (a fun fact, Free flight's card, the Spot on
+   stamp) are away while the view is; the bar at the bottom stays. */
+#corner { position: absolute; top: 14px; right: 16px; zoom: var(--ui, 1); display: flex; gap: 8px; }
+#corner button { flex: none; height: 38px; background: var(--paper); color: var(--ink); border: var(--b2z) solid var(--ink); border-radius: 3px; }
+#corner button:hover { background: var(--paper-shade); }
+#pause, #tobird, #corner-how, #corner-sound { width: 38px; padding: 0; display: grid; place-items: center; }
+#corner-how svg, #corner-sound svg { width: 22px; height: 22px; }
+#corner-sound .wave { display: var(--waves, inline); }
+#corner-sound .cross { display: var(--cross, none); }
+#corner-sound.off { --waves: none; --cross: inline; }
+#corner-home { padding: 0 12px; }          /* the word's ink 12 px from the box's top and from its foot */
 #stage.looking #ink { cursor: grab; }
 #stage.looking.dragging #ink { cursor: grabbing; }
 #place { transition: opacity .2s; }
@@ -577,7 +585,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ghost { pointer-events: none !important; }
 html #card.ghost ~ #place { visibility: visible; }
 @keyframes come-in { from { opacity: 0; } to { opacity: 1; } }
-#stage.flying #pause { animation: come-in .5s both; }
+#stage.flying #corner { animation: come-in .5s both; }
 #stage.looking #funfact, #stage.looking #place, #stage.looking #spoton { opacity: 0 !important; pointer-events: none; transition: opacity .2s; }
 #nogl { position: absolute; inset: auto 16px 16px; margin: 0; padding: 12px 14px; background: var(--paper); border: 2px solid var(--ink); border-radius: 3px; }
 /* a round left for another window: the globe is hidden until you are back (the stopwatch runs on) */
@@ -760,8 +768,7 @@ html #card.ghost ~ #place { visibility: visible; }
   <p id="held" hidden>Click to carry on</p>
   <button class="alt" id="skip" type="button" hidden>Skip to the end</button>
   <p id="skip-note" hidden>Click to carry on</p>
-  <button id="pause" type="button" aria-label="Pause (P)" title="Pause (P)" hidden><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M8.5 5v14M15.5 5v14" stroke="currentColor" stroke-width="4" fill="none"/></svg></button>
-  <button id="tobird" type="button" aria-label="Back to the bird" title="Back to the bird" hidden><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 2.5v3.5M12 18v3.5M2.5 12h3.5M18 12h3.5"/></svg></button>
+  <div id="corner"><button id="tobird" type="button" aria-label="Back to the bird" title="Back to the bird" hidden><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 2.5v3.5M12 18v3.5M2.5 12h3.5M18 12h3.5"/></svg></button><button hidden id="corner-how" type="button" aria-label="How to play" title="How to play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></button><button hidden id="corner-sound" type="button" aria-label="Sound on (M)" title="Sound (M)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path class="wave" d="M15.5 9a4.2 4.2 0 0 1 0 6"/><path class="wave" d="M18 6.5a7.7 7.7 0 0 1 0 11"/><path class="cross" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button><button class="alt" id="corner-home" type="button" hidden>Home <kbd>H</kbd></button><button id="pause" type="button" aria-label="Pause (P)" title="Pause (P)" hidden><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M8.5 5v14M15.5 5v14" stroke="currentColor" stroke-width="4" fill="none"/></svg></button></div>
   <p id="nogl" hidden>This browser cannot draw the globe (it needs WebGL 2). A recent Chrome, Edge, Firefox or Safari can.</p>
 </div>
 <div id="how-page" hidden>
@@ -1971,8 +1978,7 @@ html #card.ghost ~ #place { visibility: visible; }
   const CIRCLE_KM = 150;
   const FLASH = 1.2;           // seconds the place you land on stays lit
   const LOOK = 2.4;            // seconds the view pulls back to show where a capital is, or where you are being shown
-  const IDLE_SLEEP = 45;       // seconds on the ground with no key pressed before the bird dozes off...
-  const IDLE_PAUSE = 300;      // ...and before the game pauses itself
+  const IDLE_SLEEP = 45;       // seconds on the ground with no key pressed before the bird dozes off. It sleeps on: nothing pauses on the ground (until 2026-11-20 the game paused itself after 300, "Fast asleep")
 
   const bird = { lon: -20, lat: 20, a: 1, va: 0, vx: 0, vy: 0, h: -0.3, down: false, at: '*', beat: 0, spread: 1, squash: 0 };
   const keys = { left: false, right: false, up: false, down: false, flap: false };
@@ -3381,6 +3387,11 @@ html #card.ghost ~ #place { visibility: visible; }
     placeCamera();
     const at = unproject(x, y);
     O.H = clamp(O.H * Math.exp(e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), view.H0, gazeWhole());
+    // Explore: scrolled out to the whole globe, the home screen is back, the globe turned as the player has it (the player,
+    // 2026-11-20: "after clicking on a country and then scrolling all the way out back to how the globe looked when it was
+    // on the home screen, then it should return to the home screen ... The home screen card should return." PLAN 84). In
+    // the other games the whole globe is the look-around between two locations.
+    if (S.game === 'free' && e.deltaY > 0 && O.H >= gazeWhole() * 0.999) { goHome(true); return; }
     for (let i = 0; i < 3 && at; i++) {          // the place under the pointer stays under it, as on any map, while the pointer is well inside the globe: scrolling out ends on a globe that still faces where you were
       placeCamera();
       if (Math.hypot(x - cam.cx, y - cam.cy) > 0.85 * cam.rho) break;
@@ -3415,7 +3426,7 @@ html #card.ghost ~ #place { visibility: visible; }
   // Drawn over the map while looking around: a ring round the bird, the correct location's name, and what the pointer is on.
   let answerNamed = false;          // for the tests: the correct location's name is painted (it steps aside for the plate)
   function lookDraw() {
-    const a = gazeK();
+    const a = Math.max(gazeK(), glide && glide.kind === 'home' && glide.ring ? 1 - smooth(clamp(glideP() / GLIDE_OUT, 0, 1)) : 0);          // on the way home from a look-around the ring leaves with the corner's buttons
     answerNamed = false; gazeName = null;
     if (a <= 0) return;
     const A = lookAnswer(), g = project(unit(bird.lon, bird.lat)), bb = g && birdBox(g);
@@ -3857,7 +3868,7 @@ html #card.ghost ~ #place { visibility: visible; }
       return n ? [inside / n, wet / n] : [0, 0];
     };
     const bottom = view.h - view.deck;
-    const boxes = (card ? [card] : []).concat([{ x0: view.w - 70 * view.ui, x1: view.w, y0: 0, y1: 66 * view.ui }]);      // the card, and the pause button in the corner
+    const boxes = (card ? [card] : []).concat([{ x0: view.w - 223 * view.ui, x1: view.w, y0: 0, y1: 66 * view.ui }]);      // the card, and the corner's row (the ?, the sound mark, Home: 207 px from the window's edge, and the 16 px a name keeps from it; 70 while the corner held the pause button alone)
     const hit = (b, M) => b.x0 < M || b.y0 < M || b.x1 > view.w - M || b.y1 > bottom - M || boxes.some((o) => b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0);
     // the sizes: the capital's name 1.1 of Free flight's own name size, a city's 0.8, the names round about 0.62 (47, 34 and
     // 27 px on a 1913 px screen; until 2026-11-15 the capital 1.25 and a city 1: ten names of that size found no room)
@@ -4458,12 +4469,15 @@ html #card.ghost ~ #place { visibility: visible; }
   let steerHeld = 0;
   // Press and pull steers when a flight can go on: not while the view is away from the bird, not between two rounds
   // (what gates the flap, less the energy). Then the ring is drawn too; a ring that steers nothing is not shown. A
-  // pause ends a pull (setPaused), and on a pause a press plants no ring.
+  // pause ends a pull (setPaused), and on a pause a press plants no ring. With the bird on the ground a press steers
+  // nothing and shows nothing (the player, 2026-11-20: "when you're grounded, the press and pull feature to navigate,
+  // like it still shows up on the screen ... it should only really trigger when you're in the air"); the ring is there
+  // once the bird leaves the ground with the button still down, so a press a moment before the lift is not lost. PLAN 88.
   const steerable = () => S.mode === 'fly' && !gaze && !S.look && S.blend >= 1 && !(S.trip && S.trip.wait && !lessonFlies(S.trip));
   // The pull as the keys' steering is: [east, north], up to 1 long. It has no slow start, as a tap of a key has: the
   // pull is as long as the hand makes it (flown so by the player on the trial page).
   function pullBy() {
-    if (!pull.at || !steerable()) return [0, 0];
+    if (!pull.at || bird.down || !steerable()) return [0, 0];
     const dx = pull.x - pull.at[0], dy = pull.y - pull.at[1], d = Math.hypot(dx, dy), r0 = PULL_RING * view.mk;
     const k = clamp((d - r0) / Math.max(1, PULL_FULL * view.ref - r0), 0, 1);
     return d > 0 && k > 0 ? [(dx / d) * k, (-dy / d) * k] : [0, 0];
@@ -5662,17 +5676,19 @@ html #card.ghost ~ #place { visibility: visible; }
     takeOff(S.game);
   }
   // Back to the title: the globe stays where you were and starts turning again.
-  function goHome() {
+  function goHome(keep) {          // keep (true): the globe stays turned as the player has it (Explore scrolled out to the whole globe)
     if (S.mode === 'title') return;
+    keep = keep === true;
+    const wasLook = looking(), oldCorner = S.mode === 'fly' ? ghost($('corner')) : null;          // the corner's buttons fade out on the way, as the card does
     // From a flight the view goes home in one move, a click's move backwards (glide): where the bird stood glides to its
     // spot on the home globe, the pause card and what the landing put on the map fade out, the home card comes in after.
     // (As first built the card was back in one frame and the globe slid 293 px for 1.3 s.)
     placeCamera();
-    const was = { n: cam.n.slice(), H: cam.H, cx: cam.cx, cy: cam.cy, F: view.F }, wasFly = S.mode === 'fly', wasAt = glide && glide.fly ? glideBird() : unit(bird.lon, bird.lat);
-    const wasK = wasFly && S.game === 'free' && bird.down ? onMap() : 0, wasA = wasK ? S.around : null, old = wasFly ? ghost($('card')) : null;
+    const was = { n: cam.n.slice(), H: cam.H, cx: cam.cx, cy: cam.cy, F: view.F }, wasFly = S.mode === 'fly', wasAt = keep ? cam.n.slice() : glide && glide.fly ? glideBird() : unit(bird.lon, bird.lat);
+    const wasK = wasFly && S.game === 'free' && bird.down ? onMap() : 0, wasA = wasK && !wasLook ? S.around : null, old = wasFly ? ghost($('card')) : null;          // from a look-around the landing's names are away already: they do not come back on the way
     glide = null;
     abandon(true);
-    const from = S.mode === 'fly' ? [bird.lon, bird.lat] : [atlas.lon, atlas.lat];
+    const from = keep ? lonLat(was.n) : S.mode === 'fly' ? [bird.lon, bird.lat] : [atlas.lon, atlas.lat];
     S.mode = 'title'; S.paused = false; S.look = null; atlas.zoom = 1;
     lookEnd(true);
     S.route = null; S.legs = null; S.replay = null;           // the flight path ends with its results screen
@@ -5694,9 +5710,10 @@ html #card.ghost ~ #place { visibility: visible; }
     if (wasFly) {
       atlas.lat = clamp(atlas.lat, -45, 60); atlas.to = null; atlas.k = 1; S.blend = 0; slid = 0;
       const to = { n: unit(atlas.lon, atlas.lat), H: view.Htitle, cx: view.tx, cy: view.ty };
-      const G = glideStart('home', was, to, wasAt, { k0: wasK, k1: Math.min(1, view.H0 / view.Htitle), A0: wasA });
+      const G = glideStart('home', was, to, wasAt, { k0: wasK, k1: Math.min(1, view.H0 / view.Htitle), A0: wasA, ring: wasLook });
       atlas.idle = -G.T;          // the globe's rest begins when the view is home
       ghostFade(old, $('card'), GLIDE_OUT * G.T);
+      ghostFade(oldCorner, $('corner'), GLIDE_OUT * G.T);
       const cd = $('card');
       cd.style.animation = 'come-in ' + ((1 - GLIDE_OUT) * G.T).toFixed(2) + 's ' + (GLIDE_OUT * G.T).toFixed(2) + 's both';
       clearTimeout(cardIn); cardIn = setTimeout(() => { cd.style.animation = ''; }, G.T * 1000 + 60);
@@ -5709,12 +5726,22 @@ html #card.ghost ~ #place { visibility: visible; }
   const inRound = () => S.mode === 'fly' && S.game === 'trip' && !!S.trip && !S.trip.wait;
   // Looking away in a round (another window, another tab) cannot be stopped, so the bird is held where it is and
   // the globe is hidden, but the stopwatch keeps counting: on coming back the time away is added to the round.
+  // Outside a round the game stops itself only while the bird is in the air. ON THE GROUND THE GAME IS A MAP, AND A MAP
+  // DOES NOT PAUSE: nothing runs while the bird is down, so a window left changes nothing and a window come back to is as
+  // it was left, in every game; and the game no longer pauses itself after five minutes asleep. (The player, 2026-11-20:
+  // "I'll click away onto a different screen and then I'll click back on it and I'm just expecting it to resume, but it
+  // doesn't. I need to click carry on. So I just wish that it would automatically resume"; "when the bird is grounded,
+  // then, and you click away, I really don't think you need a pause screen, like in any mode, really ... Maybe when
+  // you're flying, that's fine.") A window left with the bird in the air: in Study the pause card, as it was (a
+  // landing counts there: the bird waits for Carry on; their pick by button, "Paused", over "Flies on by itself"); in
+  // Explore, which has no pause, the bird waits in the air with the map in view and flies on when the window is back
+  // (hold(true)). PLAN 85, 87.
   let heldAt = 0;
-  function hold() {
-    if (heldAt || !inRound()) return;
+  function hold(soft) {          // soft: no round: the bird only waits, nothing is hidden
+    if (heldAt || !(soft || inRound())) return;
     heldAt = performance.now();
     keys.left = keys.right = keys.up = keys.down = keys.flap = false; pull.at = null;
-    stage.classList.add('held'); $('held').hidden = false;
+    if (!soft) { stage.classList.add('held'); $('held').hidden = false; }
   }
   function release() {
     if (!heldAt) return;
@@ -5723,11 +5750,14 @@ html #card.ghost ~ #place { visibility: visible; }
     stage.classList.remove('held'); $('held').hidden = true;
   }
   const keptOnHome = () => (S.game === 'study' ? S.n > 0 : S.game === 'trip' && !!S.trip && !S.trip.tutor && (!S.trip.endless || (S.trip.results.length > 0 && tripMore(S.trip))));
-  function setPaused(on, asleep) {
+  // The pause card comes by hand (the corner's button, P, Esc) and for a Study flight left for another window with the
+  // bird in the air. Explore has none: it is a map, and its corner holds what its pause card held (the player,
+  // 2026-11-20: "Do you even need a pause screen? ... it's not like a dynamic game. It's more just like Google Maps, and
+  // Google Maps doesn't really pause").
+  function setPaused(on) {
     if (S.mode !== 'fly' || S.paused === on) return;
-    if (on && inRound()) return;
+    if (on && (inRound() || S.game === 'free')) return;
     S.paused = on;
-    $('pause-head').textContent = asleep ? 'Fast asleep' : 'Paused';
     // Restart is Ranked's alone. A Day Trip cannot be started again (one a day). Study and Free flight have none (the
     // player, 2026-11-13: "we should get rid of the restart button on study mode. Also get rid of the restart button on
     // free flight and just have, for study mode, just have the end game button and the home button and the carry on
@@ -5747,17 +5777,17 @@ html #card.ghost ~ #place { visibility: visible; }
     $('card-pause').hidden = !on;
     $('card').hidden = !on;
     if (on) $('resume').focus({ preventScroll: true });
-    // Paused by hand: no fun fact, unless the pause screen then sits untouched as long as it takes the
-    // bird to fall asleep. Paused for being idle: the fact stays, moved to the bird's right, clear of the card.
+    // Paused: no fun fact, unless the pause screen then sits untouched as long as it takes the bird to fall asleep
+    // (the player, 2026-11-11: "you don't need a fun fact at the user-inputted pause screen.. just if idle for a while
+    // while on pause screen").
     clearTimeout(pauseFactTimer);
     // A landing's fact stands where the pause card does: it goes while the card is up and is back when the flight
     // carries on. Asleep there, the sleeping bird's postcard takes its place (the same fact, clear of the card).
     if (on && landFact) $('funfact').hidden = true;
-    if (on && !asleep) {
+    if (on) {
       hideSleepFact();
       if (S.game === 'study' && bird.down) pauseFactTimer = setTimeout(() => { if (S.paused) showSleepFact(); }, IDLE_SLEEP * 1000);
-    } else if (on && (landFact || sleepBare)) { hideSleepFact(); showSleepFact(); }
-    else placeSleepFact();
+    } else placeSleepFact();
     if (!on && landFact) { hideSleepFact(); putLandFact(); }
     if (!on) { S.idle = 0; stage.focus({ preventScroll: true }); }
   }
@@ -5821,14 +5851,13 @@ html #card.ghost ~ #place { visibility: visible; }
 
     stepLook(dt);
 
-    // A bird left alone on the ground dozes off, and after a few minutes the game pauses itself.
+    // A bird left alone on the ground dozes off.
     S.idle += dt;
     if (keys.left || keys.right || keys.up || keys.down || keys.flap || pull.at) S.idle = 0;
     // not in Free flight (its card already has the facts) or Challenge (a clock is running)
     if (landFact && !bird.down) hideFunFact();          // a landing's fact goes at take-off
     if (bird.down && S.idle > IDLE_SLEEP + 1 && S.game === 'study') { if (!sleepFact && !landFact) showSleepFact(); } else hideSleepFact();
     stepSleepRest();
-    if (S.idle > IDLE_PAUSE) { setPaused(true, true); return; }
 
     // Flapping is the only thing that costs energy. With none left, you can only glide down.
     // No flying until the view has come down on the bird (S.blend), in any mode.
@@ -7014,6 +7043,7 @@ html #card.ghost ~ #place { visibility: visible; }
     for (const f of fx) if (f.top) f.draw(Math.min(1, f.t / f.secs));
     veiled(false);
     if (S.mode === 'fly') { drawRouteKm(); drawHud(); lookDraw(); }
+    else if (glide && glide.kind === 'home' && glide.ring) lookDraw();
   }
   // Free flight: the name (and flag) of what is under the bird's shadow, just below it.
   let below = null;
@@ -7024,7 +7054,7 @@ html #card.ghost ~ #place { visibility: visible; }
   // on every country color and over a name. Drawn over everything round the bird. The eye under the bird is the
   // game's own and is not touched ("I want the shadow underneath the birds to still look like an eye").
   function drawPull() {
-    if (!pull.at || !steerable()) return;
+    if (!pull.at || bird.down || !steerable()) return;
     const u = view.mk, c = pull.at, ring = PULL_RING * u, dx = pull.x - c[0], dy = pull.y - c[1], d = Math.hypot(dx, dy) || 1;
     const ax = dx / d, ay = dy / d, len = Math.min(d, PULL_FULL * view.ref) - ring - 3 * u;
     ctx.save();
@@ -7059,10 +7089,12 @@ html #card.ghost ~ #place { visibility: visible; }
   function frame(now) {
     const ms = now - before, dt = Math.min(0.05, ms / 1000);
     before = now;
-    if (!S.paused && !heldAt) step(dt);
+    const exploring = S.mode === 'fly' && S.game === 'free';
+    if (!S.paused && !heldAt && !(exploring && (faqOn || howOn))) step(dt);          // a sheet over Explore: the flight waits under it
     lookTick(dt);
-    const canPause = S.mode === 'fly' && !S.paused && !inRound();      // the pause button: there whenever pausing is allowed
+    const canPause = S.mode === 'fly' && !S.paused && !inRound() && !exploring;      // the pause button: there whenever pausing is allowed
     if (pauseBtn.hidden === canPause) pauseBtn.hidden = !canPause;
+    if (cornerHome.hidden === exploring) cornerHome.hidden = cornerHow.hidden = cornerSound.hidden = !exploring;          // Explore's corner: what its pause card held, with no pause between
     if (heldAt && S.trip) showClock(S.t - S.trip.t0 + (now - heldAt) / 1000);       // held: the stopwatch is seen to run on
     if (run.draw) draw();
     slow = ms > 40 ? slow + 1 : Math.max(0, slow - 2);
@@ -7085,7 +7117,8 @@ html #card.ghost ~ #place { visibility: visible; }
     release();                // a key means you are back
     S.idle = 0;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-    if ((k === 'r' || k === 'h') && !e.repeat && (S.paused || S.mode === 'over')) {
+    const exploring = S.mode === 'fly' && S.game === 'free';
+    if ((k === 'r' || k === 'h') && !e.repeat && (S.paused || S.mode === 'over' || (k === 'h' && exploring))) {
       if (k === 'h') goHome(); else if (!S.paused) start(); else if (!$('restart').hidden) restart();          // R restarts only where the pause card offers it
       e.preventDefault();
       return;
@@ -7103,7 +7136,7 @@ html #card.ghost ~ #place { visibility: visible; }
       if (S.mode === 'fly' && !S.paused) keys.flap = true; else if (!e.repeat) start();
     }
     else if (k === 'Enter') { if (e.target instanceof HTMLButtonElement) return; if (!e.repeat) start(); }
-    else if (k === 'p' || k === 'Escape') { if (!e.repeat) setPaused(!S.paused); }
+    else if (k === 'p' || k === 'Escape') { if (!e.repeat) { if (k === 'Escape' && exploring) goHome(); else setPaused(!S.paused); } }          // Explore has no pause: Esc is its way home
     else if (k === 'm') { if (!e.repeat) toggleSound(); return; }
     else return;
     e.preventDefault();
@@ -7116,13 +7149,27 @@ html #card.ghost ~ #place { visibility: visible; }
     if (k === 'ArrowDown' || k === 's') keys.down = false;
     if (k === ' ') keys.flap = false;
   });
-  const away = () => { pull.at = null; if (inRound()) hold(); else setPaused(true); };
+  // The window left (another window, another tab). The keys are let go: a key's release is not heard from there.
+  const away = () => {
+    pull.at = null;
+    keys.left = keys.right = keys.up = keys.down = keys.flap = false;
+    if (inRound()) hold();
+    else if (S.mode === 'fly' && !S.paused && !bird.down) { if (S.game === 'free') hold(true); else setPaused(true); }          // only a bird in the air waits
+  };
   window.addEventListener('blur', away);
+  window.addEventListener('focus', () => { backAt = performance.now(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) away(); else if (document.hasFocus()) release(); });
   window.addEventListener('focus', release);
 
-  const pauseBtn = $('pause');
+  // The corner, one row at the top right of every flight: the pause button in Study, Day Trip and Ranked; in Explore the
+  // ?, the sound mark and Home (the player's pick by button, 2026-11-20, from a trial page: "?, sound, Home", over "Home"
+  // alone: everything Explore's pause card had, minus the pause); left of them, while looking around, the way back to
+  // the bird. H and Esc are Home in Explore. PLAN 85.
+  const pauseBtn = $('pause'), cornerHome = $('corner-home'), cornerHow = $('corner-how'), cornerSound = $('corner-sound');
   pauseBtn.addEventListener('click', () => setPaused(true));
+  cornerHome.addEventListener('click', () => goHome());
+  cornerHow.addEventListener('click', () => howTo(true, cornerHow));
+  cornerSound.addEventListener('click', () => toggleSound());
   toBird.addEventListener('click', () => { lookEnd(); toBird.blur(); stage.focus({ preventScroll: true }); });          // so Space still goes on
   $('go').addEventListener('click', () => takeOff('study'));
   // Study's choices of what and where: one line on the home card says what is picked, in a box with an arrow. A click
@@ -7443,7 +7490,8 @@ html #card.ghost ~ #place { visibility: visible; }
   // On the title and results screens: drag to turn the globe, and point at a place for its name.
   const drag = { on: false, x: 0, y: 0 };
   inkCanvas.addEventListener('pointerdown', (e) => {
-    flyPress = S.mode === 'fly' && e.button === 0 ? [e.clientX, e.clientY, performance.now()] : null;
+    const back = performance.now() - backAt < 300;
+    flyPress = S.mode === 'fly' && e.button === 0 && !back ? [e.clientX, e.clientY, performance.now()] : null;
     if (S.mode === 'fly' && looking()) {          // looking around: the drag turns the globe
       if (e.button !== 0 || S.paused) return;
       drag.on = true; drag.x = e.clientX; drag.y = e.clientY; S.idle = 0; hover = null;
@@ -7462,7 +7510,7 @@ html #card.ghost ~ #place { visibility: visible; }
       return;
     }
     drag.on = true; drag.x = e.clientX; drag.y = e.clientY;
-    homePress = S.mode === 'title' && e.button === 0 ? [e.clientX, e.clientY] : null;
+    homePress = S.mode === 'title' && e.button === 0 && !back ? [e.clientX, e.clientY] : null;
     if (!holdGlobe([e.clientX, e.clientY])) { atlas.to = null; atlas.secs = 0; S.tour = null; atlas.back = null; if (S.replay) S.replay.free = true; }          // turning a globe by hand ends a turn it was making, unless it is an end globe's (it pauses)
     atlas.idle = 0;
     stage.classList.add('dragging');
@@ -7518,7 +7566,7 @@ html #card.ghost ~ #place { visibility: visible; }
   // The wheel, or a pinch on a trackpad, zooms the title globe and a results globe toward the pointer, as on any map:
   // the place under the pointer stays under it. As near as the lowest view of a flight, as far as the whole globe.
   // (The player: "Should be able to zoom in on the Home Screen?")
-  inkCanvas.addEventListener('wheel', (e) => {
+  const onWheel = (e) => {
     if (S.mode === 'fly') { lookWheel(e); return; }          // in a flight: looking around, once the bird is down
     e.preventDefault();
     const box = stage.getBoundingClientRect(), x = e.clientX - box.left, y = e.clientY - box.top, at = unproject(x, y);
@@ -7534,7 +7582,11 @@ html #card.ghost ~ #place { visibility: visible; }
       atlas.lat = clamp(atlas.lat + (y - s[1]) * k, -60, 75);
       atlas.lon = wrapLon(atlas.lon - ((x - s[0]) * k) / Math.max(0.2, Math.cos(atlas.lat * RAD)));
     }
-  }, { passive: false });
+  };
+  inkCanvas.addEventListener('wheel', onWheel, { passive: false });
+  // The wheel over a corner button is the map's too: the button that brings the view back comes up under a pointer that
+  // rests in that corner, and until 2026-11-20 scrolling stopped there (scrolling out to the home screen would stall).
+  $('corner').addEventListener('wheel', (e) => { if (S.mode === 'fly') onWheel(e); }, { passive: false });
   // A click on a location (not a drag), on the home globe or once the bird is down in the flight a click began: the view
   // glides to the location's resting view (glide) and its page opens on the same clock, as a landing opens it. After a
   // click on the home globe the bird stands on the clicked spot from the first frame, at the map's own scale; after a
@@ -7544,7 +7596,9 @@ html #card.ghost ~ #place { visibility: visible; }
   // and no tab or line for Free flight: "It can almost even be like an Easter egg"; of a later click: "if they click
   // on one after, then maybe the bird like automatically flies there". PLAN 75, 76, 78, 82.) Not from a first visit's
   // card: its choice comes first, and the click belongs to the home page ("On the home page, click any location").
-  let homePress = null, flyPress = null;
+  // The press that brings the window back does nothing else: it is no click on a location (with nothing pausing on the
+  // ground, that press would send the bird off, or open a country from the home globe).
+  let homePress = null, flyPress = null, backAt = -1e9;
   function explore(lon, lat) {
     const first = !(S.mode === 'fly' && S.game === 'free' && bird.down);
     placeCamera();
@@ -7591,7 +7645,7 @@ html #card.ghost ~ #place { visibility: visible; }
     showSound();
     persist();
   }
-  function showSound() { soundBtn.classList.toggle('off', !save.sound); soundBtn.setAttribute('aria-label', (save.sound ? 'Sound on' : 'Sound off') + ' (M)'); }
+  function showSound() { for (const b of [soundBtn, $('corner-sound')]) { b.classList.toggle('off', !save.sound); b.setAttribute('aria-label', (save.sound ? 'Sound on' : 'Sound off') + ' (M)'); } }          // the card's mark and the one in Explore's corner
   showSound();
   soundBtn.addEventListener('click', toggleSound);
   // The sound mark's seat: in the title card's row; on a card with no title (How to play, the pause card) at the
