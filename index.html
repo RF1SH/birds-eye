@@ -2320,6 +2320,52 @@ html #card.ghost ~ #place { visibility: visible; }
   // a picture of "Moscow": "why is there a weird gap between the capital symbol and its name label?"; from a picture
   // of 24, 9 and 6 px, by button: "9 px". PLAN 126.)
   const CAP_RIM = 10.4, CAP_GAP = 6;
+  // A COUNTRY WITH MORE THAN ONE CAPITAL (otherCaps in data/corrections.json: South Africa's three, Bolivia, Benin, Burundi,
+  // Eswatini, Ivory Coast, Sri Lanka). Wherever the map shows a country's capital it shows every one of them, each with the
+  // capital's symbol and its name in the same lettering (the player, 2026-11-20, of a landing in South Africa that showed
+  // Pretoria alone: "if it's only one of three capitals, it should show the others too"). capsOf: [name, lon, lat] of each,
+  // the one the game asks by its name first. capList: the same as marks for the map, { name, p }, each knowing its nearest
+  // other capital (near).
+  const capsOf = (c) => (c && c.cap ? [c.cap].concat(c.otherCaps || []) : []);
+  function capList(c) {
+    const L = capsOf(c).map((q) => ({ name: q[0], p: unit(q[1], q[2]) }));
+    for (const A of L) A.near = L.filter((B) => B !== A).sort((a, b) => dot(b.p, A.p) - dot(a.p, A.p))[0] || null;
+    return L;
+  }
+  // Where a capital's symbol stands on the screen. Two capitals closer together than one symbol is wide (Porto-Novo and
+  // Cotonou are 14 km apart, 13 px at a landing's rest; Sri Jayawardenepura Kotte and Colombo 11 km) stand side by side, as
+  // an atlas draws them: each moved the same way along the line between the two until CAP_CLEAR px of map show between their
+  // rims. Farther apart, each stands on its own spot.
+  const CAP_CLEAR = CAP_GAP;          // the same bare map as between a symbol's rim and its name
+  function capSpot(A) {
+    const s = project(A.p), t = s && A.near ? project(A.near.p) : null;
+    if (!t) return s;
+    const need = (2 * CAP_RIM + CAP_CLEAR) * view.mk;
+    let dx = s[0] - t[0], dy = s[1] - t[1], d = Math.hypot(dx, dy);
+    if (d >= need) return s;
+    if (d < 0.01) { dx = 1; dy = 0; d = 1; }
+    return [s[0] + dx * (need - d) / 2 / d, s[1] + dy * (need - d) / 2 / d];
+  }
+  // Whose name is whose, where two capitals stand side by side (capSpot): the upper symbol's name stands over it and the lower
+  // symbol's name under it, each on its own symbol's far side from the other. true: under; false: over; null: the two
+  // are apart, and the name takes its side as any capital's does (under its symbol when the bird is above the symbol).
+  function capSide(A) {
+    const s = project(A.p), t = s && A.near ? project(A.near.p) : null;
+    if (!t || Math.hypot(s[0] - t[0], s[1] - t[1]) >= (2 * CAP_RIM + CAP_CLEAR) * view.mk) return null;
+    return s[1] !== t[1] ? s[1] > t[1] : s[0] > t[0];
+  }
+  // A capital beside another keeps its name on its own side of the pair (capSide), also where the bird stands on that side.
+  // The name then slides sideways along the symbol, the shorter way, clear of the bird, and no farther than where it still
+  // stands over (or under) its own symbol; with no such room it moves off the bird as any name does (settle). Found on the
+  // trial page, 2026-11-20: a landing north-east of Colombo sent "Colombo" 100 px up over the bird, with a line back to
+  // its symbol. x, y: the name's middle as it would stand; bb: the bird's box. -> x
+  function capSlide(x, y, box, bb) {
+    const lim = box.half - CAP_RIM * view.mk;
+    if (!bb || lim <= 0 || Math.abs(x - bb.x) >= box.half + bb.half || y - box.up >= bb.y + bb.down || y + box.down <= bb.y - bb.up) return x;
+    const left = bb.x - bb.half - box.half - 1 - x, right = bb.x + bb.half + box.half + 1 - x, d = Math.abs(left) <= Math.abs(right) ? left : right, e = d === left ? right : left;
+    return Math.abs(d) <= lim ? x + d : Math.abs(e) <= lim ? x + e : x;
+  }
+  const capsNow = () => [S.capAt, S.capAlso].concat(S.capMore || []).filter((A) => A && A.name);          // every capital a landing shows now (markCapital)
   // A country's own name. Inside the country when it has room there: the name and flag take less than a third of the
   // country as drawn and lie in it. Else beside it, clear of its shape, with no line to it (PLAN 127): above it, below
   // it or at a side, whichever covers least of it, then least of other land (over the sea, as an atlas does), clear of
@@ -2467,18 +2513,19 @@ html #card.ghost ~ #place { visibility: visible; }
   // besideBird). A change to which side a capital's name takes is a change here too. caps: [{ name, p }]; me: the
   // bird's place on the screen.
   function capMarks(caps, me) {
-    const up = [birdBox(me)], was = ownName, r = 11.5 * view.mk, at = caps.map((A) => project(A.p));
+    const up = [birdBox(me)], was = ownName, r = 11.5 * view.mk, at = caps.map(capSpot);
     for (const q of at) if (q) up.push({ x: q[0], y: q[1], half: r, up: r, down: r });
     ownName = true;
     try {
       caps.forEach((A, i) => {
         const q = at[i];
         if (!q) return;
-        const box = plateBox(null, A.name, 'cap', null), below = me[1] < q[1], off = (CAP_RIM + CAP_GAP) * view.mk + 1.75 * nameUp();
+        const side = capSide(A), box = plateBox(null, A.name, 'cap', null), below = side === null ? me[1] < q[1] : side, off = (CAP_RIM + CAP_GAP) * view.mk + 1.75 * nameUp();
         if (below) box.down = Math.max(box.down, box.px * 0.8); else box.up = Math.max(box.up, box.px * 0.8);
-        const x = q[0] + clamp(clamp(q[0], 4 + box.half, view.w - box.half - 4) - q[0], -box.half, box.half);
+        const y0 = below ? q[1] + off + box.over : q[1] - off - box.under, x0 = q[0] + clamp(clamp(q[0], 4 + box.half, view.w - box.half - 4) - q[0], -box.half, box.half);
+        const x = side === null ? x0 : capSlide(x0, y0, box, up[0]);          // beside another capital: along its own side, clear of the bird
         const frame = placed.splice(0, placed.length, ...up);          // what a frame has placed before the capital's name: the bird and the symbols
-        const y = settle(x, below ? q[1] + off + box.over : q[1] - off - box.under, box, q[0], q[1], 0, true, true);
+        const y = settle(x, y0, box, q[0], q[1], 0, true, true);
         placed.splice(0, placed.length, ...frame);
         up.push({ x, y, half: box.half, up: box.up, down: box.down });
       });
@@ -2528,7 +2575,7 @@ html #card.ghost ~ #place { visibility: visible; }
     let F, up;
     const was = ownName;
     ownName = live ? was : true;
-    try { F = stackForm(c, str, cls, sub); up = live || capMarks(o && o.caps ? o.caps : capShown(c) ? [{ name: c.cap[0], p: unit(c.cap[1], c.cap[2]) }] : [], me); } finally { ownName = was; }
+    try { F = stackForm(c, str, cls, sub); up = live || capMarks(o && o.caps ? o.caps : capShown(c) ? capList(c) : [], me); } finally { ownName = was; }
     // as far as it fits, it can reach off the country: never onto the dot of a country drawn as one (it would read as that country's name)
     if (loose) for (const t of TINY) { const q = project(unit(t.lx, t.ly)), r = Math.max(DOT_KM / R_KM * cam.pxRad, 14 * view.mk); if (q) up.push({ x: q[0], y: q[1], half: r, up: r, down: r }); }
     if (o && o.keep) up.push(...o.keep);          // room kept free for another name (the name of where you came down, by the bird: tripLand)
@@ -2755,7 +2802,7 @@ html #card.ghost ~ #place { visibility: visible; }
   function farSpot(r, bb, box, c, asked, q, own) {
     const under = r[1] + UNDER_GAP * view.mk + box.up, over = Math.min(bb.y - bb.up, r[1] - birdLift() - ZZZ_TOP) - box.down - 1;
     const fits = (yy) => yy - box.rise >= 0 && yy + box.drop <= view.h - view.deck;
-    const marks = capMarks([S.capAt, S.capAlso].filter((M) => M && M.name), r).concat(own ? [own] : []);
+    const marks = capMarks(capsNow(), r).concat(own ? [own] : []);
     const x0 = r[0] + clamp(clamp(r[0], 4 + box.half, view.w - box.half - 4) - r[0], -box.half, box.half);
     const clearAt = (xx, yy) => xx - box.half >= 4 && xx + box.half <= view.w - 4 && fits(yy) && !marks.some((b) => !b.bird && Math.abs(b.x - xx) < b.half + box.half && yy - box.up < b.y + b.down && yy + box.down > b.y - b.up) && nameCover(asked, box, xx, yy)[0] <= 3;
     const dq = Math.hypot(r[0] - q[0], r[1] - q[1]) || 1, da = own ? Math.hypot(own.x - r[0], own.y - r[1]) || 1 : 1;
@@ -2844,8 +2891,8 @@ html #card.ghost ~ #place { visibility: visible; }
       // Above the bird only when that spot is clear of the symbol and of every other named place's own mark (shown the
       // way to San Marino, then a landing north of Rome: above the bird Italy's flag would stand on San Marino's dot);
       // otherwise the name stays under the bird and moves off the symbol as names move off one another (settle).
-      for (const A of [S.capAt, S.capAlso]) if (A && S.mode === 'fly' && bird.down) {
-        const q = project(A.p);
+      for (const A of capsNow()) if (S.mode === 'fly' && bird.down) {
+        const q = capSpot(A);
         if (q) {
           const k = S.capFit ? cam.H / S.capFit.fit.H : 1, at = [s[0] + (q[0] - s[0]) * k, s[1] + (q[1] - s[1]) * k], pad = 14 * view.mk;
           const covers = (yy, m) => Math.abs(m[0] - x) < box.half + pad && m[1] > yy - box.up - pad && m[1] < yy + box.down + pad;
@@ -2894,7 +2941,7 @@ html #card.ghost ~ #place { visibility: visible; }
   const BESIDE_GAP = 8;
   const besideAt = (bb, box, dir) => [bb.x + dir * (bb.half + BESIDE_GAP * view.mk + box.half), clamp(bb.y + (box.rise - box.drop) / 2, 4 + box.rise, view.h - view.deck - 4 - box.drop)];
   function besideBird(r, bb, box, y, c, want, slide, marks) {          // want: the side asked for (underY), whatever room there is under and over the bird; slide: that far down along the bird; marks: what stands, when the caller has worked it out
-    const up = marks || capMarks([S.capAt, S.capAlso].filter((A) => A && A.name), r), x0 = r[0] + clamp(clamp(r[0], 4 + box.half, view.w - box.half - 4) - r[0], -box.half, box.half);
+    const up = marks || capMarks(capsNow(), r), x0 = r[0] + clamp(clamp(r[0], 4 + box.half, view.w - box.half - 4) - r[0], -box.half, box.half);
     if (!marks && S.capFit && S.capFit.own) up.push(S.capFit.own);          // Day Trip and Ranked: the answer's flag and name on its country (tripLand): the name by the bird keeps off them
     if (!want) {
       const frame = placed.splice(0, placed.length, ...up), at = settle(x0, y, box, r[0], r[1], 0, true, true);
@@ -2917,8 +2964,8 @@ html #card.ghost ~ #place { visibility: visible; }
   // A name pinned to a place on the globe; it follows the globe as it turns and hides round the back.
   // With secs = GROUND it stays while the bird is on the ground, and fades once it takes off.
   // With `until`, it stays for as long as that holds (the place you were shown, until its postcard is delivered).
-  function label(c, str, p, cls, secs, sub, dy, until) {
-    const hold = secs === GROUND || !!until, seek = dy === ONIT;
+  function label(c, str, p, cls, secs, sub, dy, until) {          // p: a spot on the globe, or a function that says where on the screen it is now (a capital beside another: capSpot)
+    const hold = secs === GROUND || !!until, seek = dy === ONIT, spot0 = typeof p === 'function' ? p : () => project(p);
     let below = false;        // by a pin: under it, when the bird is above it. Chosen while the bird is on the ground.
     const f = animate(hold ? 1e9 : secs, (k) => { ownName = secs === GROUND; try { paint(k); } finally { ownName = false; } }, true);
     function paint(k) {
@@ -2929,7 +2976,7 @@ html #card.ghost ~ #place { visibility: visible; }
         alpha = f.lift === undefined ? 1 : clamp(1 - (f.t - f.lift) / 0.35, 0, 1);
         if (f.lift !== undefined && f.t > f.lift + 0.35) { f.secs = 0; return; }
       }
-      const s = project(p);
+      const s = spot0();
       if (!s) return;
       if (seek) dy = liveSpot(f, c, str, cls, sub, s) || AREA;          // found again for the view as it is
       if (dy && dy.on) {          // the flag over the name at its own spot on the country (stackSpot): it stands on the map, nothing moves it
@@ -2946,12 +2993,13 @@ html #card.ghost ~ #place { visibility: visible; }
       }
       const box = plateBox(c, str, cls, sub), spot = dy === AREA ? areaSpot(f, c, s, box) : f.pin || null, sx = s[0] + (spot ? spot[0] : 0), slideX = (lo) => sx + clamp(clamp(sx, lo + box.half, view.w - box.half - 4) - sx, -box.half, box.half);
       let x = slideX(4);
-      if (dy === OVER && bird.down) { const me = project(unit(bird.lon, bird.lat)); below = !!me && me[1] < s[1]; if (f.swap) below = !below; }          // swap: no room on that side (pinSide)
+      if (dy === OVER && bird.down) { const me = project(unit(bird.lon, bird.lat)), side = p.side ? p.side() : null; below = !!me && me[1] < s[1]; if (f.swap) below = !below; if (side !== null) below = side; }          // side: a capital beside another keeps its own side (capSide)          // swap: no room on that side (pinSide)
       if (cls === 'cap') { if (below) box.down = Math.max(box.down, box.px * 0.8); else box.up = Math.max(box.up, box.px * 0.8); }          // tight on the symbol's side only: on the other side the room every name keeps (a letter's tail, the next name)
       const wantAt = (x) => spot ? s[1] + spot[1] : dy === UNDER ? underY(s, x, box, str, c)
         : dy === OVER ? (cls === 'cap' ? (below ? s[1] + (CAP_RIM + CAP_GAP) * view.mk + box.over + 1.75 * nameUp() : s[1] - (CAP_RIM + CAP_GAP) * view.mk - box.under - 1.75 * nameUp()) : below ? s[1] + NEAR * view.mk + box.up : s[1] - NEAR * view.mk - box.down)
         : s[1] + (typeof dy === 'function' ? dy() : dy || 0);
       let want = wantAt(x);
+      if (cls === 'cap' && dy === OVER && bird.down && p.side && p.side() !== null) { const me = project(unit(bird.lon, bird.lat)); if (me) { x = capSlide(x, want, box, birdBox(me)); want = wantAt(x); } }          // a capital beside another: along its own side, clear of the bird (capSlide)
       // beside the bird (besideBird): for as long as that landing's rest is the view's, and where it stood while it fades at take-off
       if (dy === UNDER) {
         const A = S.mode === 'fly' && bird.down ? S.capFit : null;
@@ -2974,7 +3022,7 @@ html #card.ghost ~ #place { visibility: visible; }
       if (E && E.rest) {
         const A = S.capFit, fit = bird.down && A && A.fit && !A.free && !A.done ? A.fit : null;
         let r = s;
-        if (fit) { const saved = Object.assign({}, cam); aim(fit.c, fit.H, fit.rx, fit.ry); r = project(p) || s; Object.assign(cam, saved); }
+        if (fit) { const saved = Object.assign({}, cam); aim(fit.c, fit.H, fit.rx, fit.ry); r = spot0() || s; Object.assign(cam, saved); }
         const rx = r[0] + (byBird ? f.off[0] : sx - s[0]), left = (byBird ? rx : rx + clamp(clamp(rx, 4 + box.half, view.w - box.half - 4) - rx, -box.half, box.half)) - box.half;
         const yy = r[1] + settle(x, want, box, s[0], s[1], 0, true, true) - s[1];
         f.aside = left < E.x1 && yy - box.rise < E.y1 && yy + box.drop > E.y0 ? Math.min(E.x1 - left, box.half) : 0;
@@ -3474,7 +3522,7 @@ html #card.ghost ~ #place { visibility: visible; }
     if (game === 'trip' && runKind === 'day' && tripDone()) return;          // one trip a day (one begun is carried on)
     S.game = game;
     Object.assign(S, { mode: 'fly', paused: false, t: 0, energy: TANK, n: 0, streak: 0, bestStreak: 0, firstTry: 0, fresh: 0, route: null, legs: null, tickets: [], last: null,
-      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, capAt: null, capAlso: null, capFit: null, named: null, around: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), sawCap: new Set(), newC: 0, sawN: 0, intro: null, began: null, replay: null });
+      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, capAt: null, capAlso: null, capMore: [], capFit: null, named: null, around: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), sawCap: new Set(), newC: 0, sawN: 0, intro: null, began: null, replay: null });
     S.log = new Map();
     S.drops = [];
     glide = null;          // no move of the view left over (the clock starts at 0 again)
@@ -4918,12 +4966,12 @@ html #card.ghost ~ #place { visibility: visible; }
   // the room that name takes beside the bird, from the bird's place, at the size both have on the ground
   const nameSide = (c, str, cls, sub) => { const h = cam.H; cam.H = view.H0; ownName = true; const box = plateBox(c, str, cls, sub, true), bb = birdBox([0, 0]); ownName = false; cam.H = h; return Math.max(bb.x + bb.half, bb.half - bb.x) + BESIDE_GAP * view.mk + 2 * box.half + 4; };
   function tripCaps(R, W, right, room, side) {
-    const A = R.c, capA = capShown(A), capW = !right && capShown(W), at = (c) => unit(c.cap[1], c.cap[2]);
+    const A = R.c, capA = capShown(A), capW = !right && capShown(W), at = (c) => capsOf(c).map((q) => unit(q[1], q[2]));          // every capital of the country (capsOf)
     if (!capA && !capW) return NO_CAPS;
     if (right) { markCapital(A); restOn(A); return { showA: true, showW: false, secs: S.capFit ? S.capFit.T : 0 }; }
-    const ptsA = capA ? partPoints(A, partAt(A, A.cap[1], A.cap[2])).concat([at(A)]) : [R.p];
+    const ptsA = capA ? partPoints(A, partAt(A, A.cap[1], A.cap[2])).concat(at(A)) : [R.p];
     const own = fitFor({ pts: ptsA, noMe: true }), lim = Math.max(heightFor(0.5), own.H * REST_MORE) * 1.001, ok = (f) => !!f && f.whole && f.H <= lim;
-    const P2 = capW ? ptsA.concat([at(W)]) : null, both = P2 ? fitFor({ pts: P2, meRoom: room }) : null, one = ok(both) ? null : fitFor({ pts: ptsA, meRoom: room });
+    const P2 = capW ? ptsA.concat(at(W)) : null, both = P2 ? fitFor({ pts: P2, meRoom: room }) : null, one = ok(both) ? null : fitFor({ pts: ptsA, meRoom: room });
     let fit = ok(both) ? both : ok(one) ? one : null, showW = ok(both);
     // ROOM BESIDE THE BIRD FOR ITS NAME (side: nameSide). The name of where you came down stands on the bird's far side from the
     // country asked (underY). Where that side is the bird's left or right and the rest leaves it no room there (the bird near
@@ -5017,7 +5065,7 @@ html #card.ghost ~ #place { visibility: visible; }
       if (A) {
         const saved = Object.assign({}, cam);
         aim(A.c, A.H, A.rx, A.ry);
-        const o = { loose: !right, caps: [S.capAt, S.capAlso].filter((M) => M && M.name), off: W };
+        const o = { loose: !right, caps: capsNow(), off: W };
         let form = ownForm(R.c, R.name, sub, null, saved.pxRad, o);
         // THE NAME BY THE BIRD KEEPS ITS ROOM (THE WHOLE LIST 58). The answer takes its spot first, and the name of where
         // you came down then takes a side of the bird (farSpot). In a small window the answer's flag and name on a narrow
@@ -5552,14 +5600,16 @@ html #card.ghost ~ #place { visibility: visible; }
   // day: that names the neighbors, and with Mongolia's postcard aboard it would print MONGOLIA next to China.
   const capShown = (c) => !!c && !!c.cap && !c.tiny;
   function markCapital(c, also) {          // also: a second capital stands as well (Day Trip and Ranked: the country landed in, and the country asked)
-    const city = unit(c.cap[1], c.cap[2]);
-    S[also ? 'capAlso' : 'capAt'] = { p: city, t: S.t, name: c.cap[0] };
-    if (!also) S.capAlso = null;
+    const L = capList(c);          // every capital of the country (capsOf): South Africa's three stand together
+    for (const A of L) A.t = S.t;
+    S[also ? 'capAlso' : 'capAt'] = L[0];
+    if (!also) { S.capAlso = null; S.capMore = []; }
+    (S.capMore || (S.capMore = [])).push(...L.slice(1));
     S.sawCap.add(c.id);          // its capital has been shown in this flight (addTicket)
-    label(null, c.cap[0], city, 'cap', GROUND, null, OVER);
+    for (const A of L) label(null, A.name, Object.assign(() => capSpot(A), { side: () => capSide(A) }), 'cap', GROUND, null, OVER);          // the name follows its symbol where two stand side by side (capSpot), on its own side of the pair (capSide)
   }
   function restOn(c, card) {          // card: the box of a landing's fact, when one stands (the country rests beside it)
-    const fit = fitFor({ land: c, also: [unit(c.cap[1], c.cap[2])], least: view.H0 }, card || null);
+    const fit = fitFor({ land: c, also: capsOf(c).map((q) => unit(q[1], q[2])), least: view.H0 }, card || null);
     return fit ? restAt(fit) : (S.capFit = null);
   }
   function restAt(fit) {          // the view comes to rest on this fit
@@ -5593,7 +5643,7 @@ html #card.ghost ~ #place { visibility: visible; }
     S.mode = 'over'; atlas.zoom = 1;
     S.landedAt = performance.now();
     S.energy = 0;
-    S.look = null; S.capAt = null; S.capAlso = null; S.capFit = null;
+    S.look = null; S.capAt = null; S.capAlso = null; S.capMore = []; S.capFit = null;
     stage.classList.remove('flying');
     stage.classList.add('atlas');
     keys.left = keys.right = keys.up = keys.down = keys.flap = false; pull.at = null;
@@ -6096,12 +6146,16 @@ html #card.ghost ~ #place { visibility: visible; }
   // just a box. Who would even know that that's a postcard?")
   function drawDrops() {
     const big = clamp(0.7 + (cam.pxRad / R_KM) * 0.5, 0.75, 1);
-    for (const key of ['capAt', 'capAlso']) if (S[key] && S.mode === 'fly') {          // where a landing shows a capital (markCapital): it leaves as its name does (label)
-      const A = S[key], age = S.t - A.t;
+    const capDraw = (A) => {          // where a landing shows a capital (markCapital): it leaves as its name does (label); false once it is gone
+      const age = S.t - A.t;
       if (A.left === undefined && !bird.down) A.left = Math.max(age, 1.2);
-      const a = A.left === undefined ? 1 : clamp(1 - (age - A.left) / 0.35, 0, 1), s = project(A.p);
+      const a = A.left === undefined ? 1 : clamp(1 - (age - A.left) / 0.35, 0, 1), s = capSpot(A);
       if (s && a > 0) { ctx.globalAlpha = a * (1 - gazeK()) * rimDot(s, 10 * view.mk); starAt(s[0], s[1], 6 * big, view.mk); ctx.globalAlpha = 1; }          // away with the landing's names while the player looks around
-      if (a <= 0) S[key] = null;
+      return a > 0;
+    };
+    if (S.mode === 'fly') {
+      for (const key of ['capAt', 'capAlso']) if (S[key] && !capDraw(S[key])) S[key] = null;
+      if (S.capMore && S.capMore.length) S.capMore = S.capMore.filter(capDraw);          // a country's other capitals (capsOf)
     }
     for (const d of S.drops) {
       const age = S.t - d.t;
@@ -7044,7 +7098,7 @@ html #card.ghost ~ #place { visibility: visible; }
     }
     // Study's landing in a country shows its capital (markCapital): every name keeps off that symbol as names keep off
     // Day Trip's answer. The name under the bird has already taken the bird's other side for it (underY).
-    for (const A of [S.capAt, S.capAlso]) if (A && S.mode === 'fly') { const s = project(A.p), m = 11.5 * view.mk; if (s) placed.push({ x: s[0], y: s[1], half: m, up: m, down: m, cap: true }); }
+    for (const A of capsNow()) if (S.mode === 'fly') { const s = capSpot(A), m = 11.5 * view.mk; if (s) placed.push({ x: s[0], y: s[1], half: m, up: m, down: m, cap: true }); }
     veiled(true);
     for (const f of fx) if (f.top) f.draw(Math.min(1, f.t / f.secs));
     veiled(false);
