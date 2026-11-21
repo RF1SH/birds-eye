@@ -453,12 +453,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #stage.side #daycard { width: min(660px, calc(52vw / var(--ui, 1))); }          /* never wider: the globe beside the card keeps its room (from 2026-11-19 to 11-20 a card of 780 px took 68% of a 1440 x 900 window and left the globe 10% of it) */
 #daycard { padding: 20px 22px 18px; background: var(--paper); border: var(--b2z) solid var(--ink); border-radius: 3px; pointer-events: auto; }
 #daycard .top { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px; }
-/* Day Trip's card: the name over the date on the left, the score on the right with its baseline on the date's (in a browser
-   that does not know `last baseline`: its foot on the date's foot); 18 px to the day's bars. The streak is in the foot's row. */
-#daycard .top.day { display: grid; grid-template-columns: 1fr auto; margin-bottom: 18px; }
+/* Day Trip's card: the name over the date on the left; the score on the right, on the name's line and in the name's own
+   lettering, its "/1,000" gray: a player's number is never bigger than its game's name (the player, 2026-11-21, of the
+   score at 54 px beside a name of 34: "Why is the number so goddamn big"; 2026-11-20 of the home card: "number bigger
+   than the day trip letters is crazy"; 2026-11-11: "why is the score literally the biggest font on there"). 18 px to
+   the day's bars. The streak is in the foot's row. */
+#daycard .top.day { display: grid; grid-template-columns: 1fr auto; align-items: baseline; margin-bottom: 18px; }
 #daycard .top.day h2 { grid-area: 1 / 1; }
-#daycard .top.day .date { grid-area: 2 / 1; align-self: end; align-self: last baseline; }
-#daycard .top.day .score { grid-area: 1 / 2 / 3 / 3; align-self: end; align-self: last baseline; }
+#daycard .top.day .date { grid-area: 2 / 1; }
+#daycard .top.day .score { grid-area: 1 / 2; font-size: 34px; line-height: 1; }
+#daycard .top.day .score small { font: inherit; color: var(--ink-soft); margin-left: 0; }
 #daycard > .row .streak { margin-left: auto; }
 #daycard h2 { margin: 0; font: 700 34px/1 var(--display); }
 #daycard .date { font-size: 13px; color: var(--ink-soft); margin-top: 3px; }
@@ -5501,7 +5505,7 @@ html #card.ghost ~ #place { visibility: visible; }
     // (a trip saved before energy use was scored a round: its energy points are what its other parts leave of the score)
     const sums = T.results.reduce((a, r) => [a[0] + r.closeness, a[1] + r.speed], [0, 0]), streak = tripStreak();
     sums.push(T.score - sums[0] - sums[1]);
-    // The top holds what the trip is and its score: the name with the date under it, and the score on the date's line. The streak
+    // The top holds what the trip is and its score: the name with the date under it, and the score on the name's line. The streak
     // stands at the card's foot, at the right end of the row of Share and Home, as it stands beside the button on the home card
     // (the player's pick of 2026-11-21 from picture TOP-options, "A: streak at the foot"; of the top before, the name, the date
     // and the streak stacked on the left in three letterings with the score beside the last two: "The end score and the date and
