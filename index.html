@@ -315,21 +315,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .game .go { grid-column: 3; grid-row: 1; font-size: 20px; padding: 7px 14px 9px; min-width: 96px; }
 #card .game .hook { grid-column: 1 / -1; grid-row: 2; margin: 2px 0 0; }          /* 2: as far under its name as Study's box is under Study's, by their ink */
 .mode-stat { font: 500 20px/1 var(--display); color: var(--ink); white-space: nowrap; }
-/* Once today's trip is flown the day's score stands over the streak, beside "See today's trip", both in the streak's
-   lettering: a player's own numbers wear one lettering and stand beside their game's button, and none is bigger than its
-   game's name (the player, 2026-11-20, of the score at 44 px on the "Day Trip" line: "number bigger than the day trip
-   letters is crazy"; their pick from picture SCORE-line-2: "2: beside the button"; of that too: "still not great, but we
-   can save the redesign for later": PLAN 80, 81). Until then the score was a sentence in the description's spot ("Today's
-   score: 348 of 1,000 points"; the player: "wtf is this design laziness"). The two lines stand in the button's height by
-   their ink: as far from the button's top to the number's top as from the streak's baseline to the button's foot. */
-.day-stats { display: grid; row-gap: 4px; }
-#home-score:not([hidden]) + #trip-streak { margin-bottom: 2px; }
-#home-score small { font: inherit; color: var(--ink-soft); }
-/* Once today's trip is flown, Day Trip is a line of the list, as Ranked and Study are: its name (still 34 px), the day's
-   score over the streak, and a quiet button in the two other buttons' column at their size; the description and the big
-   blue button are back with tomorrow's trip (the player's pick of 2026-11-20 from picture FINISHED-day: "Build both"; PLAN
-   81). The numbers stand against their button, as "Best" does, so the score, the streak and "Best" end on one edge; they
-   stand inside the button's height, as far from its top as from its foot by their ink. The button is paper: it starts no
+/* Once today's trip is flown only the streak stands beside "See trip"; the day's score is on the day's card, which that
+   button opens (the player, 2026-11-24, of "433/1,000" over "Streak: 1 day" on the home card: "just get rid of the score for
+   day trip. only have the streak. if they want to see the score they can click on "see trip""; PLAN 108). From 2026-11-20
+   until then the score stood on the home card: as a sentence in the description's spot ("Today's score: 348 of 1,000
+   points"; the player: "wtf is this design laziness"), as a number of 44 px on the "Day Trip" line ("number bigger than the
+   day trip letters is crazy"), then over the streak beside the button (their pick "2: beside the button"; of that too:
+   "still not great, but we can save the redesign for later": PLAN 80, 81). */
+.day-stats { display: grid; }
+/* Once today's trip is flown, Day Trip is a line of the list, as Ranked and Study are: its name (still 34 px), the
+   streak, and a quiet button in the two other buttons' column at their size; the description and the big blue button are
+   back with tomorrow's trip (the player's pick of 2026-11-20 from picture FINISHED-day: "Build both"; PLAN 81; the day's
+   score stood over the streak until 2026-11-24: PLAN 108). The streak stands against its button exactly as "Best" stands
+   against Ranked's: on the button's middle, the two ending on one edge. The button is paper: it starts no
    flight. The hairline under the line is as far from this button as from Ranked's. Until then the flown card kept the
    lead's shape: the description, a blue "See today's trip" of 210 x 50 px on the left and the two numbers in its shadow
    (the player: "still not great"). The ask is of 2026-11-11: "think about what the day trip page will look like after
@@ -337,11 +335,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #home-day.flown { display: grid; grid-template-columns: 1fr auto auto; align-items: center; column-gap: 14px; }
 #card #home-day.flown h2 { grid-column: 1; grid-row: 1; margin: 0; padding: 0; }
 #home-day.flown .row { display: contents; }
-#home-day.flown .day-stats { grid-column: 2; grid-row: 1; row-gap: 2px; text-align: right; }
-#home-day.flown #trip-streak { margin-bottom: 1px; }
+#home-day.flown .day-stats { grid-column: 2; grid-row: 1; }
 #home-day.flown #see-trip { grid-column: 3; grid-row: 1; font-size: 20px; padding: 7px 14px 9px; min-width: 96px; background: var(--paper); color: var(--ink); }
 #home-day.flown #see-trip:hover { background: var(--paper-shade); }
-#home-day.flown + #home-games { margin-top: 11.5px; }
+#home-day.flown + #home-games { margin-top: 13px; }          /* the line is as high as its button since the score left it (until 2026-11-24: 11.5 under two lines of numbers 3 px higher than the button) */
 /* Study's line: what is picked stands in a box with an arrow; a click opens the choices right under it and the card
    grows at its foot (the player, 2026-11-20: "I like the idea of the expandable list ... in the home card ... it's
    like hard to tell that that's even an option"; their pick: "A box with an arrow"). */
@@ -766,7 +763,7 @@ html #card.ghost ~ #place { visibility: visible; }
         <section id="home-day">
           <h2>Day Trip</h2>
           <p class="hook" id="home-hook">A five-location daily challenge</p>
-          <div class="row"><button class="go" id="go-trip" type="button">Take off</button><button class="go" id="see-trip" type="button" hidden>See trip</button><div class="day-stats"><span class="mode-stat" id="home-score" hidden></span><span class="mode-stat" id="trip-streak" hidden></span></div></div>
+          <div class="row"><button class="go" id="go-trip" type="button">Take off</button><button class="go" id="see-trip" type="button" hidden>See trip</button><div class="day-stats"><span class="mode-stat" id="trip-streak" hidden></span></div></div>
         </section>
         <div id="home-games">
           <section class="game">
@@ -5426,7 +5423,7 @@ html #card.ghost ~ #place { visibility: visible; }
   }
   const streakText = (n) => 'Streak: ' + n + (n === 1 ? ' day' : ' days');
   // The home card's first part is today's trip: before it "Take off"; one begun and left, "Carry
-  // on"; after it Day Trip is a line of the list (`.flown`): its name, the day's score over the streak, "See trip".
+  // on"; after it Day Trip is a line of the list (`.flown`): its name, the streak, "See trip" (the day's score is on the day's card).
   // The streak beside the button, Ranked's best beside its own.
   function showTripNote() {
     // Today's trip from before the day's five changed (they do when the lists are built anew): flown to its end, it
@@ -5441,8 +5438,6 @@ html #card.ghost ~ #place { visibility: visible; }
     // punctuation.. unless more than 1 sentence"; it is away while today's trip is flown, as Ranked's is once played)
     $('home-day').classList.toggle('flown', done);
     $('home-hook').hidden = done;
-    $('home-score').hidden = !done;
-    $('home-score').innerHTML = done ? num(save.trips[today()].score) + '<small>/1,000</small>' : '';
     $('see-trip').hidden = !done;
     $('trip-streak').hidden = !streak;
     $('trip-streak').textContent = streakText(streak);
