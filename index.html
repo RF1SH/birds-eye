@@ -788,6 +788,22 @@ html #card.ghost ~ #place { visibility: visible; }
 #console.v2 #trip-clock.tq .bar::after { display: none; }          /* no mark: nothing is lost at one spot of this line */
 #console.v2 #tally b { white-space: nowrap; }
 #console.v2 .tq .pl .wd svg.tqs-star { width: 13.5px; height: 13px; }
+/* Trivia, a closed question: the correct countries the player did not find, a list beside the globe (tqAnsCard) */
+#tq-ans { zoom: var(--ui, 1); grid-column: 1; grid-row: 1; justify-self: start; align-self: center; padding: 14px 15.5px 13px 16px; background: var(--paper); border: var(--b2z) solid var(--ink); border-radius: 3px; pointer-events: auto; }
+#tq-ans.bare { padding-bottom: 11px; }
+#tq-ans h3 { margin: 0 0 8px; font: 700 14px/1 var(--text); color: var(--ink-soft); text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
+#tq-ans .rows { display: grid; grid-auto-flow: column; grid-template-rows: repeat(var(--n), auto); gap: 1px 26px; }
+#tq-ans .r { display: grid; grid-template-columns: 60px var(--w, 150px) var(--s, 45px); column-gap: 9px; align-items: center; min-height: 30px; padding: 4px 8px; margin: 0 -8px; border-radius: 2px; }
+#tq-ans .r.on { background: var(--paper-shade); }
+#tq-ans .r img { display: block; height: 30px; width: auto; max-width: 60px; border: 1px solid var(--paper-shade); }
+#tq-ans .r img.cut { border-color: transparent; }
+#tq-ans .r b { display: block; font: 700 15px/1.05 var(--display); text-wrap: balance; }
+#tq-ans .r .cap { display: flex; align-items: center; gap: 4px; margin-top: 3px; font: 700 12px/1 var(--display); white-space: nowrap; }
+#tq-ans .r .cap svg { width: 12px; height: 12px; flex: none; }
+#tq-ans .r .mk { display: flex; align-items: center; gap: 2px; }
+#tq-ans .r .mk svg { display: block; width: 13.5px; height: 13px; overflow: visible; }
+#tq-ans .note { width: 0; min-width: 100%; margin: 8px 0 0; font: 400 12px/1.35 var(--text); color: var(--ink-soft); text-wrap: pretty; }
+#tq-ans .why { width: 0; min-width: 100%; margin: 8px 0 0; font: 400 13px/1.2 var(--text); color: var(--ink); text-wrap: pretty; }
 </style>
 
 </head>
@@ -845,6 +861,7 @@ html #card.ghost ~ #place { visibility: visible; }
     </div>
 
     <div id="place" hidden aria-live="polite"></div>
+    <div id="tq-ans" hidden></div>
     <div id="bottom">
       <div id="console" hidden>
         <div id="tickets"></div>
@@ -3612,7 +3629,7 @@ html #card.ghost ~ #place { visibility: visible; }
     return null;
   }
   let gazeName = null;          // the room of the correct location's name as it stands: the pointer on it answers for the answer's country (as on every globe: pointed)
-  const lookPointed = (x, y) => { if (S.game === 'study' || S.game === 'trivia') return null; const b = gazeName; return b && Math.abs(b.x - x) < b.half && Math.abs(b.y - y) < b.tall ? { x, y, name: b.c.name, c: b.c, on: 'answer' } : pointed(x, y); };
+  const lookPointed = (x, y) => { const A = S.game === 'trivia' && TQ.on && TQ.closed ? TQ.page : null; if (S.game === 'study' || (S.game === 'trivia' && !A)) return null; if (A) for (const n of A.names) { const b = n.box; if (b && Math.abs(b.x - x) < b.half && Math.abs(b.y - y) < b.tall) return { x, y, name: n.c.name, c: n.c, on: n }; } const b = gazeName; return b && Math.abs(b.x - x) < b.half && Math.abs(b.y - y) < b.tall ? { x, y, name: b.c.name, c: b.c, on: 'answer' } : pointed(x, y); };
   function lookWheel(e) {
     if (S.paused) return;
     if (!looking()) { if (e.deltaY <= 0 || performance.now() - gazeOver < 400 || !lookStart()) return; }          // scrolling OUT begins it (not the tail of the scroll that has just ended it)
@@ -6252,10 +6269,10 @@ html #card.ghost ~ #place { visibility: visible; }
       logH = lerp(logH, Math.max(logH, Math.log(L.H)), smooth(clamp(k * 3, 0, 1))) + (moving ? L.rise * Math.sin(Math.PI * k) : 0);
     }
     if (gaze && !gaze.leaving) {          // looking around: the player's own view, its middle in the middle of the room over the bar
-      const O = gaze, e = smooth(clamp((S.t - O.t0) / 0.4, 0, 1));
+      const O = gaze, e = smooth(clamp((S.t - (O.tc || O.t0)) / 0.4, 0, 1));          // tc: the middle was sent to a new room since (Trivia's closed question: tqAnchor)
       O.own = { n, H: Math.exp(logH) };          // the game's own view meanwhile: scrolling back in to it ends the look-around (lookWheel)
       O.H = clamp(O.H, view.H0, gazeWhole());
-      aim(unit(O.lon, O.lat), O.H, lerp(O.cx0, view.w / 2, e), lerp(O.cy0, (view.h - view.deck) / 2, e));
+      aim(unit(O.lon, O.lat), O.H, lerp(O.cx0, TQ.page && TQ.page.cx ? TQ.page.cx : view.w / 2, e), lerp(O.cy0, (view.h - view.deck) / 2, e));          // Trivia's closed question: the middle of the room beside its list (tqFit)
       return;
     }
     if (gaze) {          // back to the game's own view: the turn first, while the view is high, then down
@@ -7334,7 +7351,7 @@ html #card.ghost ~ #place { visibility: visible; }
     ctx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
     ctx.setTransform(d, 0, 0, d, 0, 0);
     drawZones();
-    veiled(true); drawOutlines(); veiled(false);          // under every mark: a capital's symbol on the coast or the border stays whole (the player, of Panama City's in the first picture: "uhhh capital cut off?")
+    veiled(true); drawOutlines(); veiled(false); tqOutline();          // under every mark: a capital's symbol on the coast or the border stays whole (the player, of Panama City's in the first picture: "uhhh capital cut off?")
     drawDots();
     topHover = arrived = plateSays = null;
     if (S.mode === 'fly') drawDrops();
@@ -7375,7 +7392,7 @@ html #card.ghost ~ #place { visibility: visible; }
     veiled(true);
     for (const f of fx) if (f.top) f.draw(Math.min(1, f.t / f.secs));
     veiled(false);
-    if (S.mode === 'fly') { drawRouteKm(); drawHud(); lookDraw(); }
+    if (S.mode === 'fly') { drawRouteKm(); drawHud(); tqNames(); lookDraw(); }
     else if (glide && glide.kind === 'home' && glide.ring) lookDraw();
   }
   // Free flight: the name (and flag) of what is under the bird's shadow, just below it.
@@ -8054,7 +8071,7 @@ html #card.ghost ~ #place { visibility: visible; }
   // "End flight", and whatever Study gains later. Where it does as Study does, the line says so (lookPointed).
   const TQ_NEED = 3, TQ_START = 45, TQ_ADD = 10, TQ_COST = 10;
   const TQ_MULT = [1, 1.5, 2];          // a country of one, two, three stars
-  const TQ = { on: false, day: '', qs: [], i: 0, found: [], wrongs: [], calls: [], note: '', hist: [], rows: [], closed: false, closedT: 0, timeUp: false, end: 0, start0: TQ_START, waitView: false, lastT: 0, landFx: [] };
+  const TQ = { on: false, day: '', qs: [], i: 0, found: [], wrongs: [], calls: [], note: '', hist: [], rows: [], closed: false, closedT: 0, timeUp: false, end: 0, start0: TQ_START, waitView: false, lastT: 0, landFx: [], page: null, move: null, from: null, lift: false, why: false, rowId: null, rowOn: null };
   const tqC = (id) => PLAY.find((c) => c.id === id);
   const tqByKind = (kind) => TRIVIA.qs.find((q) => q.kind === kind);
   // a day's five: its place in the list is the days since the start, and the days come round again (as makeTrip's)
@@ -8105,7 +8122,8 @@ html #card.ghost ~ #place { visibility: visible; }
     S.energy = Infinity;          // flying takes no energy (as Explore's)
     tqQuestion(at);
   }
-  function tqClean() { for (let i = flashes.length - 1; i >= 0; i--) if (flashes[i].tq) flashes.splice(i, 1); }
+  function tqUnlit() { for (let i = flashes.length - 1; i >= 0; i--) if (flashes[i].tq) flashes.splice(i, 1); }
+  function tqClean() { tqUnlit(); TQ.move = null; TQ.page = null; TQ.from = null; TQ.lift = false; tqAnsOff(); }          // a closed question's screen goes with its question
   function tqOff() {
     if (!TQ.on) return;
     TQ.on = false; tqClean();
@@ -8115,7 +8133,7 @@ html #card.ghost ~ #place { visibility: visible; }
     $('count-what').textContent = 'delivered';
   }
   function tqQuestion(i) {
-    Object.assign(TQ, { i, found: [], wrongs: [], calls: [], note: '', closed: false, timeUp: false, start0: TQ_START, end: S.t + TQ_START, waitView: true, lastT: S.t });
+    Object.assign(TQ, { i, found: [], wrongs: [], calls: [], note: '', closed: false, why: false, timeUp: false, start0: TQ_START, end: S.t + TQ_START, waitView: true, lastT: S.t });
     tqClockShow(true);
     tqClean();
     tqLight(); tqCard(); tqKeep(); sfx.call();
@@ -8123,9 +8141,13 @@ html #card.ghost ~ #place { visibility: visible; }
   // A country's own color while its question is open: found, the game's own light; an incorrect landing, a pale red that stays.
   const TQ_BADFILL = '#' + rgb(SAND).map((v, i) => Math.round(255 * (v + (rgb(BAD)[i] - v) * 0.45)).toString(16).padStart(2, '0')).join('');
   function tqFlash(c, col, k) { flash(c, 0, 1e9, col, k); flashes[flashes.length - 1].tq = true; }
+  // Closed: every country that is no answer goes paler (the paper's color at TQ_QUIET), so the correct countries stand out in their own colors; a found
+  // one wears the bold border (tqOutline); an incorrect landing keeps its pale red.
   function tqLight() {
-    tqClean();
-    for (const id of TQ.found) tqFlash(tqC(id), null, 0.95);
+    tqUnlit();
+    const q = TQ.qs[TQ.i];
+    if (TQ.closed) { for (const c of PLAY) if (c.order !== undefined && !c.water && !q.ids.includes(c.id) && !TQ.wrongs.includes(c.id)) tqFlash(c, PAPER, TQ_QUIET); }
+    else for (const id of TQ.found) tqFlash(tqC(id), null, 0.95);
     for (const id of TQ.wrongs) tqFlash(tqC(id), TQ_BADFILL, 1);
   }
   // WHAT A LANDING PUTS ON THE MAP: the flag and the name on the country with its bold border, by the built parts as Study's deliver and strand call them; no
@@ -8170,10 +8192,29 @@ html #card.ghost ~ #place { visibility: visible; }
   }
   function tqClose() {
     const how = TQ.found.length >= TQ_NEED ? 'all' : TQ.timeUp ? 'time' : 'gave';
-    tqLandOff(); TQ.closed = true; TQ.closedT = S.t;
+    tqLandOff(); TQ.closed = true; TQ.closedT = S.t; TQ.lift = true;
     TQ.rows.push({ q: TQ.qs[TQ.i], found: TQ.found.slice(), wrongs: TQ.wrongs.slice(), how });
+    TQ.why = !save.told.stars; save.told.stars = true;          // what a star means is said once a player, at the first question that closes (written by tqKeep)
     tqKeep(how);
     tqLight(); tqCard();
+    tqAnsCard(TQ.qs[TQ.i]); tqAnchor(); TQ.page = tqPage(TQ.qs[TQ.i]);
+  }
+  // A player who is looking around already (scrolled out with the question open, the bird down): the view's middle glides to the room beside the list from
+  // where it stands, and the view goes to the question's countries as at every close (tqLift).
+  const tqAnchor = () => { if (looking()) { placeCamera(); gaze.cx0 = cam.cx; gaze.cy0 = cam.cy; gaze.tc = S.t; } };
+  // The view sets out from where the look-around stands to the closed question's own (tqFit), in the time a landing's view takes to rest.
+  function tqGo() {
+    const F = TQ.page.fit, ll = lonLat(F.c);
+    TQ.page.t = S.t;
+    TQ.move = { t0: S.t, T: TQ.page.T, lon0: gaze.lon, lat0: gaze.lat, h0: Math.log(gaze.H), lon1: gaze.lon + ((ll[0] - gaze.lon + 540) % 360 - 180), lat1: clamp(ll[1], -80, 80), h1: Math.log(F.H) };
+  }
+  // The view lifts to hold the closed question's countries: the look-around's own camera, begun once the bird is down. A question given up in the air:
+  // from the view as it stood at that moment (the bird comes down meanwhile).
+  function tqLift() {
+    if (!TQ.page || !(looking() || lookStart())) return false;
+    if (TQ.from) { Object.assign(gaze, { lon: TQ.from.lon, lat: clamp(TQ.from.lat, -80, 80), H: clamp(TQ.from.H, view.H0, gazeWhole()), cx0: TQ.from.cx, cy0: TQ.from.cy }); TQ.from = null; }
+    tqGo();
+    return true;
   }
   function tqNext() {
     if (TQ.i + 1 >= TQ.qs.length) { goHome(); return; }          // the day's card is not built yet (the plan's piece 4)
@@ -8184,10 +8225,194 @@ html #card.ghost ~ #place { visibility: visible; }
     if (!TQ.on || S.mode !== 'fly' || S.paused) return;
     if (TQ.closed) { tqNext(); return; }
     const air = !bird.down;
+    if (air) { const ll = lonLat(cam.n); TQ.from = { lon: ll[0], lat: ll[1], H: cam.H, cx: cam.cx, cy: cam.cy }; }
     tqClose();
     if (air) { bird.a = Math.min(bird.a, 0.02); bird.va = -0.2; bird.vx = bird.vy = 0; }          // given up in the air: the bird comes down where it is
   }
-  function tqFrame() { if (TQ.on && S.mode === 'fly') tqClockTick(); }
+  function tqFrame() {
+    if (!TQ.on || S.mode !== 'fly') return;
+    tqAuto(); tqClockTick();
+    if (TQ.closed && TQ.lift && tqLift()) TQ.lift = false;
+    const M = TQ.move;
+    if (M && gaze && !gaze.leaving) {
+      const k = arrive((S.t - M.t0) / M.T);
+      gaze.lon = M.lon0 + (M.lon1 - M.lon0) * k; gaze.lat = M.lat0 + (M.lat1 - M.lat0) * k; gaze.H = Math.exp(M.h0 + (M.h1 - M.h0) * k);
+      if (k >= 1) TQ.move = null;
+    }
+  }
+
+  // ---------- Trivia, a closed question: the list beside the globe, the paler map, the names (the player's pick by button, 2026-11-25: "The list") ----------
+  // The card: every correct country the player did not find (the three found stand in the bar: a thing is named once), each as the game's own label: its
+  // flag, its name, each capital with the capital's symbol, and its 1 to 3 stars; most stars first. Under the rows, the first time a question closes for
+  // a player, what a star means (their pick, 2026-11-25: "A: the sentence"); then the notes of the countries counted with a note.
+  const tqAns = $('tq-ans');
+  const TQ_QUIET = 0.62;          // every country that is no answer: the paper's color at this strength
+  function tqAnsOff() { tqAns.hidden = true; tqAns.replaceChildren(); TQ.rowId = null; }
+  function tqRowOn(id) { if (tqAns.hidden || TQ.rowOn === id) return; TQ.rowOn = id; for (const r of tqAns.querySelectorAll('.r')) r.classList.toggle('on', r.dataset.id === id); }
+  tqAns.addEventListener('mouseover', (e) => { const r = e.target.closest('.r'); TQ.rowId = r ? r.dataset.id : null; });          // a row pointed at: its country's plate on the globe (tqNames)
+  tqAns.addEventListener('mouseleave', () => { TQ.rowId = null; });
+  function tqAnsCard(q) {
+    const rest = q.ids.filter((id) => !TQ.found.includes(id)), st = (id) => { const k = tqStep(q, id); return k == null ? -1 : k; };
+    rest.sort((a, b) => st(b) - st(a) || tqC(a).name.localeCompare(tqC(b).name));
+    const row = (id) => { const c = tqC(id), caps = capsOf(c).filter((x) => x[0] !== c.name);
+      return '<div class="r" data-id="' + id + '">' + flagImg(c, '') + '<div><b>' + esc(c.name) + (q.notes[id] ? '*' : '') + '</b>' + caps.map((x) => '<span class="cap">' + STAR + esc(x[0]) + '</span>').join('') + '</div>' + tqMark(q, id) + '</div>'; };
+    // as many rows in a column as the room over the bar holds (a row is 39 px of the card's own scale), the columns of even length
+    const room = (view.h - view.deck - 2 * 14 - 12) / view.ui - 60, per = Math.max(4, Math.floor(room / 39)); let cols = Math.ceil(rest.length / per), n = Math.ceil(rest.length / cols);
+    const head = TQ.found.length ? (rest.length === 1 ? '1 other correct country' : rest.length + ' other correct countries') : rest.length + ' correct countries';
+    ctx.save(); ctx.font = '700 15px ' + DISPLAY; if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+    let wide = 0; for (const id of rest) { const c = tqC(id); wide = Math.max(wide, ctx.measureText(c.name + (q.notes[id] ? '*' : '')).width); ctx.font = '700 12px ' + DISPLAY; for (const x of capsOf(c)) if (x[0] !== c.name) wide = Math.max(wide, 16 + ctx.measureText(x[0]).width); ctx.font = '700 15px ' + DISPLAY; }
+    ctx.restore(); wide = Math.min(170, Math.ceil(wide) + 3);          // 3 px to spare: the page's letters come out a little wider than the canvas measures them
+    const why = TQ.why ? '<p class="why">A country with more stars is worth more points.</p>' : '';
+    const lay = () => {
+      const sws = rest.map((id, i) => { const most = Math.max(1, ...rest.slice(Math.floor(i / n) * n, Math.floor(i / n) * n + n).map((x) => st(x) + 1)); return most * 13.5 + (most - 1) * 2; });          // the stars' column: as wide as this column's longest row of stars, so the card's two side margins are even
+      tqAns.innerHTML = '<h3>' + head + '</h3><div class="rows" style="--n: ' + n + '; --w: ' + wide + 'px">' + rest.map((id, i) => row(id).replace('<div class="r"', '<div class="r" style="--s: ' + sws[i] + 'px"')).join('') + '</div>' + why + rest.filter((id) => q.notes[id]).map((id) => '<p class="note">* ' + esc(q.notes[id]) + '</p>').join('');
+    };
+    tqAns.hidden = !rest.length; lay();
+    // the card as laid, with all that stands under its rows, must fit its room (the hud's first row, in whose middle the card stands): one more column
+    // until it does; never wider than the window (then the columns stay as they were)
+    const fit = (view.h - view.deck - 2 * 14 + 14) / view.ui;
+    while (!tqAns.hidden && tqAns.offsetHeight > fit && n > 2) { const was = [cols, n]; cols++; n = Math.ceil(rest.length / cols); lay(); if (tqAns.getBoundingClientRect().right > view.w - 16) { [cols, n] = was; lay(); break; } }
+    tqAns.classList.toggle('bare', !tqAns.querySelector('.note, .why'));          // nothing under the rows: the last row's own room is the card's foot
+    TQ.rowId = null; TQ.rowOn = null;
+  }
+  // The card is fitted by the widths of its words and by its room: laid again, and the view with it, when a lettering arrives late or the window changes.
+  // (Laid the same as before, the view stays as the player has it: a lettering can arrive at any time, as with the first plate by the pointer.)
+  const tqLaid = () => { const b = tqAns.getBoundingClientRect(); return [b.left, b.top, b.right, b.bottom, view.w, view.h - view.deck].map((v) => Math.round(v)).join(); };
+  function tqRelay() {
+    if (!TQ.on || !TQ.closed || !TQ.page) return;
+    const row = TQ.rowId;
+    tqAnsCard(TQ.qs[TQ.i]);
+    if (tqLaid() === TQ.page.laid) { TQ.rowId = row; return; }
+    tqAnchor(); TQ.page = tqPage(TQ.qs[TQ.i]);
+    if (looking()) tqGo(); else TQ.lift = true;
+  }
+  // The globe of a closed question: the look-around's, fitted to the correct countries in the room beside the card (fitFor's own rule for Free flight's card).
+  function tqPage(q) {
+    const answers = q.ids.map(tqC), thin = (pts, n) => pts.filter((_, i) => i % Math.max(1, Math.ceil(pts.length / n)) === 0);
+    const A = { tq: true, c: { name: '' }, land: null, water: null, t: S.t, list: [], answers, found: TQ.found.slice(), noMe: true };
+    // the view: fitted to the correct countries, the smaller ones by their middles
+    A.also = answers.filter((c) => c.tiny || !c.fine || c.km < 1e6).map((c) => c.u);
+    A.pts = [].concat(...answers.map((c) => (c.fine && !c.tiny && c.km < 1e6 ? thin(partPoints(c, 0), 40) : [c.u])));
+    tqFit(A); A.laid = tqLaid();
+    A.foundLines = A.found.map(tqC).filter((c) => c.fine && !c.tiny).map((c) => ({ lined: c, shownA: 1 }));          // a found country: the game's bold border (the country you landed in)
+    return A;
+  }
+  function tqFit(A) {
+    const cb = !tqAns.hidden ? tqAns.getBoundingClientRect() : null, card = cb && view.w > 900 ? { x1: cb.right, y0: cb.top } : null;          // the view rests in the room beside the card
+    const saved = Object.assign({}, cam), rx = card ? (card.x1 + view.w) / 2 : view.w / 2, ry = (view.h - view.deck) / 2; A.cx = card ? rx : 0;
+    // the bird stays in view when that costs little (a view at most 1.3 times as high): it is where the player is
+    A.noMe = true; const alone = fitFor(A, card); A.noMe = false; const both = fitFor(A, card);
+    A.noMe = !(alone && both && alone.whole && both.whole && Math.max(both.H, view.H0) <= 1.3 * Math.max(alone.H, view.H0));
+    const fit = fitFor(A, card) || { c: unit(bird.lon, bird.lat), H: gazeWhole(), rx, ry, whole: false };
+    if (!fit.whole) {          // wider than one side of the globe: the whole globe, the bird well in view, turned toward the correct countries as far as that allows (45 degrees)
+      fit.H = gazeWhole();
+      const me = unit(bird.lon, bird.lat), m = A.answers.reduce((a, c) => [a[0] + c.u[0], a[1] + c.u[1], a[2] + c.u[2]], [0, 0, 0]), len = Math.hypot(m[0], m[1], m[2]);
+      fit.c = me;
+      if (len > 0.05) { const to = [m[0] / len, m[1] / len, m[2] / len], ang = Math.acos(clamp(dot(me, to), -1, 1)); if (ang > 1e-3) fit.c = slerp(me, to, Math.min(1, (45 * RAD) / ang)); }
+    }
+    fit.H = clamp(fit.H, view.H0, gazeWhole());
+    if (view.F / Math.sqrt((1 + fit.H) * (1 + fit.H) - 1) < 0.62 * Math.min(view.w, view.h - view.deck)) fit.H = gazeWhole();          // the globe nearly whole in the room: whole, not cut off at the room's top
+    const ll = lonLat(fit.c), upright = !fit.whole; fit.c = unit(ll[0], clamp(ll[1], upright ? -30 : -80, upright ? 40 : 80));          // a set round the globe: the whole globe rests upright (its middle between 30 south and 40 north), never looking down on a pole
+    aim(fit.c, fit.H, rx, ry);
+    // Each name's PLACE, set once and never moved: the country's own (as on every globe) where that is in the room of this view; else the
+    // middle of its land that is (a country as big as Russia: its own place can be a continent away).
+    const top = view.h - view.deck, side = 80 * view.ui + 20, inRoom = (p) => !!p && p[0] > (card ? card.x1 : 0) + side && p[0] < view.w - side && p[1] > 30 && p[1] < top - 30;          // a name whole in the room at rest
+    // (The room's points, 14 px apart, that lie in ONE country, worked out only when that country needs them. "Which country is here?" asked of every
+    // point of the room is some 7,000 questions, 50 to 130 ms at the moment a question closes; a point outside the country's own box, the most by far,
+    // is never asked. What regionAt answers for a point stays the rule: a smaller land or a tiny country's dot there has the point.)
+    let grid = null;
+    const cellsOf = (c) => {
+      if (!grid) { grid = []; for (let y = 30; y < top - 30; y += 14) for (let x = (card ? card.x1 : 0) + side; x < view.w - side; x += 14) { const at = unproject(x, y); if (at) grid.push([x, y, at[0], at[1]]); } }
+      const cs = [];
+      for (const q of grid) if ((within(c, q[2], q[3]) || (c.tiny && kmBetween(q[2], q[3], c.lx, c.ly) < DOT_KM)) && regionAt(q[2], q[3]).c === c) cs.push([q[0], q[1]]);
+      return cs.length ? cs : null;
+    };
+    const place = (c) => {
+      if (inRoom(project(c.u))) return c.u;
+      const cs = cellsOf(c);
+      if (!cs) return c.u;
+      const mx = cs.reduce((a, p) => a + p[0], 0) / cs.length, my = cs.reduce((a, p) => a + p[1], 0) / cs.length;
+      let best = cs[0], d = 1e18;
+      for (const p of cs) { const e = (p[0] - mx) ** 2 + (p[1] - my) ** 2; if (e < d) { d = e; best = p; } }
+      const at = unproject(best[0], best[1]);
+      return unit(at[0], at[1]);
+    };
+    A.names = [];
+    for (const c of A.answers) A.names.push({ c, p: place(c), helped: !A.found.includes(c.id) });
+    Object.assign(cam, saved);
+    A.fit = fit; A.T = restSecs(fit);
+  }
+  // The names, in every frame, by the end globes' own rule (placeNames, untouched): each at its place or the first free of its fixed
+  // spots; nothing is laid for one view, so nothing is laid again after a turn. They keep clear of the ring round the bird. At a
+  // screen's edge a name rides out of view with its country, as on any map. The plate by the pointer stands on clear ground, as on
+  // every globe: the name it names or covers is away while it is up, and no other name moves.
+  function tqBoxes() { const g = project(unit(bird.lon, bird.lat)), R = g && birdRing(g), q = Math.round(15 * view.ui) / 13; return R ? [{ x: R.x, y: R.y, half: R.r + 4, tall: R.r + 4 + 9 * q }] : []; }
+  function tqNames() {
+    const A = TQ.page, a = gazeK();
+    if (!A || !looking() || a <= 0 || S.mode !== 'fly') return;
+    const g = project(unit(bird.lon, bird.lat)), bb = g && birdBox(g), R = g && birdRing(g), q = Math.round(15 * view.ui) / 13;
+    const boxes = tqBoxes();
+    // A name whose own place lies inside the ring round the bird is not shown: the bird stands there and marks it (one rule in every window).
+    const live = A.names.filter((n) => { const s = R && project(n.p), under = !!s && Math.hypot(s[0] - R.x, s[1] - R.y) < R.r + 4; if (under) { n.at = n.box = null; n.spot = undefined; } n.under = under; return !under; });
+    // While the globe turns by itself, and until the player turns it: the results globe's own rule for a globe that turns by itself
+    // (placeNames' `held`): a name stands on ONE spot and is left out while that spot is not free, so no name hops at the globe's rim.
+    if (A.held && (keys.left || keys.right || keys.up || keys.down || drag.on || Math.abs(gaze.H - A.held) > 1e-9)) A.held = 0;
+    let h = !drag.on ? hover : null;
+    if (h && bb && Math.abs(bb.x - h.x) < bb.half && Math.abs(bb.y - h.y) < bb.up) h = null;
+    if (!h && TQ.rowId) { const rc = tqC(TQ.rowId), rn = A.names.find((x) => x.c === rc), rs = rn && dot(rn.p, cam.n) >= cam.cos0 + 0.08 ? project(rn.p) : null; if (rs) h = { c: rc, name: rc.name, x: rs[0], y: rs[1], row: true }; }          // a row of the card pointed at: the built plate by the pointer, over that country
+    tqRowOn(h && !h.sea && h.c ? h.c.id : null);
+    const plate = h ? pointerPlate(h, a, true) : null, own = (n) => !!h && !h.sea && h.c === n.c;
+    const was = atlasNames, a0 = ctx.globalAlpha;
+    atlasNames = live; ctx.globalAlpha = 0;
+    for (const n of A.names) n.fix = A.held ? n.hold : undefined;
+    placeNames(boxes.slice(), true, !!A.held);          // where each name stands in this frame
+    for (const n of A.names) n.fix = n.spot;
+    atlasNames = live.filter((n) => n.box && !own(n) && !covers(plate, n.box.x, n.box.y, n.box.half, 9 * q));
+    ctx.globalAlpha = a;
+    placeNames(boxes.slice(), true, true);          // painted, each on the spot just found
+    for (const n of A.names) n.on = atlasNames.includes(n) && !!n.at;
+    if (h && h.row) pointerPlate(h, a);
+    ctx.globalAlpha = a0; atlasNames = was; topHover = null; hoverBox = null;
+  }
+  function tqOutline() {          // a found country: the game's own bold outline (drawOutlines, untouched), traced in every frame the view moves
+    const A = TQ.page, lines = A ? A.foundLines : [];
+    if (!lines.length || !looking() || S.mode !== 'fly') return;
+    for (const l of lines) l.shownA = gazeK();
+    const keep = fx.splice(0, fx.length);
+    for (const l of lines) fx.push(l); drawOutlines(); fx.length = 0;
+    for (const f of keep) fx.push(f);
+  }
+  // A set wider than one view: after END_REST still seconds the globe turns by itself, slowly, past every correct country that is not
+  // in view, as the end globes turn (the player's pick of 2026-11-21: "It turns by itself"): ONE straight line for its middle, sideways, at
+  // the end globes' own speed (TOUR_DEG a second, steady), and it stays at the end. A key, the wheel or a press takes over for good.
+  function tqAuto() {
+    const A = TQ.page;
+    if (!A || !looking() || TQ.move) return;
+    if (A.auto === undefined) {
+      const unseen = A.names.filter((n) => dot(n.p, cam.n) <= cam.cos0 + 0.08).map((n) => n.c);
+      A.auto = null;
+      if (unseen.length) {
+        const lon0 = gaze.lon, lat0 = gaze.lat, far = (sign) => Math.max(...unseen.map((c) => ((sign * (c.lx - lon0)) % 360 + 360) % 360)), east = far(1), west = far(-1);
+        const to = [lon0 + (east <= west ? east : -west), clamp(unseen.reduce((a, c) => a + c.ly, 0) / unseen.length, -45, 60)], way = wayOf([[lon0, lat0], to], to, true);
+        A.auto = { t0: S.t + END_REST, way, secs: Math.max(TOUR_MIN, way.length / TOUR_DEG), H: gaze.H };
+        // each name's ONE spot for the turn: the spot it has now; a name that comes into view on the way: the spot it will have when the turn ends (settleNames' way), else its own place
+        const rest = A.names.map((n) => (n.at ? n.spot : undefined)), g0 = [gaze.lon, gaze.lat], end = alongWay(way, 1), was = atlasNames;
+        gaze.lon = end[0]; gaze.lat = clamp(end[1], -80, 80); placeCamera();
+        atlasNames = A.names; for (const n of A.names) n.fix = undefined;
+        placeNames(tqBoxes(), false, false);
+        A.names.forEach((n, i) => { n.hold = rest[i] !== undefined ? rest[i] : n.spot !== undefined ? n.spot : 0; });
+        atlasNames = was; gaze.lon = g0[0]; gaze.lat = g0[1]; placeCamera();
+        A.held = gaze.H;
+      }
+    }
+    const U = A.auto;
+    if (!U) return;
+    if (keys.left || keys.right || keys.up || keys.down || drag.on || Math.abs(gaze.H - U.H) > 1e-9) { A.auto = null; return; }          // the player's now
+    if (S.t < U.t0) return;
+    const k = Math.min(1, (S.t - U.t0) / U.secs), at = alongWay(U.way, steady(k));
+    gaze.lon = at[0]; gaze.lat = clamp(at[1], -80, 80); S.idle = 0;
+    if (k >= 1) A.auto = null;
+  }
 
   // ---------- Trivia's clock ----------
   function tqOpen() { return S.mode === 'fly' && S.game === 'trivia' && TQ.on && !TQ.closed; }
@@ -8245,10 +8470,10 @@ html #card.ghost ~ #place { visibility: visible; }
     a.style.width = (Math.ceil(Math.max(L.wide, kw)) + 3) + 'px';          // 2 px of the column's own padding, 1 to spare
     if (rows().n !== L.n) a.style.width = '';
   }
-  window.addEventListener('resize', () => { if (TQ.on) { tqClueFit(); measure(); } });
+  window.addEventListener('resize', () => { if (TQ.on) { tqClueFit(); measure(); tqRelay(); } });
   // A face of the game's lettering is fetched at its first use. One that arrives after the bar was fitted: the bar is fitted again. (Until then the heading
   // could be measured in the stand-in lettering, 166 px wide for 141, and the question's column stayed 10 px too wide: by chance, on the trial page too.)
-  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => { if (TQ.on) { tqSpotsFit(); tqClueFit(); measure(); } });
+  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => { if (TQ.on) { tqSpotsFit(); tqClueFit(); measure(); tqRelay(); } });
   // A flag spot is 64 px. A name stands under its flag on one or two lines in the bar's lettering and may reach 2 px over each side of its spot (eight names are 1 to 4 px
   // wider than a spot: Madagascar, Netherlands, ...); a name that needs more takes the smaller lettering a long name already has (Turkmenistan, Liechtenstein), then one step
   // smaller still (Central African Republic, Saint Vincent and the Grenadines). A flag wider than the spot (Qatar's) is fitted to its width, in the middle of the flag's row.
@@ -8296,7 +8521,7 @@ html #card.ghost ~ #place { visibility: visible; }
     tqSpotsFit(); tqLine(); tqClueFit(); measure();
   }
 
-  window.birdsEye = { trivia: { TQ, start: tqStart, enter: tqEnter, frame: tqFrame, saved: tqSaved, flown: tqFlown, dayQs: tqDayQs, qpts: tqQPts, score: tqDay, open: tqOpen, clueFit: tqClueFit, spotsFit: tqSpotsFit, BADFILL: TQ_BADFILL, ask: (kind) => { TQ.qs[TQ.i] = tqByKind(kind); tqQuestion(TQ.i); },
+  window.birdsEye = { trivia: { TQ, start: tqStart, enter: tqEnter, frame: tqFrame, saved: tqSaved, flown: tqFlown, dayQs: tqDayQs, qpts: tqQPts, score: tqDay, open: tqOpen, clueFit: tqClueFit, spotsFit: tqSpotsFit, BADFILL: TQ_BADFILL, page: () => TQ.page, ans: () => tqAns, close: tqClose, relay: tqRelay, ask: (k) => { TQ.qs[TQ.i] = typeof k === 'string' ? tqByKind(k) : k; tqQuestion(TQ.i); },
     flashes: () => flashes.filter((f) => f.tq).map((f) => [f.c.name, f.col, f.k]), boxes: () => placed.map((b) => ({ name: b.name || (b.bird ? 'BIRD' : '?'), box: [b.x - b.half, b.y - b.up, b.x + b.half, b.y + b.down].map(Math.round), flag: !!b.flag, sub: b.sub || '', lines: b.lines || null })) },          // Trivia, for the tests
     idk, canIdk, goodFor, explore, glide: () => glide, glideP, glideLook, howTo, pair: () => view.pair, homeNote: () => { showTripNote(); showKnown(); measure(); }, stackLines: (id) => { const c = PLAY.find((q) => q.id === id); ownName = true; try { return stackForm(c, c.name, 'name', null).lines; } finally { ownName = false; } }, hoverBox: () => hoverBox, slerp, showLeg, legView, STILL_DEG, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, TRIVIA, endlessRound, rankedLevel, rankedRounds, easiest, flagClue, capClue, capFlagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     outlines: () => fx.filter((f) => f.lined && f.shownA > 0).map((f) => f.lined.id), OUTLINE, pull, pullBy, steerable, PULL_FULL, PULL_RING, hFor, look: () => gaze, looking, canLook, lookStart, lookEnd, lookAnswer, answerNamed: () => answerNamed, birdRing: () => { const g = project(unit(bird.lon, bird.lat)); return g && birdRing(g); }, answerRoom: () => gazeName, lookK: gazeK, plate: () => plateSays, capLineOf: (id) => capLine(PLAY.find((c) => c.id === id)), plateRoom: (h) => pointerPlate(h, 1, true), hoverNow: () => (hover ? hover.name : null), project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
