@@ -6917,7 +6917,7 @@ html #card.ghost ~ #place { visibility: visible; }
   // a results globe by hand ended its turn for good.)
   const HOLD_SECS = 5;
   const globeHold = { on: false, still: 0, down: null, at: null };
-  let keyTurn = false;          // an arrow key is turning an end screen's globe (keyTurns)
+  let keyTurn = false;          // an arrow key is turning the home screen's globe or an end screen's (keyTurns)
   const ARROWS = new Map([['ArrowLeft', 'left'], ['a', 'left'], ['ArrowRight', 'right'], ['d', 'right'], ['ArrowUp', 'up'], ['w', 'up'], ['ArrowDown', 'down'], ['s', 'down']]);
   const turning = () => S.mode === 'over' && (S.replay ? !S.replay.done : !!S.legs && !!(atlas.to || S.tour || atlas.back));
   const zoomedIn = () => (atlas.zoom || 1) > 1.0001;
@@ -6939,9 +6939,13 @@ html #card.ghost ~ #place { visibility: visible; }
   // around, lookTick): at that view's speed, about 520 px a second on the screen, within the pull's limits. The first frame
   // of it is a press: a turn the globe was making pauses (holdGlobe) or ends; while a key is down the pause holds, and the
   // plate by a resting pointer names what has come under it.
+  // The home screen's globe too (the player's pick by button, 2026-11-26: "Yes, there too", of "Every globe you can pull
+  // with the mouse also turns by the arrow keys"): as after a pull the globe rests where the keys put it, then turns on
+  // slowly, and holds still while the pointer is on a location. Not while the view is on its way home from a flight (the
+  // view is that move's until it is home), and not under How to play or the FAQ (no key reaches the game under a sheet).
   function keyTurns(dt) {
     const ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0), iy = (keys.up ? 1 : 0) - (keys.down ? 1 : 0);
-    if (!(ix || iy) || S.mode !== 'over' || drag.on) { keyTurn = false; return; }
+    if (!(ix || iy) || S.mode === 'fly' || drag.on || gliding() || howOn || faqOn) { keyTurn = false; return; }
     if (!keyTurn) { keyTurn = true; if (!holdGlobe(null)) { atlas.to = null; atlas.secs = 0; S.tour = null; atlas.back = null; if (S.replay) S.replay.free = true; } }
     const k = 520 * view.ui * (cam.H / view.F) / RAD * dt;
     atlas.lat = clamp(atlas.lat + iy * k, -60, 75);
@@ -7326,8 +7330,8 @@ html #card.ghost ~ #place { visibility: visible; }
     }
     if (k === 'e' && !e.repeat && S.paused && !$('end').hidden) { endFlight(); e.preventDefault(); return; }          // E ends a flight only where the pause card offers it
     if ((k === ' ' || k === 'Enter') && !e.repeat && looking() && !S.paused) lookEnd();          // looking around: the view comes back, and the same press goes on (the next location, or held, the take-off)
-    // On an end screen only a new press of an arrow key counts: a key still held from the flight does not turn the globe.
-    if (e.repeat && S.mode === 'over' && ARROWS.has(k) && !keys[ARROWS.get(k)]) { e.preventDefault(); return; }
+    // On the home screen and an end screen only a new press of an arrow key counts: a key still held from the flight does not turn the globe.
+    if (e.repeat && S.mode !== 'fly' && ARROWS.has(k) && !keys[ARROWS.get(k)]) { e.preventDefault(); return; }
     if (k === 'ArrowLeft' || k === 'a') keys.left = true;
     else if (k === 'ArrowRight' || k === 'd') keys.right = true;
     else if (k === 'ArrowUp' || k === 'w') keys.up = true;
