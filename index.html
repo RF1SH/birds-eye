@@ -1759,6 +1759,7 @@ html #card.ghost ~ #place { visibility: visible; }
   const DECAY = -0.5, FACTOR = 19 / 81;
   const DAY = 864e5;
   const RELEARN = 90e3;                // something missed is due again this soon (after the 6-postcard rest)
+  const SITTING = 0.5;                 // days: asked again within this is the same sitting (review; and a postcard known well comes once a sitting: nextItem)
   const COLD = 4;
   const recall = (m, now) => Math.pow(1 + FACTOR * Math.max(0, now - m.last) / DAY / m.s, DECAY);
   const boxFor = (sd) => (sd < 1 ? 1 : sd < 7 ? 2 : sd < 21 ? 3 : sd < 90 ? 4 : 5);
@@ -1769,7 +1770,7 @@ html #card.ghost ~ #place { visibility: visible; }
       m.d = d0(g);
     } else {
       const days = (now - m.last) / DAY, r = recall(m, now), d = m.d, sd = m.s;
-      if (days < 0.5) m.s = Math.max(g >= OK ? sd : 0, sd * Math.exp(W[17] * (g - 3 + W[18])));   // the same sitting
+      if (days < SITTING) m.s = Math.max(g >= OK ? sd : 0, sd * Math.exp(W[17] * (g - 3 + W[18])));   // the same sitting
       else if (g === AGAIN) m.s = Math.min(sd, W[11] * Math.pow(d, -W[12]) * (Math.pow(sd + 1, W[13]) - 1) * Math.exp(W[14] * (1 - r)));
       else m.s = sd * (1 + Math.exp(W[8]) * (11 - d) * Math.pow(sd, -W[9]) * (Math.exp(W[10] * (1 - r)) - 1) * (g === HARD ? W[15] : 1) * (g === EASY ? W[16] : 1));
       const next = d - W[6] * (g - 3) * (10 - d) / 9;
@@ -1781,11 +1782,16 @@ html #card.ghost ~ #place { visibility: visible; }
     const days = (m.s / FACTOR) * (Math.pow(RETAIN, 1 / DECAY) - 1);
     m.due = g === AGAIN ? now + RELEARN : now + days * DAY;
   }
+  // The last LATELY postcards delivered, 1 found at the first try (deliver's `clean`, the end screen's "first try"),
+  // 0 not: kept in the save, so a flight that ended on misses is followed by postcards known well. Under FEW of them
+  // found (fewer than 5 of 8), the next postcard is one known well (nextItem); with fewer than FEW_FROM results on
+  // file, the share counts as met.
+  const LATELY = 8, FEW = 0.6, FEW_FROM = 4;
   const KEY = 'birds-eye-world-1';
   const KINDS = ['c', 'k', 'f', 's'], REGIONS = ['World', 'Africa', 'Americas', 'Asia', 'Europe', 'Oceania'];
   // asked, games: Ranked's turns. games counts the Ranked games begun; asked holds, for a country, the game it was last asked in
   // told: how often a wrong landing has said why speed and energy use have an X (n, in the tutorial and the real games together), and the real games that have said it (day, ranked)
-  const save = { mem: {}, best: 0, sound: true, study: { kinds: KINDS.slice(), where: ['World'] }, trips: {}, endless: 0, skill: null, visited: false, asked: {}, games: 0, told: { n: 0 } };
+  const save = { mem: {}, lately: [], best: 0, sound: true, study: { kinds: KINDS.slice(), where: ['World'] }, trips: {}, endless: 0, skill: null, visited: false, asked: {}, games: 0, told: { n: 0 } };
   const wholeWorld = (w) => !w.length || w.includes('World') || REGIONS.every((r) => r === 'World' || w.includes(r));      // no region, World itself, or all five
   try {
     const got = JSON.parse(localStorage.getItem(KEY)) || {};
@@ -1801,6 +1807,7 @@ html #card.ghost ~ #place { visibility: visible; }
         save.mem[k] = { box: boxFor(sd), due: +m.due || 0, seen, last: +m.last || seen, s: sd, d: fsrs ? clamp(+m.d, 1, 10) : 5 };
       }
     }
+    if (Array.isArray(got.lately)) save.lately = got.lately.filter((x) => x === 0 || x === 1).slice(-LATELY);          // Study's last results (nextItem)
     if (Number.isFinite(got.best)) save.best = got.best;
     if (typeof got.sound === 'boolean') save.sound = got.sound;
     if (Number.isFinite(got.endless)) save.endless = got.endless;
@@ -1912,10 +1919,9 @@ html #card.ghost ~ #place { visibility: visible; }
   const pointOf = (it) => (it.kind === 'k' ? unit(it.c.cap[1], it.c.cap[2]) : it.c.u);
 
   // Variety first: a country that was just asked (in any form: its place, capital or flag) stays
-  // away until COOLDOWN other postcards have gone by. Then: something due if there is one (a missed
-  // one, or one whose chance of being remembered is down to 90%); otherwise something new; only when
-  // nothing new is left, whatever is likeliest to have been forgotten. Nothing depends on where the
-  // bird is: the next postcard can be anywhere in the world.
+  // away until COOLDOWN other postcards have gone by. What comes next is dealt from four piles, by the
+  // game's memory of each postcard (nextItem). Nothing depends on where the bird is: the next postcard
+  // can be anywhere in the world.
   const COOLDOWN = 6;
   // A new thing is drawn at random from the next this many of its kind, the best known first: 25 of the 190 or so
   // countries, capitals and flags, 6 of the 46 seas (the same share of the list; with 25 for the seas too the first sea
@@ -1949,28 +1955,55 @@ html #card.ghost ~ #place { visibility: visible; }
     const rested = (it) => !recent.includes(it.c.id) && !S.tickets.some((t) => t.it.c.id === it.c.id);
     let pool = all.filter(rested);
     if (!pool.length) pool = all.filter((it) => it.c.id !== S.history[S.history.length - 1]);
-    const due = pool.filter((it) => memOf(it).box > 0 && memOf(it).due <= now);
-    const unmet = pool.filter((it) => memOf(it).box === 0);
-
-    // New things take turns: a country, a capital or flag of a country you can find, a country, a sea.
-    // A guaranteed mix: while you are missing a lot, at least one new thing in every three postcards,
-    // with what you missed in between; otherwise at least one in every two; and whenever nothing is
-    // due, every postcard is new.
-    const struggling = S.recent.filter(Boolean).length >= 3;
-    const hold = due.length && S.sinceNew < (struggling ? 2 : 1);
-    if (unmet.length && !hold) {
+    // THE MIX (the player's pick of 2026-11-26, "Build it into the game", from numbers flown on a copy of their own
+    // save; PLAN, THE WHOLE LIST 110). Their words: "It's way too hard ... why the fuck am I getting literally every
+    // single island country there is when I'm studying the whole world? And why am I never getting repeats of things
+    // that I've done?" Until then (the first build's rule, nobody's pick): a new postcard at least every second one,
+    // every third while missing a lot, and among the due the missed ones held 72 in 100 of the draw; far along the
+    // line a well known postcard came 5 times in 100.
+    // Four piles, by the memory of each postcard: NEW (never asked), MISSED LATELY (under a day of memory, its wait
+    // over), FOUND ONCE OR TWICE (a day to a week of memory, due) and KNOWN WELL (a week or more).
+    // The work: missed lately, new, found once or twice take turns; a pile with nothing to give passes its turn on
+    // (a first flight is all new postcards, as before).
+    // The rest: whenever fewer than 5 of the last 8 postcards were found at the first try (save.lately, FEW), the
+    // next postcard is one known well: one that is due, the most overdue likeliest; none due: one of the ten
+    // remembered least. A postcard known well comes so at most once a sitting (last asked SITTING ago or longer):
+    // a beginner knows few, and with only the rest of six postcards between them the same ones came up to 9 times
+    // in 60 postcards (the player, 2026-11-10: "the same postcards over and over. It's boring"; measured on the
+    // build of 2026-11-26 before it went out, PLAN 110). With none left, the work goes on.
+    const unmet = pool.filter((it) => memOf(it).box === 0), met = pool.filter((it) => memOf(it).box > 0);
+    const dueIn = (from, to) => met.filter((it) => { const m = memOf(it); return m.box >= from && m.box <= to && m.due <= now; });
+    const missed = dueIn(1, 1), once = dueIn(2, 2), known = met.filter((it) => { const m = memOf(it); return m.box >= 3 && now - m.last >= SITTING * DAY; }), knownDue = known.filter((it) => memOf(it).due <= now);
+    // among what is due, the most overdue (for how long it was meant to wait) is likeliest
+    const overdue = (it) => { const m = memOf(it); return Math.min(10, 1 + (now - m.due) / Math.max(RELEARN, m.due - m.last)); };
+    const aKnown = () => {
+      if (knownDue.length) return pick(knownDue, overdue);
+      if (!known.length) return null;
+      const low = known.slice().sort((a, b) => recall(memOf(a), now) - recall(memOf(b), now)).slice(0, 10);
+      return low[Math.floor(Math.random() * low.length)];
+    };
+    // New things take turns: a country, a capital or flag of a country you can find, a country, a sea; with no sea
+    // to give, a capital or flag (until 2026-11-26 a country: with every sea met, 3 of 4 new postcards were
+    // countries, and at the line's end those are the island countries).
+    const aNew = () => {
+      if (!unmet.length) return null;
       const next = (kind, n) => { const list = unmet.filter(kind).slice(0, n); return list.length ? list[Math.floor(Math.random() * list.length)] : null; };
       // S.saw: country -> its turn (the count of new countries handed out by which it may come) * 1e4 + the order it was named in
       const saw = unmet.filter((it) => it.kind === 'c').slice(0, SAW_REACH).filter((it) => S.saw.has(it.c.id) && Math.floor(S.saw.get(it.c.id) / 1e4) <= S.newC);
       const place = (saw.length ? saw.reduce((a, b) => (S.saw.get(a.c.id) <= S.saw.get(b.c.id) ? a : b)) : null) || next((it) => it.kind === 'c', NEXT), more = next((it) => it.kind === 'k' || it.kind === 'f', NEXT),
         water = next((it) => it.kind === 's', NEXT_SEA);
       S.turn = (S.turn + 1) % 4;
-      return (S.turn === 1 ? more : S.turn === 3 ? water : place) || place || more || water;
-    }
-    // among what is due, the most overdue (for how long it was meant to wait) is likeliest
-    if (due.length) return pick(due, (it) => { const m = memOf(it); return Math.min(10, 1 + (now - m.due) / Math.max(RELEARN, m.due - m.last)); });
-    if (unmet.length) return unmet[0];
-    const met = pool.filter((it) => memOf(it).box > 0);
+      return (S.turn === 1 ? more : S.turn === 3 ? water || more : place) || place || more || water;
+    };
+    const piles = [() => (once.length ? pick(once, overdue) : null), () => (missed.length ? pick(missed, overdue) : null), aNew];
+    const work = () => {
+      for (let i = 0; i < piles.length; i++) { const it = piles[(S.work = (S.work + 1) % piles.length)](); if (it) return it; }
+      return null;
+    };
+    const L = save.lately, few = L.length >= FEW_FROM && L.reduce((a, b) => a + b, 0) / L.length < FEW;
+    const it = few ? aKnown() || work() : work() || aKnown();
+    if (it) return it;
+    // nothing new, nothing due and nothing known well: whatever is likeliest to have been forgotten
     if (!met.length) return pool[0];
     return met.reduce((a, b) => (recall(memOf(a), now) <= recall(memOf(b), now) ? a : b));
   }
@@ -2142,7 +2175,7 @@ html #card.ghost ~ #place { visibility: visible; }
     mode: 'title',             // title | fly | over
     paused: false,
     t: 0, energy: TANK, n: 0, streak: 0, bestStreak: 0, firstTry: 0, fresh: 0, blend: 0, idle: 0, lastGain: 0,
-    tickets: [], last: null, history: [], spawnAt: 0, sinceNew: 2, recent: [], turn: 0, endAt: 0,
+    tickets: [], last: null, history: [], spawnAt: 0, turn: 0, work: 0, endAt: 0,
     log: new Map(), drops: [], look: null, gain: 0, fails: new Map(), saw: new Map(), sawCap: new Set(), newC: 0, sawN: 0,
   };
   // Seconds a globe holds still before it starts to turn: the title's; and Study's end globe on where the flight started,
@@ -3268,7 +3301,6 @@ html #card.ghost ~ #place { visibility: visible; }
     const saw = isNew && (it.kind === 'c' ? S.saw.has(it.c.id) : it.kind === 'k' && S.sawCap.has(it.c.id));
     if (it.kind === 'c') S.saw.delete(it.c.id);
     if (isNew && it.kind === 'c') S.newC++;
-    S.sinceNew = isNew ? 0 : S.sinceNew + 1;
     S.tickets.push({ it, node, age: 0, isNew, saw, misses: 0, shown: false, warm: false, from: [bird.lon, bird.lat] });
     sfx.call();
     measure();
@@ -3588,7 +3620,7 @@ html #card.ghost ~ #place { visibility: visible; }
     if (game === 'trip' && runKind === 'day' && tripDone()) return;          // one trip a day (one begun is carried on)
     S.game = game;
     Object.assign(S, { mode: 'fly', paused: false, t: 0, energy: TANK, n: 0, streak: 0, bestStreak: 0, firstTry: 0, fresh: 0, route: null, legs: null, tickets: [], last: null,
-      spawnAt: 0, sinceNew: 2, recent: [], history: [], endAt: 0, look: null, capAt: null, capAlso: null, capMore: [], capFit: null, named: null, around: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), sawCap: new Set(), newC: 0, sawN: 0, intro: null, began: null, replay: null });
+      spawnAt: 0, history: [], endAt: 0, look: null, capAt: null, capAlso: null, capMore: [], capFit: null, named: null, around: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), sawCap: new Set(), newC: 0, sawN: 0, intro: null, began: null, replay: null });
     S.log = new Map();
     S.drops = [];
     glide = null;          // no move of the view left over (the clock starts at 0 again)
@@ -3666,7 +3698,7 @@ html #card.ghost ~ #place { visibility: visible; }
     const ll = (p) => lonLat(p).map((v) => +v.toFixed(3)), t = S.tickets[0];
     save.flight = { n: S.n, energy: +S.energy.toFixed(3), streak: S.streak, best: S.bestStreak, first: S.firstTry, fresh: S.fresh,
       bird: [+bird.lon.toFixed(3), +bird.lat.toFixed(3), +bird.a.toFixed(3), bird.down ? 1 : 0, bird.at],
-      fails: [...S.fails], saw: [...S.saw], sawCap: [...S.sawCap], newC: S.newC, sawN: S.sawN, recent: S.recent.slice(), history: S.history.slice(-12), sinceNew: S.sinceNew, last: S.last,
+      fails: [...S.fails], saw: [...S.saw], sawCap: [...S.sawCap], newC: S.newC, sawN: S.sawN, history: S.history.slice(-12), last: S.last,
       log: [...S.log.values()].map((r) => [r.it.key, r.shown ? 1 : 0, r.isNew ? 1 : 0].concat(r.p ? ll(r.p) : [])),
       drops: S.drops.filter((d) => d.from).map((d) => ll(d.p).concat(ll(d.from), [d.km, d.city])), began: S.began ? ll(S.began) : null,
       card: t ? [t.it.key, t.misses, t.shown ? 1 : 0, t.warm ? 1 : 0, t.isNew ? 1 : 0, t.from[0], t.from[1], t.saw ? 1 : 0] : null,
@@ -3694,7 +3726,7 @@ html #card.ghost ~ #place { visibility: visible; }
         if (t.misses) setStrikes(t);
         if (t.shown) shownName(t);
       }
-      Object.assign(S, { recent: (f.recent || []).slice(), history: (f.history || []).slice(), sinceNew: f.sinceNew | 0, newC: f.newC | 0 });      // after the postcard is back aboard: putting it there counts as asking
+      Object.assign(S, { history: (f.history || []).slice(), newC: f.newC | 0 });      // after the postcard is back aboard: putting it there counts as asking
       $('count').textContent = S.n;
     } catch (e) { delete save.flight; persist(); }          // a kept flight that cannot be read: a new one
   }
@@ -5600,7 +5632,7 @@ html #card.ghost ~ #place { visibility: visible; }
     }
     if (clean) { S.streak++; S.firstTry++; }
     if (t.isNew) S.fresh++;
-    if (!t.isNew) { S.recent.push(!clean); if (S.recent.length > 6) S.recent.shift(); }
+    save.lately.push(clean ? 1 : 0); if (save.lately.length > LATELY) save.lately.shift();          // the last results: nextItem deals by them
     m.seen = now;
     S.bestStreak = Math.max(S.bestStreak, S.streak);
     S.n++;
