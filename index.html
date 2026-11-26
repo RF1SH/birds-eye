@@ -184,6 +184,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
   letter-spacing: .02em;
 }
 .alt:hover { background: var(--paper-shade); }
+#idk kbd { vertical-align: 3.3px; }          /* the cap's middle on the middle of the capital letters of this button's 16 px word (.alt kbd's 5px is for a 20 px word; measured by ink at three window sizes, as Home's cap) */
+#idk.off { opacity: .4; cursor: default; }          /* it cannot be pressed now: the bird is in the air, or the location is shown */
+#idk.off:hover { background: var(--paper); }
 .alt kbd { min-width: 0; margin: -2px 0 -2px 4px; padding: 0 5px 1px; font-size: 11.5px; line-height: 1.2; vertical-align: 5px; }      /* level with the word: the cap's middle on the middle of the capital letters (at 2px it hung 3.4 px low) */
 :focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
 .aside { color: var(--ink-soft); font-size: 13px; }
@@ -803,6 +806,7 @@ html #card.ghost ~ #place { visibility: visible; }
           <div id="tutor-go" class="tutor-btn" hidden><button class="go" id="tutor-continue" type="button">Continue</button></div>
           <div id="tutor-skip" class="tutor-btn" hidden><button class="alt" id="tutor-skip-btn" type="button">Skip</button></div>
           <div id="tally"><b id="count">0</b><span id="count-what">delivered</span></div>
+          <div id="idk-cell" class="tutor-btn" hidden><button class="alt" id="idk" type="button">I don't know <kbd>F</kbd></button></div>
         </div>
       </div>
       <div id="daycard" hidden></div>
@@ -2047,12 +2051,14 @@ html #card.ghost ~ #place { visibility: visible; }
   const TANK = 100;            // energy; you take off with it full
   const BURN = 7;              // energy a second of flapping costs. Nothing else uses it.
   const GUESSES = 3;           // wrong landings before you are shown the way
-  const MISS = 5;              // energy a wrong landing costs
-  const MISS_NEW = 1.5;        // ...when it is a guess at something you have never been asked for
+  // A wrong landing takes no energy, and neither does "I don't know" (the player's pick by button, 2026-11-26, after flying a
+  // trial page: "Energy, misses free"; their words for the button: "I wouldn't want to waste energy trying to guess"). Until
+  // then a wrong landing took 5, or 1.5 at a location never asked. The flight to a wrong location is still not given back.
   // What a delivery gives back. A clean delivery refunds what an efficient flight from where the
   // letter was picked up would have cost (its "par"), with a little slack, plus a bonus that starts
   // generous and settles at 1 but never reaches 0. Flawless flying therefore always pays for itself;
-  // climbing to look around, wrong landings and being shown the way are what run you down.
+  // climbing to look around and flying to wrong locations are what run you down (a delivery after a wrong landing, or
+  // after being shown the way, gives back par alone).
   const SLACK = 1.25;          // a clean delivery refunds this much of par...
   const BONUS = 19;            // ...plus 1 + BONUS * BONUS_FADE^n, n = letters delivered so far:
   const BONUS_FADE = 0.96;     //    20 for the first, 9.4 by the twentieth, and never below 1
@@ -3651,6 +3657,7 @@ html #card.ghost ~ #place { visibility: visible; }
     $('place').hidden = true; $('daycard').hidden = true; hideFunFact();
     $('trip-pips').hidden = $('trip-clock').hidden = S.game !== 'trip';
     $('count-what').textContent = S.game === 'trip' ? 'points' : 'delivered';
+    $('idk-cell').hidden = S.game !== 'study';
     S.cap = 0; S.trip = null;
     if (S.game === 'free') S.energy = Infinity;          // Free flight: no energy, no end
     if (S.game === 'trip') tripStart(runKind);
@@ -5691,7 +5698,7 @@ html #card.ghost ~ #place { visibility: visible; }
   }
 
   // A capital letter brought down in the right country but too far from the city. The first time it
-  // only says how far; after that it counts as a wrong landing, so hunting around has a price.
+  // only says how far; after that it counts as a wrong landing (an X on the postcard), so hunting around is counted.
   function warm(t, p, lon, lat) {
     const c = t.it.c, off = kmBetween(lon, lat, c.cap[1], c.cap[2]);
     S.said = 'correct country'; S.named = c.name;
@@ -5703,9 +5710,7 @@ html #card.ghost ~ #place { visibility: visible; }
       sfx.thud();
       return;
     }
-    S.energy = Math.max(0, S.energy - (t.isNew ? MISS_NEW : MISS));
     S.streak = 0;
-    S.gain = -1;
     sfx.miss();
     countAgainst(t);
   }
@@ -5747,11 +5752,8 @@ html #card.ghost ~ #place { visibility: visible; }
   // Nothing here for this letter. Say where "here" is, so the wrong landing still teaches something.
   function strand(here, p) {
     const t = S.tickets[0];
-    const cost = t && t.isNew ? MISS_NEW : MISS;          // nobody is expected to know what they have never met
-    S.energy = Math.max(0, S.energy - cost);
     S.streak = 0;
     S.said = S.named = here.name;
-    S.gain = -1;
     ring(p, 6, 30, BAD, 2.5, 0.5);
     const lit = here.c || (here.sea && here.w >= 0 ? WATERS[here.w] : null);
     // a country never asked, named here: it comes sooner as a new one (SAW_REACH), at a turn drawn now; named again, it keeps its turn
@@ -7329,6 +7331,7 @@ html #card.ghost ~ #place { visibility: visible; }
     const exploring = S.mode === 'fly' && S.game === 'free';
     if (!S.paused && !heldAt && !(exploring && (faqOn || howOn))) step(dt);          // a sheet over Explore: the flight waits under it
     lookTick(dt);
+    idkBtn.classList.toggle('off', S.mode === 'fly' && S.game === 'study' && (!bird.down || !!(S.tickets[0] && S.tickets[0].shown)));          // dimmed in the air and once the location is shown; never between two postcards
     const canPause = S.mode === 'fly' && !S.paused && !inRound() && !exploring;      // the pause button: there whenever pausing is allowed
     if (pauseBtn.hidden === canPause) pauseBtn.hidden = !canPause;
     if (cornerHome.hidden === exploring) cornerHome.hidden = cornerHow.hidden = cornerSound.hidden = !exploring;          // Explore's corner: what its pause card held, with no pause between
@@ -7347,6 +7350,23 @@ html #card.ghost ~ #place { visibility: visible; }
     if (S.paused) { setPaused(false); return true; }
     return false;
   }
+  // "I don't know" (Study): the location is shown at once, as after the last wrong landing, by the game's own countAgainst
+  // and pointOut; the postcard gets its three X's. The player, 2026-11-26: "there should be an I don't know button next to
+  // study mode, and it'll just show you as if you just got 3 questions wrong because sometimes you give me things that I
+  // don't know at all, and I would just be guessing anyways. And I wouldn't want to waste energy trying to guess." It takes
+  // no energy (their pick by button the same day). It works with a postcard aboard, the bird on the ground and the
+  // location not shown yet: a postcard comes with the bird on the ground, and the showing is made for a bird that stands.
+  // A press ends the row of first tries, and the delivery after it counts as one after three wrong landings does.
+  const idkBtn = $('idk');
+  function canIdk() { const t = S.tickets && S.tickets[0]; return S.mode === 'fly' && S.game === 'study' && !S.paused && bird.down && !S.look && !S.intro && !!t && !t.shown; }
+  function idk() {
+    if (!canIdk()) return;
+    const t = S.tickets[0];
+    S.streak = 0;
+    t.misses = GUESSES - 1;
+    countAgainst(t);
+  }
+  idkBtn.addEventListener('click', () => { idk(); idkBtn.blur(); stage.focus({ preventScroll: true }); });
   window.addEventListener('keydown', (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (faqOn) { if (e.key === 'Escape') { faqClose(); e.preventDefault(); } return; }          // the FAQ is over the game: Esc is its Back, and no key reaches the game under it
@@ -7360,6 +7380,7 @@ html #card.ghost ~ #place { visibility: visible; }
       e.preventDefault();
       return;
     }
+    if (k === 'f' && !e.repeat && S.mode === 'fly' && S.game === 'study') { idk(); e.preventDefault(); return; }          // "I don't know" (the player, 2026-11-26: "F should be the button for i dont know")
     if (k === 'e' && !e.repeat && S.paused && !$('end').hidden) { endFlight(); e.preventDefault(); return; }          // E ends a flight only where the pause card offers it
     if ((k === ' ' || k === 'Enter') && !e.repeat && looking() && !S.paused) lookEnd();          // looking around: the view comes back, and the same press goes on (the next location, or held, the take-off)
     // On the home screen and an end screen only a new press of an arrow key counts: a key still held from the flight does not turn the globe.
@@ -7920,7 +7941,7 @@ html #card.ghost ~ #place { visibility: visible; }
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   // for the tests: the bird put somewhere by hand. That is no flight, so the view is the bird's own at once (no rest on the last landing's country still being handed back)
   const setBird = (lon, lat, a, down) => { Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down }); S.capFit = null; fitClear(); };
-  window.birdsEye = { explore, glide: () => glide, glideP, glideLook, howTo, pair: () => view.pair, homeNote: () => { showTripNote(); showKnown(); measure(); }, stackLines: (id) => { const c = PLAY.find((q) => q.id === id); ownName = true; try { return stackForm(c, c.name, 'name', null).lines; } finally { ownName = false; } }, hoverBox: () => hoverBox, slerp, showLeg, legView, STILL_DEG, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, rankedRounds, easiest, flagClue, capClue, capFlagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
+  window.birdsEye = { idk, canIdk, explore, glide: () => glide, glideP, glideLook, howTo, pair: () => view.pair, homeNote: () => { showTripNote(); showKnown(); measure(); }, stackLines: (id) => { const c = PLAY.find((q) => q.id === id); ownName = true; try { return stackForm(c, c.name, 'name', null).lines; } finally { ownName = false; } }, hoverBox: () => hoverBox, slerp, showLeg, legView, STILL_DEG, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, rankedRounds, easiest, flagClue, capClue, capFlagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     outlines: () => fx.filter((f) => f.lined && f.shownA > 0).map((f) => f.lined.id), OUTLINE, pull, pullBy, steerable, PULL_FULL, PULL_RING, hFor, look: () => gaze, looking, canLook, lookStart, lookEnd, lookAnswer, answerNamed: () => answerNamed, birdRing: () => { const g = project(unit(bird.lon, bird.lat)); return g && birdRing(g); }, answerRoom: () => gazeName, lookK: gazeK, plate: () => plateSays, capLineOf: (id) => capLine(PLAY.find((c) => c.id === id)), plateRoom: (h) => pointerPlate(h, 1, true), hoverNow: () => (hover ? hover.name : null), project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
