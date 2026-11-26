@@ -7771,9 +7771,14 @@ html #card.ghost ~ #place { visibility: visible; }
     }
     if (S.mode === 'fly') { hover = mouse = null; if (pull.at) { pull.x = x; pull.y = y; S.idle = 0; } return; }
     if (drag.on) {
-      const k = cam.H / view.F / RAD;
-      atlas.lat = clamp(atlas.lat + (e.clientY - drag.y) * k, -60, 75);
-      atlas.lon = wrapLon(atlas.lon - ((e.clientX - drag.x) * k) / Math.max(0.2, Math.cos(atlas.lat * RAD)));
+      // While the view is still on its way home from a flight a pull turns nothing, as the arrow keys (keyTurns): the view is
+      // that move's until it is home, and the pull goes on from where the pointer is then. (Until 2026-11-26 the globe turned
+      // unseen under the move and the view leapt when the move ended, 2 degrees in one frame: PLAN, THE WHOLE LIST 111.)
+      if (!gliding()) {
+        const k = cam.H / view.F / RAD;
+        atlas.lat = clamp(atlas.lat + (e.clientY - drag.y) * k, -60, 75);
+        atlas.lon = wrapLon(atlas.lon - ((e.clientX - drag.x) * k) / Math.max(0.2, Math.cos(atlas.lat * RAD)));
+      }
       drag.x = e.clientX; drag.y = e.clientY;
       atlas.idle = 0;
       hover = mouse = null;
