@@ -804,6 +804,39 @@ html #card.ghost ~ #place { visibility: visible; }
 #tq-ans .r .mk svg { display: block; width: 13.5px; height: 13px; overflow: visible; }
 #tq-ans .note { width: 0; min-width: 100%; margin: 8px 0 0; font: 400 12px/1.35 var(--text); color: var(--ink-soft); text-wrap: pretty; }
 #tq-ans .why { width: 0; min-width: 100%; margin: 8px 0 0; font: 400 13px/1.2 var(--text); color: var(--ink); text-wrap: pretty; }
+/* Trivia, the day's card: Day Trip's end card with a row a question (tqDayDraw). A row: the question, three flag spots as the bar's (64 px, 10 px between two;
+   an empty spot a box of a flag's size, 40 x 20), the points over the question's worth. Under the open row: the other correct countries by their stars at
+   the left, the incorrect landings at the right, the notes under both. */
+#daycard table.tqd td { vertical-align: middle; }
+#daycard table.tqd td.asked { width: auto; padding-right: 14px; }
+#daycard table.tqd td.asked .big { display: block; text-wrap: balance; }
+#daycard table.tqd td.you { width: 1px; padding-right: 12px; color: var(--ink); }
+#daycard table.tqd td.pts { width: 66px; }
+#daycard .tqp { display: flex; gap: 10px; align-items: flex-start; }
+#daycard .tqp .pl { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; align-content: start; row-gap: 3px; width: 64px; }
+#daycard .tqp .wd { display: flex; justify-content: center; align-items: center; height: 11px; }
+#daycard .tqp .wd .mk { display: flex; gap: 2px; }
+#daycard .tqp .wd svg { display: block; width: 11.4px; height: 11px; overflow: visible; }
+#daycard .tqp i { display: block; box-sizing: border-box; width: 40px; height: 20px; border: 2px solid #b9b2a0; border-radius: 2px; }
+#daycard .tqp img { display: block; }
+#daycard .tqp .nm { min-height: 14px; font: 700 13px/14px var(--display); color: var(--ink); text-align: center; text-wrap: balance; }
+#daycard .tqp .none .nm { font: 600 13px/14px var(--display); color: var(--ink-soft); white-space: nowrap; }
+#daycard .tqp .nm.long { font-size: 11px; line-height: 13px; }
+#daycard .tqp .nm .ast { position: absolute; }
+#daycard .ast { display: none; }
+#daycard tr.on .ast { display: inline; }
+#daycard table.tqd tr.detail td { padding: 0 0 12px 22px; vertical-align: top; cursor: default; }
+#daycard .tqo { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 28px; align-items: start; font: 400 13px/19px var(--text); color: var(--ink); }
+#daycard .tqo .lab { color: var(--ink-soft); }
+#daycard .tqo .no { max-width: 230px; }
+#daycard .tqo .bad2 .at { color: var(--bad); font-weight: 700; }
+#daycard .tqo .bad2 .tick { margin-right: 6px; }
+#daycard .tqo .g { display: grid; grid-template-columns: 38px 1fr; column-gap: 8px; align-items: start; }
+#daycard .tqo .g .mk { display: flex; gap: 2px; align-items: center; height: 19px; }
+#daycard .tqo .g .mk svg { display: block; width: 11.4px; height: 11px; overflow: visible; }
+#daycard .tqo .c.lit, #daycard .tqp .pl.lit .nm { text-decoration: underline; text-underline-offset: 2px; }
+#daycard .tqo .note { grid-column: 1 / -1; margin: 4px 0 0; color: var(--ink-soft); line-height: 17px; }
+body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons (back to the bird, pause) have no job at a day's end */
 </style>
 
 </head>
@@ -1068,7 +1101,7 @@ html #card.ghost ~ #place { visibility: visible; }
   // The camera hangs straight above a point on the globe with north up. Its height above the
   // ground is H, in earth radii. From close in you see about 1,600 km across; at the top the
   // whole of one side of the earth.
-  const view = { ui: 1, mk: 1, ox: 0, slide: 0, w: 1, h: 1, dpr: 1, scale: 1, deck: 0, ref: 1, F: 1, H0: 0.3, H1: 3, Htitle: 3, gy: 0, tx: 0, ty: 0 };
+  const view = { ui: 1, mk: 1, ox: 0, slide: 0, w: 1, h: 1, dpr: 1, scale: 1, deck: 0, ref: 1, F: 1, H0: 0.3, H1: 3, Htitle: 3, gy: 0, tx: 0, ty: 0, tqRight: 0 };
   const cam = { n: [1, 0, 0], e: [0, 1, 0], u: [0, 0, 1], H: 1, D: 2, cos0: 0.5, sin0: 0.87, cx: 0, cy: 0, rho: 1, pxRad: 1 };
   const GROUND_KM = 1600;
   const KEY_ROOM = 40;                // the room under a results globe for the line that explains its lines, times the scale of the cards
@@ -3586,7 +3619,7 @@ html #card.ghost ~ #place { visibility: visible; }
   const toBird = $('tobird');
   const looking = () => !!gaze && !gaze.leaving;
   const canLook = () => S.mode === 'fly' && !S.paused && bird.down && S.blend >= 1 && (!S.trip || (S.trip.wait && !S.trip.count && !S.trip.tutor && !S.trip.lesson && !!S.trip.reveal));
-  const gazeWhole = () => hFor(0.46 * Math.min(view.w, view.h - view.deck));          // the whole globe in the room over the bar, as the title's
+  const gazeWhole = () => hFor(0.46 * Math.min(view.w - view.tqRight, view.h - view.deck));          // the whole globe in the room over the bar, as the title's (tqRight: beside the card of Trivia's day, as an end globe is sized by the room beside its card)
   // How much of the look-around is there, 0 to 1: the landing's names fade as it comes, and are back when the view is nearly home.
   const gazeK = () => (!gaze ? 0 : gaze.leaving ? (gaze.T ? 1 - smooth(clamp(((S.t - gaze.t1) / gaze.T - 0.6) / 0.4, 0, 1)) : 1) : smooth(clamp((S.t - gaze.t0) / 0.25, 0, 1)));
   // The veil: while the view is away, what a landing put on the map (its names and flags, its bold borders, Free
@@ -3611,6 +3644,7 @@ html #card.ghost ~ #place { visibility: visible; }
   function lookEnd(now) {          // now: at once, with no way back (a flight begins or ends)
     const O = gaze;
     if (!O) return;
+    if (TQ.dayOn && !now) return;          // the end of Trivia's day: the globe is the day's, with no way back to the bird
     hover = mouse = null; drag.on = false; stage.classList.remove('dragging');
     if (now) { gaze = null; stage.classList.remove('looking'); return; }
     if (O.leaving) return;
@@ -5967,7 +6001,6 @@ html #card.ghost ~ #place { visibility: visible; }
   // Back to the title: the globe stays where you were and starts turning again.
   function goHome(keep) {          // keep (true): the globe stays turned as the player has it (Explore scrolled out to the whole globe)
     if (S.mode === 'title') return;
-    tqOff();          // Trivia: the day is in the save as it stands (tqKeep); a question left open closes at the next look (tqSaved)
     keep = keep === true;
     const wasLook = looking(), oldCorner = S.mode === 'fly' ? ghost($('corner')) : null;          // the corner's buttons fade out on the way, as the card does
     // From a flight the view goes home in one move, a click's move backwards (glide): where the bird stood glides to its
@@ -5976,6 +6009,10 @@ html #card.ghost ~ #place { visibility: visible; }
     placeCamera();
     const was = { n: cam.n.slice(), H: cam.H, cx: cam.cx, cy: cam.cy, F: view.F }, wasFly = S.mode === 'fly', wasAt = keep ? cam.n.slice() : glide && glide.fly ? glideBird() : unit(bird.lon, bird.lat);
     const wasK = wasFly && S.game === 'free' && bird.down ? onMap() : 0, wasA = wasK && !wasLook ? S.around : null, old = wasFly ? ghost($('card')) : null;          // from a look-around the landing's names are away already: they do not come back on the way
+    // Trivia: the day is in the save as it stands (tqKeep); a question left open closes at the next look (tqSaved). Its cards are taken down only here, once
+    // the view is read as it stands on the screen: a closed question's globe and the day's stand in the room beside a card. (Taken down first, the globe's
+    // middle leapt to the window's middle in the frame of Home: 172 px at a closed question, 380 px and a third bigger at the day's card, 1440 x 900.)
+    tqOff();
     glide = null;
     abandon(true);
     const from = keep ? lonLat(was.n) : S.mode === 'fly' ? [bird.lon, bird.lat] : [atlas.lon, atlas.lat];
@@ -6271,7 +6308,7 @@ html #card.ghost ~ #place { visibility: visible; }
     if (gaze && !gaze.leaving) {          // looking around: the player's own view, its middle in the middle of the room over the bar
       const O = gaze, e = smooth(clamp((S.t - (O.tc || O.t0)) / 0.4, 0, 1));          // tc: the middle was sent to a new room since (Trivia's closed question: tqAnchor)
       O.own = { n, H: Math.exp(logH) };          // the game's own view meanwhile: scrolling back in to it ends the look-around (lookWheel)
-      O.H = clamp(O.H, view.H0, gazeWhole());
+      O.H = clamp(O.H, view.H0, Math.max(gazeWhole(), TQ.move ? Math.exp(TQ.move.h0) : 0));          // (Trivia: a move of the view that begins higher than the whole globe of a room just grown, the bar gone for the day's card, comes down through the move, not in its first frame)
       aim(unit(O.lon, O.lat), O.H, lerp(O.cx0, TQ.page && TQ.page.cx ? TQ.page.cx : view.w / 2, e), lerp(O.cy0, (view.h - view.deck) / 2, e));          // Trivia's closed question: the middle of the room beside its list (tqFit)
       return;
     }
@@ -7491,6 +7528,11 @@ html #card.ghost ~ #place { visibility: visible; }
     S.idle = 0;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     const exploring = S.mode === 'fly' && S.game === 'free';
+    if (TQ.on && TQ.dayOn && S.mode === 'fly') {          // the card of Trivia's day: H goes home; the keys of a flight (Space, Enter, P, Esc, R) have no job; the arrow keys turn the globe
+      if (e.target instanceof HTMLButtonElement && (k === 'Enter' || k === ' ')) { if (e.repeat) e.preventDefault(); return; }          // a key still held from the flight (the Enter or Space that brought the card up) presses no button: held a moment too long it pressed Share
+      if (k === 'h' && !e.repeat) { $('tq-home').click(); e.preventDefault(); return; }
+      if (k === 'p' || k === 'Escape' || k === 'Enter' || k === ' ' || k === 'r') { e.preventDefault(); return; }
+    }
     if ((k === 'r' || k === 'h') && !e.repeat && (S.paused || S.mode === 'over' || (k === 'h' && exploring))) {
       if (k === 'h') goHome(); else if (!S.paused) start(); else if (!$('restart').hidden) restart();          // R restarts only where the pause card offers it
       e.preventDefault();
@@ -8071,7 +8113,7 @@ html #card.ghost ~ #place { visibility: visible; }
   // "End flight", and whatever Study gains later. Where it does as Study does, the line says so (lookPointed).
   const TQ_NEED = 3, TQ_START = 45, TQ_ADD = 10, TQ_COST = 10;
   const TQ_MULT = [1, 1.5, 2];          // a country of one, two, three stars
-  const TQ = { on: false, day: '', qs: [], i: 0, found: [], wrongs: [], calls: [], note: '', hist: [], rows: [], closed: false, closedT: 0, timeUp: false, end: 0, start0: TQ_START, waitView: false, lastT: 0, landFx: [], page: null, move: null, from: null, lift: false, why: false, rowId: null, rowOn: null };
+  const TQ = { on: false, day: '', qs: [], i: 0, found: [], wrongs: [], calls: [], note: '', hist: [], rows: [], closed: false, closedT: 0, timeUp: false, end: 0, start0: TQ_START, waitView: false, lastT: 0, landFx: [], page: null, move: null, from: null, lift: false, why: false, rowId: null, rowOn: null, dayOn: false, rowQ: -1, dayTall: 0, dayAt: 0 };
   const tqC = (id) => PLAY.find((c) => c.id === id);
   const tqByKind = (kind) => TRIVIA.qs.find((q) => q.kind === kind);
   // a day's five: its place in the list is the days since the start, and the days come round again (as makeTrip's)
@@ -8089,14 +8131,17 @@ html #card.ghost ~ #place { visibility: visible; }
 
   // What is kept of a day (save.trivia[day], in the form of Day Trip's save.trips): for each question begun its name in the bank (kind), the countries found
   // in their order, the incorrect landings, its points as scored, and how it closed (how: 'all' three found, 'time' ran out, 'gave' up, 'left'). The
-  // question with no `how` yet stands open. Written as each thing happens, so nothing more is owed when the window goes.
+  // question with no `how` yet stands open. With the day, where the bird stands (at): the finished day opens again with the bird where it stood (tqResults).
+  // Written as each thing happens, so nothing more is owed when the window goes.
   function tqKeep(how) {
     const T = save.trivia[TQ.day] || (save.trivia[TQ.day] = { score: 0, qs: [] });
     T.qs[TQ.i] = { kind: TQ.qs[TQ.i].kind, found: TQ.found.slice(0, TQ_NEED), wrong: TQ.wrongs.slice(), pts: tqQPts(TQ.i, TQ.found) };
     if (how) T.qs[TQ.i].how = how;
     T.score = T.qs.reduce((a, r) => a + r.pts, 0);
+    T.at = tqAt();
     persist();
   }
+  const tqAt = () => [+bird.lon.toFixed(4), +bird.lat.toFixed(4)];
   const tqFlown = (day) => { const T = save.trivia[day]; return !!T && T.qs.length >= 5 && T.qs.every((r) => !!r.how); };          // a day counts once its fifth question is closed
   // The day as kept, looked at before it is carried on or shown. A day begun before the day's five changed (they do when a question joins the bank): flown
   // to its end it stays as it was flown; left part-way, or with a question that can no longer be read, it is free to fly again (Day Trip's rule:
@@ -8116,7 +8161,7 @@ html #card.ghost ~ #place { visibility: visible; }
     if (S.mode !== 'title') return;
     const day = today(), T = tqSaved(day), at = T ? T.qs.length : 0, qs = tqDayQs(day);
     if (at >= 5 || qs.length < 5) return;          // the day is flown
-    Object.assign(TQ, { on: true, day, qs, i: at, hist: T ? T.qs.map((r) => r.found.slice()) : [], rows: T ? T.qs.map((r, i) => ({ q: qs[i], found: r.found.slice(), wrongs: r.wrong.slice(), how: r.how })) : [],
+    Object.assign(TQ, { on: true, day, qs, i: at, hist: T ? T.qs.map((r) => r.found.slice()) : [], rows: T ? T.qs.map((r, i) => ({ q: qs[i], found: r.found.slice(), wrongs: r.wrong.slice(), how: r.how, pts: r.pts })) : [],
       found: [], wrongs: [], calls: [], note: '', closed: false, landFx: [] });
     takeOff('trivia');
     S.energy = Infinity;          // flying takes no energy (as Explore's)
@@ -8126,7 +8171,7 @@ html #card.ghost ~ #place { visibility: visible; }
   function tqClean() { tqUnlit(); TQ.move = null; TQ.page = null; TQ.from = null; TQ.lift = false; tqAnsOff(); }          // a closed question's screen goes with its question
   function tqOff() {
     if (!TQ.on) return;
-    TQ.on = false; tqClean();
+    TQ.on = false; tqDayOff(); tqClean();
     const box = $('tq-box'); if (box) box.remove();
     tqClockShow(false); tqFoot(); tqBtns(); $('console').classList.remove('v2'); $('trip-bar').style.background = '';
     ticketsEl.replaceChildren();
@@ -8193,7 +8238,7 @@ html #card.ghost ~ #place { visibility: visible; }
   function tqClose() {
     const how = TQ.found.length >= TQ_NEED ? 'all' : TQ.timeUp ? 'time' : 'gave';
     tqLandOff(); TQ.closed = true; TQ.closedT = S.t; TQ.lift = true;
-    TQ.rows.push({ q: TQ.qs[TQ.i], found: TQ.found.slice(), wrongs: TQ.wrongs.slice(), how });
+    TQ.rows.push({ q: TQ.qs[TQ.i], found: TQ.found.slice(), wrongs: TQ.wrongs.slice(), how, pts: tqQPts(TQ.i, TQ.found) });
     TQ.why = !save.told.stars; save.told.stars = true;          // what a star means is said once a player, at the first question that closes (written by tqKeep)
     tqKeep(how);
     tqLight(); tqCard();
@@ -8217,12 +8262,12 @@ html #card.ghost ~ #place { visibility: visible; }
     return true;
   }
   function tqNext() {
-    if (TQ.i + 1 >= TQ.qs.length) { goHome(); return; }          // the day's card is not built yet (the plan's piece 4)
+    if (TQ.i + 1 >= TQ.qs.length) { tqDay5(); return; }          // after the fifth question: the day's card
     if (looking()) lookEnd();
     tqQuestion(TQ.i + 1);
   }
   function tqEnter() {
-    if (!TQ.on || S.mode !== 'fly' || S.paused) return;
+    if (!TQ.on || S.mode !== 'fly' || S.paused || TQ.dayOn) return;
     if (TQ.closed) { tqNext(); return; }
     const air = !bird.down;
     if (air) { const ll = lonLat(cam.n); TQ.from = { lon: ll[0], lat: ll[1], H: cam.H, cx: cam.cx, cy: cam.cy }; }
@@ -8248,7 +8293,10 @@ html #card.ghost ~ #place { visibility: visible; }
   const tqAns = $('tq-ans');
   const TQ_QUIET = 0.62;          // every country that is no answer: the paper's color at this strength
   function tqAnsOff() { tqAns.hidden = true; tqAns.replaceChildren(); TQ.rowId = null; }
-  function tqRowOn(id) { if (tqAns.hidden || TQ.rowOn === id) return; TQ.rowOn = id; for (const r of tqAns.querySelectorAll('.r')) r.classList.toggle('on', r.dataset.id === id); }
+  function tqRowOn(id) {
+    if (TQ.dayOn) { if (TQ.rowOn !== id) { TQ.rowOn = id; for (const r of $('daycard').querySelectorAll('tr.on [data-id]')) r.classList.toggle('lit', r.dataset.id === id); } return; }          // the day's card: the name is underlined
+    if (tqAns.hidden || TQ.rowOn === id) return; TQ.rowOn = id; for (const r of tqAns.querySelectorAll('.r')) r.classList.toggle('on', r.dataset.id === id);
+  }
   tqAns.addEventListener('mouseover', (e) => { const r = e.target.closest('.r'); TQ.rowId = r ? r.dataset.id : null; });          // a row pointed at: its country's plate on the globe (tqNames)
   tqAns.addEventListener('mouseleave', () => { TQ.rowId = null; });
   function tqAnsCard(q) {
@@ -8277,9 +8325,9 @@ html #card.ghost ~ #place { visibility: visible; }
   }
   // The card is fitted by the widths of its words and by its room: laid again, and the view with it, when a lettering arrives late or the window changes.
   // (Laid the same as before, the view stays as the player has it: a lettering can arrive at any time, as with the first plate by the pointer.)
-  const tqLaid = () => { const b = tqAns.getBoundingClientRect(); return [b.left, b.top, b.right, b.bottom, view.w, view.h - view.deck].map((v) => Math.round(v)).join(); };
+  const tqLaid = () => { const b = (TQ.dayOn ? $('daycard') : tqAns).getBoundingClientRect(); return [b.left, b.top, b.right, b.bottom, view.w, view.h - view.deck].map((v) => Math.round(v)).join(); };
   function tqRelay() {
-    if (!TQ.on || !TQ.closed || !TQ.page) return;
+    if (!TQ.on || !TQ.closed || !TQ.page || TQ.dayOn) return;
     const row = TQ.rowId;
     tqAnsCard(TQ.qs[TQ.i]);
     if (tqLaid() === TQ.page.laid) { TQ.rowId = row; return; }
@@ -8298,7 +8346,7 @@ html #card.ghost ~ #place { visibility: visible; }
     return A;
   }
   function tqFit(A) {
-    const cb = !tqAns.hidden ? tqAns.getBoundingClientRect() : null, card = cb && view.w > 900 ? { x1: cb.right, y0: cb.top } : null;          // the view rests in the room beside the card
+    const cb = TQ.dayOn ? $('daycard').getBoundingClientRect() : !tqAns.hidden ? tqAns.getBoundingClientRect() : null, card = cb && view.w > 900 ? { x1: cb.right, y0: cb.top } : null;          // the view rests in the room beside the card
     const saved = Object.assign({}, cam), rx = card ? (card.x1 + view.w) / 2 : view.w / 2, ry = (view.h - view.deck) / 2; A.cx = card ? rx : 0;
     // the bird stays in view when that costs little (a view at most 1.3 times as high): it is where the player is
     A.noMe = true; const alone = fitFor(A, card); A.noMe = false; const both = fitFor(A, card);
@@ -8311,7 +8359,7 @@ html #card.ghost ~ #place { visibility: visible; }
       if (len > 0.05) { const to = [m[0] / len, m[1] / len, m[2] / len], ang = Math.acos(clamp(dot(me, to), -1, 1)); if (ang > 1e-3) fit.c = slerp(me, to, Math.min(1, (45 * RAD) / ang)); }
     }
     fit.H = clamp(fit.H, view.H0, gazeWhole());
-    if (view.F / Math.sqrt((1 + fit.H) * (1 + fit.H) - 1) < 0.62 * Math.min(view.w, view.h - view.deck)) fit.H = gazeWhole();          // the globe nearly whole in the room: whole, not cut off at the room's top
+    if (view.F / Math.sqrt((1 + fit.H) * (1 + fit.H) - 1) < 0.62 * Math.min(view.w - view.tqRight, view.h - view.deck)) fit.H = gazeWhole();          // the globe nearly whole in the room: whole, not cut off at the room's top
     const ll = lonLat(fit.c), upright = !fit.whole; fit.c = unit(ll[0], clamp(ll[1], upright ? -30 : -80, upright ? 40 : 80));          // a set round the globe: the whole globe rests upright (its middle between 30 south and 40 north), never looking down on a pole
     aim(fit.c, fit.H, rx, ry);
     // Each name's PLACE, set once and never moved: the country's own (as on every globe) where that is in the room of this view; else the
@@ -8371,6 +8419,7 @@ html #card.ghost ~ #place { visibility: visible; }
     ctx.globalAlpha = a;
     placeNames(boxes.slice(), true, true);          // painted, each on the spot just found
     for (const n of A.names) n.on = atlasNames.includes(n) && !!n.at;
+    A.stood = !TQ.move;
     if (h && h.row) pointerPlate(h, a);
     ctx.globalAlpha = a0; atlasNames = was; topHover = null; hoverBox = null;
   }
@@ -8389,6 +8438,7 @@ html #card.ghost ~ #place { visibility: visible; }
     const A = TQ.page;
     if (!A || !looking() || TQ.move) return;
     if (A.auto === undefined) {
+      if (!A.stood) return;          // the names stand first (a frame drawn at this view: tqNames): each keeps the spot it has now through the turn
       const unseen = A.names.filter((n) => dot(n.p, cam.n) <= cam.cos0 + 0.08).map((n) => n.c);
       A.auto = null;
       if (unseen.length) {
@@ -8413,6 +8463,170 @@ html #card.ghost ~ #place { visibility: visible; }
     gaze.lon = at[0]; gaze.lat = clamp(at[1], -80, 80); S.idle = 0;
     if (k >= 1) A.auto = null;
   }
+
+  // ---------- Trivia, the day's card: Day Trip's end card with a row a question ----------
+  // After the fifth question (the player's picks by button, 2026-11-25: "Keep it", "A: two columns", "B: a flag's size"): the game's own end card. Its top is
+  // Ranked's: the name, the score on the name's line ("526/1,000"), the day and "points" on the gray line under them. A row a question: the question as the
+  // set it names, the three flag spots as on the bar (an empty spot: a box of a flag's size, the first with the reason under it), the question's points over
+  // its worth. ONE question is open at a time, the last one when the card comes up: under its row the other correct countries by their stars at the left,
+  // the incorrect landings at the right, the notes under both. The globe beside the card is the closed question's own (tqPage), on the open question's
+  // countries; a name of the card pointed at brings up that country's plate on the globe. Share and Home at the foot, Trivia's own streak at the row's end.
+  // The day's end is a state of the trivia flight (TQ.dayOn), as on the trial page the player flew: the bird stands where it came down last, the globe is
+  // the look-around's, and there is no way back to the bird (lookEnd).
+  const TQ_WHY = { time: 'Time ran out', gave: 'Gave up', left: 'Not finished' };          // left (Home, or the window closed, with the question open): Day Trip's own words for a round left with its clue showing
+  // Days in a row with a trivia day flown to its fifth question's end, counted as Day Trip's (tripStreak; the player's pick, 2026-11-25): until today's is
+  // flown the streak still stands from yesterday.
+  function tqStreak() {
+    const d = new Date(today() + 'T12:00:00Z');
+    if (!tqFlown(today())) d.setUTCDate(d.getUTCDate() - 1);
+    let n = 0;
+    while (tqFlown(d.toISOString().slice(0, 10))) { n++; d.setUTCDate(d.getUTCDate() - 1); }
+    return n;
+  }
+  const tqDayTotal = () => TQ.rows.reduce((a, r) => a + r.pts, 0);          // each question's points as scored (kept with the day)
+  function tqDayDraw() {
+    const day = $('daycard'), X = '<span class="tick miss">✗</span>', star = (q, id) => (q.notes[id] ? '<span class="ast">*</span>' : '');
+    const place = (q, id) => { const c = tqC(id); return '<span class="pl" data-id="' + id + '"><span class="wd">' + tqMark(q, id) + '</span>' + flagImg(c, '') + '<span class="nm">' + esc(c.name) + star(q, id) + '</span></span>'; };
+    const empty = (why) => '<span class="pl none"><span class="wd"></span><i></i><span class="nm">' + (why || '') + '</span></span>';
+    const detail = (r) => {
+      const q = r.q, st = (id) => { const k = tqStep(q, id); return k == null ? 0 : k; };
+      const rest = q.ids.filter((id) => !r.found.includes(id)).sort((a, b) => st(b) - st(a) || tqC(a).name.localeCompare(tqC(b).name));
+      const head = r.found.length ? (rest.length === 1 ? '1 other correct country' : rest.length + ' other correct countries') : rest.length + ' correct countries';          // the list card's own words
+      const groups = [2, 1, 0].map((k) => [k, rest.filter((id) => st(id) === k)]).filter((g) => g[1].length);
+      const name = (id) => '<span class="c" data-id="' + id + '">' + esc(tqC(id).name) + star(q, id) + '</span>';
+      const lines = groups.map(([k, ids]) => '<div class="g"><span class="mk">' + tqStars(k) + '</span><span class="ns">' + ids.map(name).join(', ') + '</span></div>').join('');
+      const wrong = r.wrongs.map((id) => '<b class="at c" data-id="' + id + '">' + esc(tqC(id).name) + '</b>').join(', ');
+      const notes = q.ids.filter((id) => q.notes[id]).map((id) => '<p class="note">* ' + esc(tqSay(tqC(id), q.notes[id], true)) + '</p>').join('');
+      // the player's own layout (2026-11-25: "shouldn't the correct and incorrect landings be separate columns?"; their pick "A: two columns")
+      return '<div class="tqo"><div class="ok"><div class="lab">' + head + '</div>' + lines + '</div>' +
+        (r.wrongs.length ? '<div class="no"><div class="lab">' + (r.wrongs.length === 1 ? '1 incorrect landing' : r.wrongs.length + ' incorrect landings') + '</div><div class="bad2">' + X + wrong + '</div></div>' : '') + notes + '</div>';
+    };
+    const row = (r, i) => {
+      const q = r.q, cells = r.found.slice(0, TQ_NEED).map((id) => place(q, id)).concat(Array.from({ length: Math.max(0, TQ_NEED - r.found.length) }, (_, j) => empty(j === 0 ? TQ_WHY[r.how] : '')));
+      return '<tr data-i="' + i + '"><td class="n">' + (i + 1) + '</td><td class="asked"><span class="big">' + esc('Countries' + (q.t[0] === ',' ? '' : ' ') + tqMany(q.t)) + '</span></td><td class="you"><div class="tqp">' + cells.join('') + '</div></td>' +
+        '<td class="pts">' + out(r.pts, tqQWorth(i)) + '</td></tr><tr class="detail" data-i="' + i + '"><td colspan="4">' + detail(r) + '</td></tr>';
+    };
+    const run = tqStreak();
+    // no row of headings stands over the questions, so the word "points" is said at the top, once
+    day.innerHTML = '<div class="top"><h2>Trivia</h2><div class="score">' + num(tqDayTotal()) + '<small>/1,000</small></div><div class="date">' + tripDate({ day: TQ.day }) + '</div><div class="date unit">points</div></div>' +
+      '<table class="day tqd">' + TQ.rows.map(row).join('') + '</table>' +
+      '<div class="row"><button class="go" id="tq-share" type="button">Share</button><button class="alt" id="tq-home" type="button">Home <kbd>H</kbd></button>' + (run ? '<span class="streak">' + streakText(run) + '</span>' : '') + '</div>';
+    for (const tr of day.querySelectorAll('tr[data-i]')) tr.classList.toggle('on', +tr.dataset.i === TQ.rowQ);
+  }
+  // A name stands under its flag on one or two lines at the card's 13 px and may reach 2 px over each side of its spot (Turkmenistan); a name that would
+  // take three lines takes 11 px (Central African Republic, Saint Vincent and the Grenadines), and the one still wider the least width that holds it on two
+  // lines. Worked out under the zoom the card has (tqDayFit calls it at each zoom it tries).
+  function tqCardSpots() {
+    const day = $('daycard'), sc = (day.offsetWidth && day.getBoundingClientRect().width / day.offsetWidth) || 1;
+    for (const p of day.querySelectorAll('.tqp .pl:not(.none)')) {
+      const nm = p.querySelector('.nm'), w = p.getBoundingClientRect().width / sc; if (!nm || !w) continue;
+      const read = () => { const r = document.createRange(); r.selectNodeContents(nm.firstChild); const xs = [...r.getClientRects()].filter((x) => x.width > 0); return [new Set(xs.map((x) => Math.round(x.top / 4))).size, (Math.max(...xs.map((x) => x.right)) - Math.min(...xs.map((x) => x.left))) / sc]; };          // lines, and the width of the ink (the name's own letters, without an asterisk)
+      const fits = (most) => { nm.style.width = ''; let [n, ink] = read(); if (n <= 2 && ink <= most) return true; for (let x = Math.ceil(w); x <= most; x++) { nm.style.width = x + 'px'; [n, ink] = read(); if (n <= 2 && ink <= most) return true; } nm.style.width = ''; return false; };
+      nm.classList.remove('long');
+      if (!fits(w + 4.5)) { nm.classList.add('long'); if (!fits(w + 4.5)) fits(96); }
+    }
+  }
+  // The card is made smaller where its tallest form (whichever question is open) does not fit the window, and stands in the room's middle at that tallest
+  // height: its top stays where it is whichever question is open.
+  function tqDayFit() {
+    const day = $('daycard'), keep = TQ.rowQ, rows = () => day.querySelectorAll('tr[data-i]');
+    day.style.marginBottom = ''; day.style.zoom = ''; measure();
+    const room = view.h / view.ui - 2 * 14;
+    let zoom = 1;
+    for (let pass = 0; pass < 6; pass++) {
+      day.style.zoom = zoom < 1 ? zoom.toFixed(4) : ''; measure(); tqCardSpots();
+      TQ.dayTall = 0;
+      for (let i = 0; i < TQ.rows.length; i++) { for (const tr of rows()) tr.classList.toggle('on', +tr.dataset.i === i); TQ.dayTall = Math.max(TQ.dayTall, day.offsetHeight); }
+      if (TQ.dayTall * zoom <= room + 0.5) break;
+      zoom = Math.min(zoom * 0.995, room / TQ.dayTall);
+    }
+    for (const tr of rows()) tr.classList.toggle('on', +tr.dataset.i === keep);
+    day.style.marginBottom = Math.max(0, TQ.dayTall - day.offsetHeight) + 'px';
+    measure();
+    view.tqRight = stage.classList.contains('side') ? day.getBoundingClientRect().right - stage.getBoundingClientRect().left : 0;          // the globe keeps to the room beside the card (gazeWhole)
+  }
+  function tqDayOpen(i, was) {          // one question open at a time: its row, and the globe on its countries (was: the view as it stood before the card came up)
+    const r = TQ.rows[i], day = $('daycard');
+    if (!r || !TQ.dayOn) return;
+    const same = TQ.rowQ === i && !!TQ.page; TQ.rowQ = i;
+    day.style.marginBottom = '';
+    for (const tr of day.querySelectorAll('tr[data-i]')) tr.classList.toggle('on', +tr.dataset.i === i);
+    day.style.marginBottom = Math.max(0, TQ.dayTall - day.offsetHeight) + 'px';
+    if (same) return;
+    Object.assign(TQ, { i, found: r.found.slice(), wrongs: r.wrongs.slice(), closed: true, rowId: null, rowOn: null });
+    tqLight();
+    // the view's middle glides to the room beside this card from where it stands; the card just up: from where the globe stood, at the size it had, before
+    // the bar went and the card came (read after that, the globe's middle leapt 204 px and the globe grew 13% in the frame of the card: 1913 x 1073)
+    if (was && looking()) { gaze.cx0 = was.cx; gaze.cy0 = was.cy; gaze.tc = S.t; gaze.H = Math.max(view.H0, hFor(was.rho)); } else tqAnchor();
+    TQ.page = tqPage(r.q);
+    if (looking()) tqGo(); else TQ.lift = true;
+  }
+  function tqDay5() {          // after the last question: the day's card
+    if (TQ.dayOn) return;
+    const T = save.trivia[TQ.day], at = tqAt();
+    if (T && !(Array.isArray(T.at) && T.at[0] === at[0] && T.at[1] === at[1])) { T.at = at; persist(); }
+    let was = null;
+    if (looking()) { placeCamera(); was = { cx: cam.cx, cy: cam.cy, rho: cam.rho }; }
+    TQ.closed = true; TQ.note = ''; tqClockShow(false); tqAnsOff(); tqFoot();
+    TQ.dayOn = true; TQ.rowQ = -1; TQ.page = null; TQ.dayAt = performance.now();
+    tqDayDraw();
+    const day = $('daycard'); day.style.marginBottom = ''; day.style.zoom = '';
+    $('console').hidden = true; day.hidden = false;
+    document.body.classList.add('tq-day');
+    tqDayFit();
+    tqDayOpen(TQ.rows.length - 1, was);
+    $('tq-share').focus({ preventScroll: true });
+  }
+  function tqDayOff() {
+    if (!TQ.dayOn) return;
+    TQ.dayOn = false; TQ.rowQ = -1; view.tqRight = 0; document.body.classList.remove('tq-day');
+    const day = $('daycard'); day.hidden = true; day.style.marginBottom = ''; day.style.zoom = ''; day.replaceChildren();
+  }
+  // Today's finished day again, from the home card, as it was flown (as Day Trip's seeTrip): the day's card with its last question open and the globe on that
+  // question's countries at once, the bird where it stood when the day ended (kept with the day). The questions are the ones flown, by their names in the
+  // bank, and each question's points are as scored that day.
+  function tqResults() {
+    if (S.mode !== 'title') return;
+    const day = today(), T = tqSaved(day);
+    if (!T || !tqFlown(day)) return;
+    const qs = T.qs.map((r) => tqByKind(r.kind));
+    Object.assign(TQ, { on: true, day, qs, i: qs.length - 1, hist: T.qs.map((r) => r.found.slice()), rows: T.qs.map((r, i) => ({ q: qs[i], found: r.found.slice(), wrongs: r.wrong.slice(), how: r.how, pts: r.pts })),
+      found: [], wrongs: [], calls: [], note: '', closed: true, timeUp: false, why: false, landFx: [], end: 0 });
+    takeOff('trivia');
+    S.energy = Infinity; S.intro = null; S.blend = 1;          // no flight begins: the view does not come down on the bird
+    if (Array.isArray(T.at) && T.at.length === 2 && T.at.every(Number.isFinite)) { bird.lon = T.at[0]; bird.lat = T.at[1]; bird.at = locationAt(bird.lon, bird.lat).key; }
+    tqDay5();
+    if (lookStart()) {          // the globe on the open question's countries at once: a cut, as "See trip" is
+      const F = TQ.page.fit, ll = lonLat(F.c);
+      Object.assign(gaze, { lon: ll[0], lat: clamp(ll[1], -80, 80), H: F.H, cx0: TQ.page.cx || view.w / 2, cy0: (view.h - view.deck) / 2, t0: S.t - 1 });
+      TQ.lift = false; TQ.page.t = S.t;
+      placeCamera();          // the camera is this view from the first frame on: the turn by itself reads which countries are out of view (tqAuto)
+    }
+  }
+  // The card is fitted by the widths of its words and by its room: fitted again, and the view with it, when a lettering arrives late or the window changes
+  // (laid the same as before, the globe stays as the player has it: tqRelay's rule).
+  function tqDayRelay() {
+    if (!TQ.on || !TQ.dayOn || !TQ.page) return;
+    tqDayFit();
+    if (tqLaid() === TQ.page.laid) return;
+    tqAnchor(); TQ.page = tqPage(TQ.rows[TQ.rowQ].q);
+    if (looking()) tqGo(); else TQ.lift = true;
+  }
+  $('daycard').addEventListener('click', (e) => {
+    if (!TQ.dayOn) return;
+    const b = e.target.closest('button');
+    if (b && b.id === 'tq-home') { goHome(); stage.focus({ preventScroll: true }); return; }
+    if (b && b.id === 'tq-share') {          // what a friend needs: the game's name, the day, the score, a mark a spot (no answer given away), a streak from its second day, the address last
+      const run = tqStreak(), text = "Bird's Eye Trivia, " + tripDate({ day: TQ.day }) + ': ' + num(tqDayTotal()) + '/1,000\n' + TQ.rows.map((r) => Array.from({ length: TQ_NEED }, (_, j) => (j < r.found.length ? '\u{1F7E9}' : '⬜')).join('')).join(' ') + (run >= 2 ? '\n' + streakText(run) : '') + '\n' + ADDRESS;
+      const done = () => { b.textContent = 'Copied'; }; TQ.shared = text;
+      if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, () => {}); else done();
+      return;
+    }
+    const tr = e.target.closest('tr[data-i]');
+    if (tr) tqDayOpen(+tr.dataset.i);
+  });
+  $('daycard').addEventListener('mouseover', (e) => { if (!TQ.dayOn) return; const c = e.target.closest('tr.on [data-id]'); TQ.rowId = c ? c.dataset.id : null; });          // a name of the open question pointed at: its country's plate on the globe (tqNames)
+  $('daycard').addEventListener('mouseleave', () => { if (TQ.dayOn) TQ.rowId = null; });
 
   // ---------- Trivia's clock ----------
   function tqOpen() { return S.mode === 'fly' && S.game === 'trivia' && TQ.on && !TQ.closed; }
@@ -8470,10 +8684,10 @@ html #card.ghost ~ #place { visibility: visible; }
     a.style.width = (Math.ceil(Math.max(L.wide, kw)) + 3) + 'px';          // 2 px of the column's own padding, 1 to spare
     if (rows().n !== L.n) a.style.width = '';
   }
-  window.addEventListener('resize', () => { if (TQ.on) { tqClueFit(); measure(); tqRelay(); } });
+  window.addEventListener('resize', () => { if (TQ.on) { tqClueFit(); measure(); tqRelay(); tqDayRelay(); } });
   // A face of the game's lettering is fetched at its first use. One that arrives after the bar was fitted: the bar is fitted again. (Until then the heading
   // could be measured in the stand-in lettering, 166 px wide for 141, and the question's column stayed 10 px too wide: by chance, on the trial page too.)
-  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => { if (TQ.on) { tqSpotsFit(); tqClueFit(); measure(); tqRelay(); } });
+  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => { if (TQ.on) { tqSpotsFit(); tqClueFit(); measure(); tqRelay(); tqDayRelay(); } });
   // A flag spot is 64 px. A name stands under its flag on one or two lines in the bar's lettering and may reach 2 px over each side of its spot (eight names are 1 to 4 px
   // wider than a spot: Madagascar, Netherlands, ...); a name that needs more takes the smaller lettering a long name already has (Turkmenistan, Liechtenstein), then one step
   // smaller still (Central African Republic, Saint Vincent and the Grenadines). A flag wider than the spot (Qatar's) is fitted to its width, in the middle of the flag's row.
@@ -8512,7 +8726,7 @@ html #card.ghost ~ #place { visibility: visible; }
     if (TQ.closed) { way.id = 'tq-on'; way.innerHTML = '<button class="go" id="tq-next" type="button">' + (last ? 'See your day' : 'Next question') + '</button>'; }
     else { way.id = 'tq-give'; way.innerHTML = '<button class="alt" id="tq-next" type="button">Give up</button>'; }
     $('status').appendChild(way);
-    $('tq-next').addEventListener('click', (e) => { tqEnter(); e.currentTarget.blur(); stage.focus({ preventScroll: true }); });
+    $('tq-next').addEventListener('click', (e) => { tqEnter(); e.currentTarget.blur(); if (!TQ.dayOn) stage.focus({ preventScroll: true }); });          // the day's card up: Share keeps the focus, as when a key brought the card
     let box = $('tq-box');
     if (!box) { box = document.createElement('div'); box.className = 'tripbox'; box.id = 'tq-box'; $('status').insertBefore(box, $('trip-clock')); }
     box.innerHTML = '<div class="row5">' + TQ.qs.map((x, j) => '<i' + (j < TQ.i || (j === TQ.i && TQ.closed) ? ' class="done"' : j === TQ.i ? ' class="now"' : '') + '></i>').join('') + '</div><span>Question ' + (TQ.i + 1) + ' of ' + TQ.qs.length + '</span>';
@@ -8521,7 +8735,7 @@ html #card.ghost ~ #place { visibility: visible; }
     tqSpotsFit(); tqLine(); tqClueFit(); measure();
   }
 
-  window.birdsEye = { trivia: { TQ, start: tqStart, enter: tqEnter, frame: tqFrame, saved: tqSaved, flown: tqFlown, dayQs: tqDayQs, qpts: tqQPts, score: tqDay, open: tqOpen, clueFit: tqClueFit, spotsFit: tqSpotsFit, BADFILL: TQ_BADFILL, page: () => TQ.page, ans: () => tqAns, close: tqClose, relay: tqRelay, ask: (k) => { TQ.qs[TQ.i] = typeof k === 'string' ? tqByKind(k) : k; tqQuestion(TQ.i); },
+  window.birdsEye = { trivia: { TQ, start: tqStart, enter: tqEnter, frame: tqFrame, saved: tqSaved, flown: tqFlown, dayQs: tqDayQs, qpts: tqQPts, score: tqDay, open: tqOpen, clueFit: tqClueFit, spotsFit: tqSpotsFit, BADFILL: TQ_BADFILL, page: () => TQ.page, ans: () => tqAns, close: tqClose, relay: tqRelay, results: tqResults, streak: tqStreak, dayOn: () => TQ.dayOn, dayOpen: tqDayOpen, dayFit: tqDayFit, dayRelay: tqDayRelay, dayTall: () => TQ.dayTall, cardSpots: tqCardSpots, view, address: ADDRESS, ask: (k) => { TQ.qs[TQ.i] = typeof k === 'string' ? tqByKind(k) : k; tqQuestion(TQ.i); },
     flashes: () => flashes.filter((f) => f.tq).map((f) => [f.c.name, f.col, f.k]), boxes: () => placed.map((b) => ({ name: b.name || (b.bird ? 'BIRD' : '?'), box: [b.x - b.half, b.y - b.up, b.x + b.half, b.y + b.down].map(Math.round), flag: !!b.flag, sub: b.sub || '', lines: b.lines || null })) },          // Trivia, for the tests
     idk, canIdk, goodFor, explore, glide: () => glide, glideP, glideLook, howTo, pair: () => view.pair, homeNote: () => { showTripNote(); showKnown(); measure(); }, stackLines: (id) => { const c = PLAY.find((q) => q.id === id); ownName = true; try { return stackForm(c, c.name, 'name', null).lines; } finally { ownName = false; } }, hoverBox: () => hoverBox, slerp, showLeg, legView, STILL_DEG, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, TRIVIA, endlessRound, rankedLevel, rankedRounds, easiest, flagClue, capClue, capFlagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     outlines: () => fx.filter((f) => f.lined && f.shownA > 0).map((f) => f.lined.id), OUTLINE, pull, pullBy, steerable, PULL_FULL, PULL_RING, hFor, look: () => gaze, looking, canLook, lookStart, lookEnd, lookAnswer, answerNamed: () => answerNamed, birdRing: () => { const g = project(unit(bird.lon, bird.lat)); return g && birdRing(g); }, answerRoom: () => gazeName, lookK: gazeK, plate: () => plateSays, capLineOf: (id) => capLine(PLAY.find((c) => c.id === id)), plateRoom: (h) => pointerPlate(h, 1, true), hoverNow: () => (hover ? hover.name : null), project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
