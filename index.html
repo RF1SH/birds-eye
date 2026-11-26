@@ -356,6 +356,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #home-day.flown .day-stats { grid-column: 2; grid-row: 1; }
 #home-day.flown #see-trip { grid-column: 3; grid-row: 1; font-size: 20px; padding: 7px 14px 9px; min-width: 96px; background: var(--paper); color: var(--ink); }
 #home-day.flown #see-trip:hover { background: var(--paper-shade); }
+/* Trivia's line, first under Day Trip, made of the list's own parts and with no description (the player's picks by button of 2026-11-25 from picture
+   HOME-question: the name "Trivia", "C: the line alone"). Once today's five questions are flown: Trivia's own streak beside a quiet paper button, as Day
+   Trip's line. The button reads "Results": "See trivia" came out 9 px wider than the list's column of buttons (96 px), and a wider column makes "Day Trip"
+   wrap beside a three-digit streak. */
+#see-trivia { background: var(--paper); color: var(--ink); }
+#see-trivia:hover { background: var(--paper-shade); }
 #home-day.flown + #home-games { margin-top: 13px; }          /* the line is as high as its button since the score left it (until 2026-11-24: 11.5 under two lines of numbers 3 px higher than the button) */
 /* Study's line: what is picked stands in a box with an arrow; a click opens the choices right under it and the card
    grows at its foot (the player, 2026-11-20: "I like the idea of the expandable list ... in the home card ... it's
@@ -925,7 +931,11 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
           <div class="row"><button class="go" id="go-trip" type="button">Take off</button><button class="go" id="see-trip" type="button" hidden>See trip</button><div class="day-stats"><span class="mode-stat" id="trip-streak" hidden></span></div></div>
         </section>
         <div id="home-games">
-          <section class="game">
+          <section class="game" id="game-trivia">
+            <h3>Trivia</h3>
+            <span class="mode-stat" id="trivia-streak" hidden></span><button class="go" id="go-trivia" type="button">Take off</button><button class="go" id="see-trivia" type="button" hidden>Results</button>
+          </section>
+          <section class="game" id="game-ranked">
             <h3>Ranked</h3>
             <p class="hook" id="ranked-hook">Show your knowledge</p>
             <span class="mode-stat" id="endless-best" hidden></span><button class="go" id="go-endless" type="button">Take off</button>
@@ -1170,7 +1180,7 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
   // The camera hangs straight above a point on the globe with north up. Its height above the
   // ground is H, in earth radii. From close in you see about 1,600 km across; at the top the
   // whole of one side of the earth.
-  const view = { ui: 1, mk: 1, ox: 0, slide: 0, w: 1, h: 1, dpr: 1, scale: 1, deck: 0, ref: 1, F: 1, H0: 0.3, H1: 3, Htitle: 3, gy: 0, tx: 0, ty: 0, tqRight: 0 };
+  const view = { ui: 1, fit: 1, mk: 1, ox: 0, slide: 0, w: 1, h: 1, dpr: 1, scale: 1, deck: 0, ref: 1, F: 1, H0: 0.3, H1: 3, Htitle: 3, gy: 0, tx: 0, ty: 0, tqRight: 0 };
   const cam = { n: [1, 0, 0], e: [0, 1, 0], u: [0, 0, 1], H: 1, D: 2, cos0: 0.5, sin0: 0.87, cx: 0, cy: 0, rho: 1, pxRad: 1 };
   const GROUND_KM = 1600;
   const KEY_ROOM = 40;                // the room under a results globe for the line that explains its lines, times the scale of the cards
@@ -1220,13 +1230,14 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
     // The home card and the globe stand as one pair in the middle of the window (the player's pick of 2026-11-20 from
     // picture HOME-redesign). Until then the card stood at the window's left edge and the globe in the middle of the rest.
     view.pair = null;
+    homeFit();
     {
       const cd = $('card');
       cd.style.marginLeft = '0px';
       if (S.mode === 'title' && w > 900 && !cd.hidden) {
         const r0 = cd.getBoundingClientRect(), cw = r0.width, pad = r0.left - box.left, rmax = 0.46 * avail;
         const gap = clamp(w - 2 * pad - cw - 2 * rmax, 40, 0.058 * w), rho = Math.min(rmax, (w - 2 * pad - cw - gap) / 2), x0 = Math.max(pad, (w - cw - gap - 2 * rho) / 2);
-        cd.style.marginLeft = ((x0 - pad) / view.ui).toFixed(2) + 'px';
+        cd.style.marginLeft = ((x0 - pad) / (view.ui * view.fit)).toFixed(2) + 'px';
         view.pair = { cx: x0 + cw + gap + rho, rho, gap, x0 };
       }
     }
@@ -1248,16 +1259,44 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
   // The home card keeps its top still when Study's choices open: it grows at its foot, so nothing above the choices
   // moves under the mouse. It sits where the closed card is centered; in a window too short for the open card under
   // that spot, the card (closed too) sits as much higher as the open one needs to stay 16 px inside the window.
+  // The home card is drawn smaller in a window too short for its tallest form: Study's choices open, and today's trip not flown yet (Day Trip leads the
+  // card). One size for a window, whether the choices are open or shut and whether the trip is flown: nothing changes under the mouse, the card is no
+  // other size in the evening than in the morning, and the open card always stands at least 16 px inside the window (the rule of the card of Trivia's day,
+  // tqDayFit). Its borders stay whole screen pixels at that size (as measure's). Until Trivia's line (2026-11-26) the card had no size of its own: in a
+  // window 600 px high the open card ran 34 px past the window's foot and its top moved 19 px as it opened.
+  function homeFit() {
+    const card = $('card'), pick = $('study-pick'), own = card.style;
+    const put = (fit) => {
+      view.fit = fit;
+      if (fit >= 1) { own.zoom = ''; own.removeProperty('--b2z'); own.removeProperty('--b1z'); return; }
+      const z = view.ui * fit, b2 = Math.max(1, Math.round(2 * z)), b1 = Math.max(1, b2 - 1);
+      own.zoom = z.toFixed(4); own.setProperty('--b2z', ((b2 + 0.02) / z).toFixed(4) + 'px'); own.setProperty('--b1z', ((b1 + 0.02) / z).toFixed(4) + 'px');
+    };
+    put(1);
+    if (S.mode !== 'title' || card.hidden || $('card-title').hidden || stage.clientWidth <= 560) return;
+    const room = stage.clientHeight - 2 * 16, was = pick.hidden, flown = $('home-day').classList.contains('flown');
+    pick.hidden = false;
+    if (flown) dayForm(false);
+    // as big as the room lets it be: a border one screen pixel thinner makes the card shorter, so the first passes may also grow it; the last only make it fit
+    for (let pass = 0; pass < 7; pass++) {
+      const tall = card.getBoundingClientRect().height;
+      if (tall <= room + 0.25 && (view.fit >= 1 || tall >= room - 0.75 || pass >= 4)) break;
+      put(Math.min(1, view.fit * room / tall));
+    }
+    if (flown) dayForm(true);
+    pick.hidden = was;
+  }
   function steadyCard() {
     const card = $('card'), pick = $('study-pick');
     card.style.transform = '';
     if (card.hidden || $('card-title').hidden || stage.clientWidth <= 560) return;
     const was = pick.hidden, box = stage.getBoundingClientRect();
     pick.hidden = true; const shut = card.getBoundingClientRect();
-    pick.hidden = false; const open = card.getBoundingClientRect().height;
+    pick.hidden = false; const wide = card.getBoundingClientRect(), open = wide.height;
     pick.hidden = was;
-    const lift = clamp(shut.top + open + 16 - box.bottom, 0, Math.max(0, shut.top - box.top - 16)), by = (was ? 0 : (open - shut.height) / 2) - lift;
-    if (by) card.style.transform = 'translateY(' + (by / view.ui).toFixed(1) + 'px)';
+    // from where the card stands as it is laid out (an open card that fills its room is not centered in it: read, never worked out)
+    const lift = clamp(shut.top + open + 16 - box.bottom, 0, Math.max(0, shut.top - box.top - 16)), by = shut.top - lift - (was ? shut.top : wide.top);
+    if (Math.abs(by) > 0.05) card.style.transform = 'translateY(' + (by / (view.ui * view.fit)).toFixed(2) + 'px)';
   }
 
   function aim(n, H, cx, cy) {
@@ -4778,7 +4817,7 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
   // until their average Wikipedia rank was near the middle: 10 days of 365 went from easier to harder.)
   const DAYS = D.days || { start: '2026-11-15', list: [] };
   // Trivia's questions and its five for every day, the same for everyone (D.trivia, tools/build_trivia.py): a day's five climb, the easiest first; the FAQ's
-  // example question (faq) is on no day. The game around them: the block "Trivia" near the end (tqStart); no button of the home card leads to it yet (PLAN, THE TRIVIA RETHINK, step 9).
+  // example question (faq) is on no day. The game around them: the block "Trivia" near the end (tqStart), begun from its line on the home card (tqHomeNote; PLAN, THE TRIVIA RETHINK, step 9).
   const TRIVIA = D.trivia || { start: '2026-11-26', worth: [], faq: -1, days: [], qs: [] };
   function makeTrip(day) {
     const n = DAYS.list.length, at = Math.round((Date.parse(day + 'T00:00:00Z') - Date.parse(DAYS.start + 'T00:00:00Z')) / 864e5);
@@ -5664,9 +5703,12 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
     return n;
   }
   const streakText = (n) => 'Streak: ' + n + (n === 1 ? ' day' : ' days');
+  let tqReady = false;          // Trivia's block stands further down: its line on the home card is drawn from the first look after it (tqHomeNote)
   // The home card's first part is today's trip: before it "Take off"; one begun and left, "Carry
   // on"; after it Day Trip is a line of the list (`.flown`): its name, the streak, "See trip" (the day's score is on the day's card).
   // The streak beside the button, Ranked's best beside its own.
+  // Day Trip's part in one of its two forms: the card's lead (today's trip not flown yet) or a line of the list (flown)
+  function dayForm(done) { $('go-trip').hidden = done; $('home-day').classList.toggle('flown', done); $('home-hook').hidden = done; $('see-trip').hidden = !done; }
   function showTripNote() {
     // Today's trip from before the day's five changed (they do when the lists are built anew): flown to its end, it
     // stays as it was flown; left part-way, or with a round that can no longer be read, it is free to fly again.
@@ -5674,13 +5716,10 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
     if (was && (was.rounds.some((r) => !savedAsk(r)) || (was.rounds.length < 5 && was.rounds.some((r, i) => now.rounds[i].name !== r.name || now.rounds[i].kind !== r.kind)))) { delete save.trips[today()]; persist(); }
     tripSettle();
     const begun = save.trips[today()], done = tripDone(), streak = tripStreak();
-    $('go-trip').hidden = done;
     $('go-trip').textContent = begun && !done ? 'Carry on' : 'Take off';
     // (a description of one sentence has no period: the player, 2026-11-20: "none of the descriptions need
     // punctuation.. unless more than 1 sentence"; it is away while today's trip is flown, as Ranked's is once played)
-    $('home-day').classList.toggle('flown', done);
-    $('home-hook').hidden = done;
-    $('see-trip').hidden = !done;
+    dayForm(done);
     $('trip-streak').hidden = !streak;
     $('trip-streak').textContent = streakText(streak);
     // A Ranked flight kept: its button reads "Carry on" and nothing stands beside it; the best is back when the
@@ -5695,6 +5734,7 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
     $('ranked-hook').hidden = !!(save.rankedFlown || save.endless || save.ranked);
     $('endless-best').hidden = !save.endless || !!save.ranked;
     $('endless-best').textContent = 'Best: ' + save.endless.toLocaleString('en');
+    if (tqReady) tqHomeNote();
   }
   // a new day: today's button again. Day Trip's part is then the lead once more, a taller card: the page measures itself again (steadyCard)
   setInterval(() => { if (S.mode !== 'title') return; const was = $('home-day').classList.contains('flown'); showTripNote(); if (was !== $('home-day').classList.contains('flown')) measure(); }, 60000);
@@ -8723,6 +8763,20 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
       placeCamera();          // the camera is this view from the first frame on: the turn by itself reads which countries are out of view (tqAuto)
     }
   }
+  // Trivia's line on the home card, as Day Trip's part (showTripNote, which calls this at every look: at Home, and each minute for a new day): before today's
+  // five "Take off"; a day begun and left, "Carry on" (a question left open is closed first: tqSaved); the five flown, "Results" (the day's card: tqResults).
+  // Trivia's own streak stands beside the button whenever there is one, as Day Trip's does.
+  function tqHomeNote() {
+    const day = today(), T = tqSaved(day), done = tqFlown(day), run = tqStreak();
+    $('go-trivia').hidden = done;
+    $('go-trivia').textContent = T && !done ? 'Carry on' : 'Take off';
+    $('see-trivia').hidden = !done;
+    $('trivia-streak').hidden = !run;
+    $('trivia-streak').textContent = streakText(run);
+  }
+  $('go-trivia').addEventListener('click', tqStart);
+  $('see-trivia').addEventListener('click', tqResults);
+  tqReady = true; tqHomeNote();
   // The card is fitted by the widths of its words and by its room: fitted again, and the view with it, when a lettering arrives late or the window changes
   // (laid the same as before, the globe stays as the player has it: tqRelay's rule).
   function tqDayRelay() {
