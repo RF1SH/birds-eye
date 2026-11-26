@@ -1791,11 +1791,12 @@ html #card.ghost ~ #place { visibility: visible; }
   // found (fewer than 5 of 8), the next postcard is one known well (nextItem); with fewer than FEW_FROM results on
   // file, the share counts as met.
   const LATELY = 8, FEW = 0.6, FEW_FROM = 4;
+  const FLOWN = 300;          // rows kept of how Study postcards were flown (deliver)
   const KEY = 'birds-eye-world-1';
   const KINDS = ['c', 'k', 'f', 's'], REGIONS = ['World', 'Africa', 'Americas', 'Asia', 'Europe', 'Oceania'];
   // asked, games: Ranked's turns. games counts the Ranked games begun; asked holds, for a country, the game it was last asked in
   // told: how often a wrong landing has said why speed and energy use have an X (n, in the tutorial and the real games together), and the real games that have said it (day, ranked)
-  const save = { mem: {}, lately: [], best: 0, sound: true, study: { kinds: KINDS.slice(), where: ['World'] }, trips: {}, endless: 0, skill: null, visited: false, asked: {}, games: 0, told: { n: 0 } };
+  const save = { mem: {}, lately: [], flown: [], best: 0, sound: true, study: { kinds: KINDS.slice(), where: ['World'] }, trips: {}, endless: 0, skill: null, visited: false, asked: {}, games: 0, told: { n: 0 } };
   const wholeWorld = (w) => !w.length || w.includes('World') || REGIONS.every((r) => r === 'World' || w.includes(r));      // no region, World itself, or all five
   try {
     const got = JSON.parse(localStorage.getItem(KEY)) || {};
@@ -1812,6 +1813,7 @@ html #card.ghost ~ #place { visibility: visible; }
       }
     }
     if (Array.isArray(got.lately)) save.lately = got.lately.filter((x) => x === 0 || x === 1).slice(-LATELY);          // Study's last results (nextItem)
+    if (Array.isArray(got.flown)) save.flown = got.flown.filter((r) => Array.isArray(r) && r.length === 7 && Number.isFinite(r[0]) && Number.isFinite(r[1])).slice(-FLOWN);
     if (Number.isFinite(got.best)) save.best = got.best;
     if (typeof got.sound === 'boolean') save.sound = got.sound;
     if (Number.isFinite(got.endless)) save.endless = got.endless;
@@ -2054,14 +2056,16 @@ html #card.ghost ~ #place { visibility: visible; }
   // A wrong landing takes no energy, and neither does "I don't know" (the player's pick by button, 2026-11-26, after flying a
   // trial page: "Energy, misses free"; their words for the button: "I wouldn't want to waste energy trying to guess"). Until
   // then a wrong landing took 5, or 1.5 at a location never asked. The flight to a wrong location is still not given back.
-  // What a delivery gives back. A clean delivery refunds what an efficient flight from where the
-  // letter was picked up would have cost (its "par"), with a little slack, plus a bonus that starts
-  // generous and settles at 1 but never reaches 0. Flawless flying therefore always pays for itself;
-  // climbing to look around and flying to wrong locations are what run you down (a delivery after a wrong landing, or
-  // after being shown the way, gives back par alone).
-  const SLACK = 1.25;          // a clean delivery refunds this much of par...
-  const BONUS = 19;            // ...plus 1 + BONUS * BONUS_FADE^n, n = letters delivered so far:
-  const BONUS_FADE = 0.96;     //    20 for the first, 9.4 by the twentieth, and never below 1
+  // What a delivery gives back (the player's pick by button, 2026-11-26, "30 to 80 postcards", after their pick "Give back less energy"). A delivery
+  // at the first try gives back a good flight from where the postcard was picked up, and FIRST_TRY more; a delivery after an incorrect landing, or after
+  // the location was shown (the third incorrect landing, "I don't know"), a good flight alone. A good flight (goodFor): the higher of par (a climb
+  // until the location is in view) and the cheapest flight for the distance (cheapFor: a short hop's par is 0.35, less than any take-off). Nothing
+  // fades through a flight. So the cheapest flight every time never runs out; what runs a flight down is flying up more than a flight needs, and
+  // flights to incorrect locations, which are not given back. Until 2026-11-26: 1.25 times par, plus 1 + 19 x 0.96^n (20 at a flight's first
+  // postcard, 9.4 by the twentieth; the first build's numbers, nobody's pick), and par alone after an incorrect landing. Counted on recorded flights
+  // with the player's own Day Trip flying, that gave a flight of about 88 postcards, and no end for a player who pressed "I don't know" at every
+  // postcard not known; this rule 32 to 82 (PLAN, THE WHOLE LIST 113).
+  const FIRST_TRY = 1;         // a delivery at the first try gives back this much more than a good flight
   const BULLSEYE = 2;          // extra for a capital landed within a third of its radius
   // A capital's circle: a landing inside it is correct, in every game, whatever the clue and whatever country the
   // landing is in. One circle for every capital and every city (the player's pick, 2026-11-15: "One circle, 150 km").
@@ -2228,6 +2232,7 @@ html #card.ghost ~ #place { visibility: visible; }
     }
     return parRows[clamp(Math.ceil(seeHeight(km) * 100) - 1, 0, 99)];
   }
+  const goodFor = (km) => Math.max(parFor(km), cheapFor(km));          // what a Study delivery gives back: see FIRST_TRY
   const capKm = (c) => (c.tiny ? TINY_KM : CIRCLE_KM);
   const fmtKm = (km) => (km < 995 ? Math.round(km / 10) * 10 : Math.round(km / 100) * 100).toLocaleString('en') + ' km';
 
@@ -5618,9 +5623,15 @@ html #card.ghost ~ #place { visibility: visible; }
     // ground like any other; until 2026-11-13 it came at the top, a height that was free, and had none). Also when the
     // bird was already off the ground again as it came (it paid for that climb: until 2026-11-12 taking off within
     // 0.6 s of a delivery lost the next postcard's whole par)
-    const par = parFor(kmBetween(t.from[0], t.from[1], lon, lat));
-    let gain = clean ? SLACK * par + 1 + BONUS * Math.pow(BONUS_FADE, S.n) + (spot ? BULLSEYE : 0) : par;
+    const km = kmBetween(t.from[0], t.from[1], lon, lat), good = goodFor(km);
+    let gain = clean ? good + FIRST_TRY + (spot ? BULLSEYE : 0) : good;
     S.lastGain = gain;
+    // The unseen note of how a Study postcard was flown (the player's pick, 2026-11-26: "The game also notes, unseen, the energy each Study postcard
+    // takes, so the next check uses your Study flights"; until then nothing recorded a Study flight's energy, and the rule above rests on 10 of their Day
+    // Trip rounds). A row: the energy used by flying since the postcard came, its good flight, the km, the kind, the incorrect landings, how the location
+    // was shown (0 not, 1 by the third incorrect landing, 2 by "I don't know"), 1 for a capital found after its country. The last FLOWN rows are kept.
+    save.flown.push([+(t.used || 0).toFixed(2), +good.toFixed(2), Math.round(km), it.kind, t.misses, t.idk ? 2 : t.shown ? 1 : 0, t.warm ? 1 : 0]);
+    if (save.flown.length > FLOWN) save.flown.shift();
     // How well it was known: flown straight to (a new one too: then it was known already) is Good, or
     // Easy the first time; the right country for a capital before finding the city, or a water landed
     // in its border zone, is Hard; any wrong
@@ -6048,7 +6059,9 @@ html #card.ghost ~ #place { visibility: visible; }
     const held = rested();          // one held press: no take-off until the view is back on the bird
     const flap = keys.flap && !flapSpent && !S.look && S.energy > 0 && S.blend >= 1 && !(S.trip && S.trip.wait && !lessonFlies(S.trip)) && !(held && S.t < held.takeAt) && !gaze;          // nor until a look-around's view is back
     if (flap) {
+      const eWas = S.energy, tk = S.game === 'study' && S.tickets && S.tickets[0];
       S.energy = Math.max(0, S.energy - BURN * dt);
+      if (tk) tk.used = (tk.used || 0) + eWas - S.energy;          // for the unseen note of a postcard's flying (deliver)
       if (bird.down) { fitv.s0 = groundScale(); fitv.g0 = S.t; bird.down = false; bird.va = CLIMB * 0.45; }          // the size the bird has on the ground as it leaves it, and when: it grows from there (onMap)
       flapClock -= dt;
       if (flapClock <= 0) { flapClock = 0.15; sfx.flap(); puffs.push({ t: 0, side: 1 }, { t: 0, side: -1 }); }
@@ -7363,6 +7376,7 @@ html #card.ghost ~ #place { visibility: visible; }
     if (!canIdk()) return;
     const t = S.tickets[0];
     S.streak = 0;
+    t.idk = true;          // for the unseen note of a postcard's flying (deliver)
     t.misses = GUESSES - 1;
     countAgainst(t);
   }
@@ -7941,7 +7955,7 @@ html #card.ghost ~ #place { visibility: visible; }
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   // for the tests: the bird put somewhere by hand. That is no flight, so the view is the bird's own at once (no rest on the last landing's country still being handed back)
   const setBird = (lon, lat, a, down) => { Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down }); S.capFit = null; fitClear(); };
-  window.birdsEye = { idk, canIdk, explore, glide: () => glide, glideP, glideLook, howTo, pair: () => view.pair, homeNote: () => { showTripNote(); showKnown(); measure(); }, stackLines: (id) => { const c = PLAY.find((q) => q.id === id); ownName = true; try { return stackForm(c, c.name, 'name', null).lines; } finally { ownName = false; } }, hoverBox: () => hoverBox, slerp, showLeg, legView, STILL_DEG, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, rankedRounds, easiest, flagClue, capClue, capFlagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
+  window.birdsEye = { idk, canIdk, goodFor, explore, glide: () => glide, glideP, glideLook, howTo, pair: () => view.pair, homeNote: () => { showTripNote(); showKnown(); measure(); }, stackLines: (id) => { const c = PLAY.find((q) => q.id === id); ownName = true; try { return stackForm(c, c.name, 'name', null).lines; } finally { ownName = false; } }, hoverBox: () => hoverBox, slerp, showLeg, legView, STILL_DEG, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, endlessRound, rankedLevel, rankedRounds, easiest, flagClue, capClue, capFlagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     outlines: () => fx.filter((f) => f.lined && f.shownA > 0).map((f) => f.lined.id), OUTLINE, pull, pullBy, steerable, PULL_FULL, PULL_RING, hFor, look: () => gaze, looking, canLook, lookStart, lookEnd, lookAnswer, answerNamed: () => answerNamed, birdRing: () => { const g = project(unit(bird.lon, bird.lat)); return g && birdRing(g); }, answerRoom: () => gazeName, lookK: gazeK, plate: () => plateSays, capLineOf: (id) => capLine(PLAY.find((c) => c.id === id)), plateRoom: (h) => pointerPlate(h, 1, true), hoverNow: () => (hover ? hover.name : null), project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
