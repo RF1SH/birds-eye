@@ -675,11 +675,12 @@ html #card.ghost ~ #place { visibility: visible; }
 }
 /* The FAQ: a paper sheet over the game's own page, on the game's dark (the player, 2026-11-13: "an entire FAQs section or
    button on the homepage to talk about like how scoring works"; 2026-11-17: "clean, CLEAR, VERY CLEAR, and readable and
-   concise, and not overbearing.. with the most common questions at the top"; PLAN 35, 35b). Every question is a row, the
-   first stands open, a click opens another (their pick from picture FAQ-question: "A: click to open"). One picture for
-   each answer and one to three lines. A closed row's capitals stand midway between its two hairlines. */
+   concise, and not overbearing.. with the most common questions at the top"; PLAN 35, 35b). The questions stand in
+   sections, a list at the left with the open answer at the right; in a window too narrow for both, the sections one under
+   another, every question a closed row that a click opens (the rules for both forms: "The FAQ in sections", below). One
+   picture for each answer and one to three lines. */
 #faq-page { position: fixed; inset: 0; z-index: 20; overflow: auto; display: flex; justify-content: center; align-items: flex-start; padding: 14px 16px; background: var(--space); }
-#faq { zoom: var(--ui, 1); flex: none; width: min(660px, 100%); padding: 20px 30px 22px; background: var(--paper); border: var(--b2z) solid var(--ink); border-radius: 3px; }          /* 22 under the last row: with the first answer open the nine rows end 14 px over the foot of a 1913 x 1073 window, the page's own margin */
+#faq { zoom: var(--ui, 1); flex: none; width: min(660px, 100%); padding: 20px 30px 22px; background: var(--paper); border: var(--b2z) solid var(--ink); border-radius: 3px; }          /* its width and its rows as a list of sections: "The FAQ in sections", below */
 #faq, #faq section { scroll-margin-top: calc(14px / var(--ui, 1)); }          /* a page opened at #faq or at an answer's address: the browser brings that element to the top, under the page's margin, never against the window's edge */
 #faq .top { display: flex; justify-content: space-between; align-items: center; }
 #faq h2 { margin: 0; font: 700 34px/1 var(--display); }
@@ -753,6 +754,46 @@ html #card.ghost ~ #place { visibility: visible; }
 #faq .ruler .h2 { grid-row: 2; }
 #faq td.what { width: 38%; padding-right: 14px; }
 #faq p.credits { margin-top: 16px; font-size: 13px; color: var(--ink-soft); }
+/* Trivia's answers (PLAN, THE TRIVIA RETHINK, step 8). A sum in the form of Day Trip's five stamps: a cell is what the game shows (a flag spot as on the bottom bar, or a question's number) over its points. */
+#faq .stamps.tq3 { grid-template-columns: repeat(2, 1fr auto) 1fr auto; margin-top: 14px; }
+#faq .stamps .pt { font: 700 24px/1 var(--display); font-variant-numeric: tabular-nums; }
+#faq .stamps.tq3 .op { padding-top: 77px; }          /* on the line of the points: a spot is 68 px (13 + 4 + 32 + 4 + 15) and 9 px stand under it */
+#faq .stamps .op small { display: inline; font-family: inherit; font-size: .6em; font-weight: 600; color: var(--ink-soft); margin-left: 1px; }          /* a maximum, as the bar's '/300' */
+#faq .stamps.q5 { padding-top: 3px; }          /* a first line of 13 px with no room of its own over it: its ink as far under the question as every answer's first line (24 px of the screen at 1913 x 1073) */
+#faq .stamps.q5 .op { padding-top: 22px; }          /* on the line of the points: 13 px of label and 9 px under it */
+#faq .stamps .pl { display: grid; justify-items: center; align-content: start; gap: 4px; width: 64px; }          /* the bottom bar's flag spot: its stars, its flag, its name */
+#faq .stamps .pl .wd { display: flex; justify-content: center; align-items: center; gap: 2px; height: 13px; }
+#faq .stamps .pl .wd svg { display: block; width: 13.5px; height: 13px; overflow: visible; }
+#faq .stamps .pl img { display: block; height: 32px; width: auto; border: 1px solid var(--paper-shade); }
+#faq .stamps .pl img.cut { border-color: transparent; }
+#faq .stamps .pl .nm { height: 15px; font: 700 15px/1 var(--display); color: var(--ink); text-align: center; white-space: nowrap; }
+/* The FAQ in sections (the player, 2026-11-25, of twelve questions in one list: "split the FAQ up into multiple different sections ... figure out a better system, because
+   that is an ugly, ugly page"; their three picks by button, 2026-11-26, from picture FAQ-sections-question: "Side by side", "Combined, as drawn", "Yes, as drawn"). The
+   sheet takes one of two forms (data-sec on #faq, set by faqLay). split: the sections and their questions at the left, the open answer at the right under its question;
+   the sheet's height is the list's and never changes, no row of the list moves, one answer is always shown. heads, in a window too narrow for both: the sections one
+   under another, every question a closed row (their pick "All closed", 2026-11-25), an answer opens under its row. A section's name stands in How to play's lettering
+   for a game's name, a question in the clue's lettering. */
+#faq > .part { margin: 0; font: 700 24px/1 var(--display); }
+#faq[data-sec="heads"] > .part { margin-top: 12px; padding-top: 14px; border-top: 1px solid var(--paper-shade); margin-bottom: 4px; }
+#faq[data-sec="heads"] section { margin-top: 0; padding-top: 0; border-top: 0; }
+#faq[data-sec="heads"] h3, #faq[data-sec="split"] h3 { font: 700 18px/1.15 var(--display); }
+#faq[data-sec="heads"] h3 button { padding: 5px 0; }
+#faq[data-sec="heads"] .ans { padding: 8px 0 12px; }
+#faq[data-sec="split"] { width: min(1036px, 100%); display: grid; grid-template-columns: 330px 600px; column-gap: 40px; align-items: start; }
+#faq[data-sec="split"] .top { grid-column: 1 / -1; grid-row: 1; padding-bottom: 12px; border-bottom: 1px solid var(--paper-shade); }
+#faq[data-sec="split"] section { display: contents; }
+#faq[data-sec="split"] > .part { grid-column: 1; margin: 18px 0 6px; }
+#faq[data-sec="split"] .top + .part { margin-top: 16px; }
+#faq[data-sec="split"] h3 { grid-column: 1; }
+#faq[data-sec="split"] h3 button { display: block; width: calc(100% + 16px); margin: 0 -8px; padding: 5px 8px; border-radius: 3px; }
+#faq[data-sec="split"] h3 button i { display: none; }
+#faq[data-sec="split"] h3 button[aria-expanded="true"], #faq[data-sec="split"] h3 button:hover { background: var(--paper-shade); }
+#faq[data-sec="split"] .ans { grid-column: 2; grid-row: 2 / -1; align-self: stretch; margin: 0 0 -22px -20px; padding: 16px 0 22px 20px; border-left: 1px solid var(--paper-shade); }          /* the line between the list and the answer runs from the line under the title to the sheet's foot */
+#faq[data-sec="split"] .ans::before { content: attr(data-q); display: block; margin-bottom: 14px; font: 700 24px/1.05 var(--display); }
+#faq td.who { width: 1px; padding-right: 16px; white-space: nowrap; }
+#faq td.who .fl { flex: none; display: flex; width: 40px; }          /* a flag's column, as wide as the widest ordinary flag at this height (the list beside the globe: 60 px for 30): every name starts at one spot */
+#faq td.res { width: 1px; padding-left: 16px; text-align: right; white-space: nowrap; }
+#faq table.calls tr:last-child td { padding-bottom: 0; }          /* sentences follow this table: no more white under its last row than under any other part */
 
 /* ---------- Trivia: the bar of a question (PLAN, THE TRIVIA RETHINK, step 9, piece 2). The rules of the trial page the player flew
    (audit/tt/trivia-faqsec.html), in the order they were written there: the later ones stand on the earlier. ---------- */
@@ -7716,9 +7757,12 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
   $('how-tutor').addEventListener('click', () => { howTo(false); startTutor(); });
   // ---------- the FAQ ----------
   // A sheet over the game's page at the address #faq (and #faq-x for one answer), opened by the word "FAQ" in the title
-  // card's row; Back, Esc and the browser's own Back close it. Every question is a row; the first stands open; a click
-  // on a question opens its answer and closes the one that was open (one answer on the screen at a time: the player's
-  // pick by button, 2026-11-18, "One at a time"), a click on the open one closes it. PLAN 35, 35b, 35c.
+  // card's row; Back, Esc and the browser's own Back close it. The questions stand in sections (FAQ_PARTS: How to play's
+  // own names, then "General"), side by side with the open answer where the window has the room for both, else one under
+  // another (faqLay). One answer on the screen at a time (the player's pick by button, 2026-11-18, "One at a time"): a
+  // click on a question shows its answer in place of the one that was shown. Side by side one answer is always shown, the
+  // first as the sheet opens; one under another every question opens closed, and a click on the open one closes it.
+  // PLAN 35, 35b, 35c; THE TRIVIA RETHINK, steps 8 and 9.
   // Nothing on the sheet is a number typed in: every card, stamp, graph and figure is made here, when the sheet is
   // first opened, by the game's own rules (landingScore, resultHtml, roundWorth ...) from ONE example, so a change of a
   // rule redraws it. The example: round 3 of a Day Trip, Berlin, flown from where round 2 ended (Japan, found by its
@@ -7727,6 +7771,9 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
   // The example day: five locations that never run together (the player's pick, 2026-11-18: a real day's five on the sheet
   // would give that day away; no day of the list has more than one of them in its round, and smoke holds it).
   const FAQ_AT = { right: [11.918, 52.52], wrong: [9.99, 53.55] }, FAQ_SECS = 5.9, FAQ_OVER = 0.5;
+  // Trivia's example: the question the game never asks (TRIVIA.faq: it would give no day's answer away), as question 5, the one seat where a country's points are whole
+  // numbers; three found countries of one, two and three stars; one close call that counts and one that does not.
+  const TQ_FAQ = { at: 4, found: ['KEN', 'BWA', 'GAB'], note: 'SOM', out: 'SDN' };
   const faqLand = (name) => PLAY.find((c) => c.name === name);
   const faqDay = () => [areaAsk('country', faqLand('Mexico')), areaAsk('flag', faqLand('Japan')), pointAsk('capital', faqLand('Germany')), pointAsk('capflag', faqLand('Egypt')), cityAsk(FIVE.find((x) => x.name === 'Auckland'))];
   function faqExample() {
@@ -7862,6 +7909,27 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
         // The player's own three lines, 2026-11-18. "minimum" holds: rankedBack gives back what the flight spent, up to the least it needed and ENERGY_BACK more (a hand that lets go a seventh of a second late)
         '<p>A correct landing replenishes the minimum energy that flight needed.<br>An incorrect landing does not replenish any energy you used that round.<br>The game ends when your energy runs out.</p>';
     }],
+    // TRIVIA'S THREE ANSWERS (the player's pick by button, 2026-11-26: "Yes, as drawn"). One example runs through them: TQ_FAQ. Under its section's name a question does
+    // not name its game. What a found country gives: the bar's own flag spot (its stars over its flag, its name) over its points, the three as a sum.
+    ['tscore', 'How does scoring work?', () => {
+      const q = TRIVIA.qs[TRIVIA.faq], most = tqQWorth(TQ_FAQ.at), unit = most / (2 * TQ_NEED), pts = TQ_FAQ.found.map((id) => unit * TQ_MULT[tqStep(q, id)]);
+      const spot = (id) => { const c = tqC(id), k = tqStep(q, id); return '<span class="pl"><span class="wd" role="img" aria-label="' + (k + 1) + ' of ' + TQ_MULT.length + ' stars">' + tqStars(k) + '</span>' + flagImg(c, '') + '<span class="nm">' + esc(c.name) + '</span></span>'; };
+      return faqCap('Find ' + TQ_NEED + ' countries ' + tqMany(q.t), 'in this example question ' + (TQ_FAQ.at + 1)) +
+        '<div class="stamps tq3">' + TQ_FAQ.found.map((id, i) => '<div>' + spot(id) + '<span class="pt">' + num(pts[i]) + '</span></div>').join('<div class="op">+</div>') + '<div class="op"><span>= ' + num(pts.reduce((a, b) => a + b, 0)) + '<small>/' + num(most) + '</small> points</span></div></div>' +          // the question's score as the bar writes it: its maximum gray
+        '<p>A country with more stars is worth more points.</p><p class="near">Landing in ' + TQ_NEED + ' countries with ' + TQ_MULT.length + ' stars each gives the question\'s maximum points.</p>';          // the first is the How to play sheet's own sentence
+    }],
+    // What each of the five questions is worth: Day Trip's row and Day Trip's line (the player's, 2026-11-18), with "question" for "round"
+    ['tworth', 'How many points is a question worth?', () => {
+      const five = TRIVIA.worth;
+      return '<div class="stamps q5">' + five.map((w, i) => '<div><span class="rd">Question ' + (i + 1) + '</span><span class="pt">' + num(w) + '</span></div>').join('<div class="op">+</div>') + '<div class="op">= ' + num(five.reduce((a, b) => a + b, 0)) + ' points</div></div>' +
+        '<p>Each question is more difficult than the question before.</p>';
+    }],
+    // The asterisk: one close call that counts and one that does not, each with the question's own note
+    ['tcalls', 'Why does a country have an asterisk (*)?', () => {
+      const q = TRIVIA.qs[TRIVIA.faq], row = (id, note, says) => '<tr><td class="who"><span class="big"><span class="fl">' + flagImg(tqC(id), '') + '</span>' + esc(tqC(id).name) + '*</span></td><td>' + esc(note) + '</td><td class="res">' + says + '</td></tr>';
+      return '<table class="calls">' + row(TQ_FAQ.note, q.notes[TQ_FAQ.note], 'Correct') + row(TQ_FAQ.out, q.out[TQ_FAQ.out], 'Not counted') + '</table>' +
+        '<p>Landing in a country that is not counted does not subtract ' + TQ_COST + ' sec.</p><p class="near">An asterisk (*) marks a country that is a close call for the question.</p>';
+    }],
     // Where the rules' numbers come from (the player, 2026-11-13: "How did you decide this?"; last on the sheet by their pick), and
     // under it the credits the data's licenses ask for, where a player can see them (LICENSE has each in full)
     ['decided', 'How did you decide this?', () => '<table>' + [
@@ -7869,20 +7937,41 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
       ['The timer\'s halfway mark', '54,775 timed answers on slepemapy.cz'],
       ['Points by distance', 'MapTap\'s formula, sized for a map that shows borders'],
       ['The energy a flight needs', 'Flown by the game\'s own rules'],
+      ['A country\'s stars in Trivia', 'An estimate from how often real players name or find that country: Sporcle, JetPunk, slepemapy.cz'],
+      ['The correct countries in Trivia', 'At least 2 published sources for each country'],          // tools/build_trivia.py holds every question to this line
     ].map(([what, from]) => '<tr><td class="what">' + what + '</td><td>' + from + '</td></tr>').join('') + '</table>' +
       '<p class="credits">Map outlines: Natural Earth. Flags: flagcdn.com. City populations: United Nations, World Urbanization Prospects: The 2025 Revision (CC BY 3.0 IGO). ' +
       'Country populations: World Bank (CC BY 4.0). slepemapy.cz data sets: Papoušek, Pelánek and Stanislav, Masaryk University (ODbL 1.0).</p>'],
   ];
   let faqOn = false, faqBuilt = false, faqPushed = false;
+  // The sections: How to play's own names and order, then "General" (the player's pick by button, 2026-11-26: "Combined, as drawn")
+  const FAQ_PARTS = [['Day Trip and Ranked', ['scoring', 'x', 'close', 'fast', 'energy', 'worth', 'harder', 'ends']], ['Trivia', ['tscore', 'tworth', 'tcalls']], ['General', ['decided']]];
+  const FAQ_SPLIT = 1036;          // the sheet's own px side by side: 30 + 330 + 40 + 600 + 30 and its two borders
+  function faqLay() {          // side by side where the window has the room for the list and the answer, else the sections one under another
+    const sheet = $('faq'), ui = +getComputedStyle(sheet).zoom || 1, split = ($('faq-page').clientWidth - 32) / ui >= FAQ_SPLIT;
+    sheet.dataset.sec = split ? 'split' : 'heads';
+    if (split && !sheet.querySelector('.ans:not([hidden])')) faqPick(FAQ[0][0]);          // side by side one answer is always shown
+  }
+  window.addEventListener('resize', () => { if (faqOn) { measure(); faqLay(); } });          // measure first: the sheet's zoom is the window's
   function faqBuild() {
     faqBuilt = true;
     const ex = faqExample(), sheet = $('faq');
+    let row = 2;          // side by side the sheet is a grid: its title in row 1, then a row for every section's name and every question, the answer beside them all
     for (const [id, question, answer] of FAQ) {
+      const part = FAQ_PARTS.find(([, ids]) => ids[0] === id);
+      if (part) {
+        const h = document.createElement('div');
+        h.className = 'part'; h.setAttribute('role', 'heading'); h.setAttribute('aria-level', '3'); h.textContent = part[0]; h.style.gridRow = row++;
+        sheet.appendChild(h);
+      }
       const sec = document.createElement('section');
       sec.id = 'faq-' + id;
       sec.innerHTML = '<h3><button type="button" aria-expanded="false" aria-controls="faq-' + id + '-a">' + esc(question) + '<i aria-hidden="true">+</i></button></h3><div class="ans" id="faq-' + id + '-a" hidden>' + answer(ex) + '</div>';
+      sec.querySelector('h3').style.gridRow = row++;
+      sec.querySelector('.ans').dataset.q = question;          // side by side the answer stands under its question (#faq[data-sec="split"] .ans::before)
       sec.querySelector('button').addEventListener('click', () => {
         const open = !sec.querySelector('.ans').hidden;
+        if (open && sheet.dataset.sec === 'split') return;          // side by side one answer is always shown: a click on its own question changes nothing
         faqPick(open ? null : id);
         history.replaceState(null, '', open ? '#faq' : '#faq-' + id);
         if (!open) {          // an answer that ends under the window is brought into it, as far as its question stays in sight
@@ -7892,6 +7981,7 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
       });
       sheet.appendChild(sec);
     }
+    sheet.style.gridTemplateRows = 'auto repeat(' + (row - 2) + ', auto) 1fr';          // the list's rows keep their own heights: the answer spans them all and a last row takes what is left
   }
   function faqPick(id) {          // this answer open, every other closed
     for (const sec of document.querySelectorAll('#faq section')) {
@@ -7907,7 +7997,9 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
     faqOn = on; $('faq-page').hidden = !on;
     if (on) {
       if (S.mode === 'fly' && !S.paused) setPaused(true);          // reached in a flight by the browser's Forward: the game waits
-      faqPick(m[1] && $('faq-' + m[1]) ? m[1] : FAQ[0][0]);
+      for (const a of document.querySelectorAll('#faq .ans')) a.hidden = true;          // every opening begins anew: no answer left open from the last time
+      faqLay();
+      faqPick(m[1] && $('faq-' + m[1]) ? m[1] : $('faq').dataset.sec === 'split' ? FAQ[0][0] : null);          // an answer's own address; else the first side by side, none one under another (the player's pick, 2026-11-25: "All closed")
       $('faq-page').scrollTop = 0;
       $('faq-back').focus({ preventScroll: true });
     } else {
@@ -8763,7 +8855,7 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
     tqSpotsFit(); tqLine(); tqClueFit(); measure();
   }
 
-  window.birdsEye = { trivia: { TQ, start: tqStart, enter: tqEnter, frame: tqFrame, saved: tqSaved, flown: tqFlown, dayQs: tqDayQs, qpts: tqQPts, score: tqDay, open: tqOpen, clueFit: tqClueFit, spotsFit: tqSpotsFit, BADFILL: TQ_BADFILL, page: () => TQ.page, ans: () => tqAns, close: tqClose, relay: tqRelay, results: tqResults, streak: tqStreak, dayOn: () => TQ.dayOn, dayOpen: tqDayOpen, dayFit: tqDayFit, dayRelay: tqDayRelay, dayTall: () => TQ.dayTall, cardSpots: tqCardSpots, view, address: ADDRESS, rules: { need: TQ_NEED, start: TQ_START, add: TQ_ADD, cost: TQ_COST }, ask: (k) => { TQ.qs[TQ.i] = typeof k === 'string' ? tqByKind(k) : k; tqQuestion(TQ.i); },
+  window.birdsEye = { trivia: { TQ, start: tqStart, enter: tqEnter, frame: tqFrame, saved: tqSaved, flown: tqFlown, dayQs: tqDayQs, qpts: tqQPts, score: tqDay, open: tqOpen, clueFit: tqClueFit, spotsFit: tqSpotsFit, BADFILL: TQ_BADFILL, page: () => TQ.page, ans: () => tqAns, close: tqClose, relay: tqRelay, results: tqResults, streak: tqStreak, dayOn: () => TQ.dayOn, dayOpen: tqDayOpen, dayFit: tqDayFit, dayRelay: tqDayRelay, dayTall: () => TQ.dayTall, cardSpots: tqCardSpots, view, address: ADDRESS, rules: { need: TQ_NEED, start: TQ_START, add: TQ_ADD, cost: TQ_COST, mult: TQ_MULT, faq: TQ_FAQ, worth: TRIVIA.worth }, ask: (k) => { TQ.qs[TQ.i] = typeof k === 'string' ? tqByKind(k) : k; tqQuestion(TQ.i); },
     flashes: () => flashes.filter((f) => f.tq).map((f) => [f.c.name, f.col, f.k]), boxes: () => placed.map((b) => ({ name: b.name || (b.bird ? 'BIRD' : '?'), box: [b.x - b.half, b.y - b.up, b.x + b.half, b.y + b.down].map(Math.round), flag: !!b.flag, sub: b.sub || '', lines: b.lines || null })) },          // Trivia, for the tests
     idk, canIdk, goodFor, explore, glide: () => glide, glideP, glideLook, howTo, pair: () => view.pair, homeNote: () => { showTripNote(); showKnown(); measure(); }, stackLines: (id) => { const c = PLAY.find((q) => q.id === id); ownName = true; try { return stackForm(c, c.name, 'name', null).lines; } finally { ownName = false; } }, hoverBox: () => hoverBox, slerp, showLeg, legView, STILL_DEG, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, TRIVIA, endlessRound, rankedLevel, rankedRounds, easiest, flagClue, capClue, capFlagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     outlines: () => fx.filter((f) => f.lined && f.shownA > 0).map((f) => f.lined.id), OUTLINE, pull, pullBy, steerable, PULL_FULL, PULL_RING, hFor, look: () => gaze, looking, canLook, lookStart, lookEnd, lookAnswer, answerNamed: () => answerNamed, birdRing: () => { const g = project(unit(bird.lon, bird.lat)); return g && birdRing(g); }, answerRoom: () => gazeName, lookK: gazeK, plate: () => plateSays, capLineOf: (id) => capLine(PLAY.find((c) => c.id === id)), plateRoom: (h) => pointerPlate(h, 1, true), hoverNow: () => (hover ? hover.name : null), project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
