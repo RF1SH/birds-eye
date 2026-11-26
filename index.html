@@ -130,20 +130,29 @@ kbd.space { min-width: 88px; }
 @media (max-height: 650px) { .how { row-gap: 7px; } }
 /* How to play: one page for every game, a paper sheet over the page as the FAQ is. On top what every game shares, then
    a column a game (the player's picks of 2026-11-20 from pictures HOWTO-redesign, HOWTO-mockups and HOWTO-pictures;
-   PLAN 75). Until then a card for each of the title card's three tabs, in the title card's place. */
+   PLAN 75). Until then a card for each of the title card's three tabs, in the title card's place.
+   FOUR COLUMNS since Trivia has one (the player's pick by button of 2026-11-25 from picture HOWTO-question, "Keep it"):
+   the sheet as wide as the window lets it be up to 1248 px (until then 1120), the games in four columns under the top
+   row, whose three cells stay as they were: the keys need 314 px, and a quarter of the sheet is 273. */
 #how-page { position: fixed; inset: 0; z-index: 20; overflow: auto; display: flex; padding: 14px 16px; background: var(--space); }
 #how-page[hidden] { display: none; }
-#how { zoom: var(--ui, 1); flex: none; margin: auto; width: min(1120px, 100%); padding: 20px 30px 26px; background: var(--paper); border: var(--b2z) solid var(--ink); border-radius: 3px; }
+#how { zoom: var(--ui, 1); flex: none; margin: auto; width: min(1248px, 100%); padding: 20px 30px 26px; background: var(--paper); border: var(--b2z) solid var(--ink); border-radius: 3px; }
 #how .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 #how h2 { margin: 0; font: 700 34px/1 var(--display); }
-#how .cols { display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 30px; }
-#how .shared { align-items: start; padding-bottom: 20px; margin-bottom: 18px; border-bottom: var(--b1z) solid var(--paper-shade); }
+#how .cols { display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 30px; }
+#how .shared { grid-template-columns: repeat(3, 1fr); align-items: start; padding-bottom: 20px; margin-bottom: 18px; border-bottom: var(--b1z) solid var(--paper-shade); }
 #how .shared .keys { align-self: center; }
 #how h3 { margin: 0 0 14px; font: 700 24px/1 var(--display); }
 #how .how, #how .keys { margin: 0; }
+/* Trivia's column, its third line: one, two and three stars, a row each, with the player's three words each level with
+   its row (their pick by button of 2026-11-25, "B: my three words"), and one sentence across the column under them. */
+#how .ill.levels { height: 63px; justify-content: flex-end; }
+#how .ill.levels > svg { transform-origin: 100% 50%; }
+#how p.across { grid-column: 1 / -1; }
 /* From a flight's pause card: the common top and the column of the game being flown, one column wide (the player, the
    same day: "whichever game mode you're in at that point, then that specific how to play should show"). Free flight has
-   no postcard and no energy: those two lines are not on its page. */
+   no postcard and no energy: those two lines are not on its page. Nor has Trivia (a pause card comes there only at a
+   closed question: an open question's clock cannot be stopped). */
 #how[data-only] { width: min(451px, 100%); padding: 18px 22px 20px; }
 #how[data-only] .top { margin-bottom: 14px; }
 #how[data-only] .cols { grid-template-columns: 1fr; row-gap: 8px; }
@@ -152,7 +161,8 @@ kbd.space { min-width: 88px; }
 #how[data-only] .shared .keys { margin-bottom: 6px; }
 #how[data-only] h3 { margin-bottom: 10px; }
 #how[data-only="trip"] section[data-for]:not([data-for="trip"]), #how[data-only="study"] section[data-for]:not([data-for="study"]),
-#how[data-only="free"] section[data-for]:not([data-for="free"]), #how[data-only="free"] .no-free { display: none; }
+#how[data-only="free"] section[data-for]:not([data-for="free"]), #how[data-only="free"] .no-free,
+#how[data-only="trivia"] section[data-for]:not([data-for="trivia"]), #how[data-only="trivia"] .no-free { display: none; }
 kbd {
   display: inline-block;
   min-width: 26px;
@@ -853,6 +863,7 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
         <path d="M14.6,-1.9 L20.5,0 L14.6,1.9 Z" fill="#f3c544"/>
       </g>
       <g id="i-stamp"><rect x="1.5" y="1.5" width="27" height="33" fill="#4a9cd8" stroke="#fffdf6" stroke-width="3" stroke-dasharray="2 2"/><rect x="4.5" y="4.5" width="21" height="27" fill="none" stroke="#fffdf6" stroke-width=".8"/><use href="#i-bird" transform="translate(14 19) rotate(-28) scale(.5)"/></g>
+      <symbol id="i-tqstar" viewBox="-7 -7.3 14 13.3"><path d="M0.00,-7.00 L1.85,-2.55 L6.66,-2.16 L3.00,0.97 L4.11,5.66 L0.00,3.15 L-4.11,5.66 L-3.00,0.97 L-6.66,-2.16 L-1.85,-2.55 Z" fill="#13263b"/></symbol>
     </defs>
   </svg>
   <div id="spoton" hidden>Spot on</div>
@@ -960,6 +971,18 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
           <p>Land before the timer's halfway mark for full speed points.</p>
           <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><circle cx="19.5" cy="12" r="8.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/><circle cx="19.5" cy="12" r="5.8" fill="none" stroke="var(--paper-shade)" stroke-width="3.6"/><path d="M19.5 6.2 A5.8 5.8 0 1 1 13.80 10.91" fill="none" stroke="var(--good)" stroke-width="3.6"/><text x="47" y="17.6" text-anchor="end" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" fill="var(--ink)" font-size="16">10</text><circle cx="19.5" cy="32" r="8.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/><circle cx="19.5" cy="32" r="5.8" fill="none" stroke="var(--paper-shade)" stroke-width="3.6"/><path d="M19.5 26.2 A5.8 5.8 0 0 1 25.30 32.00" fill="none" stroke="var(--orange)" stroke-width="3.6"/><text x="47" y="37.6" text-anchor="end" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" fill="var(--ink)" font-size="16">5</text></svg></div>
           <p>The less energy you use, the more points.</p>
+        </div>
+      </section>
+      <section data-for="trivia">
+        <h3>Trivia</h3>
+        <div class="how">
+          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><rect x="1.0" y="16.5" width="16" height="11" rx="1.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/><path d="M5.2 22.1 l2.6 2.9 l4.9 -5.9" fill="none" stroke="var(--good)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><rect x="20.0" y="16.5" width="16" height="11" rx="1.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/><path d="M24.2 22.1 l2.6 2.9 l4.9 -5.9" fill="none" stroke="var(--good)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><rect x="39.0" y="16.5" width="16" height="11" rx="1.5" fill="var(--paper)" stroke="#b9b2a0" stroke-width="1.5"/></svg></div>
+          <p>Land in 3 countries that answer the question.</p>
+          <div class="ill"><svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true"><text x="28" y="19" text-anchor="middle" font-size="16" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" fill="var(--ink)">45 sec</text><rect x="1" y="26" width="54" height="4.4" rx="1.6" fill="var(--good)"/></svg></div>
+          <p>A correct landing adds 10 sec. An incorrect landing subtracts 10 sec.</p>
+          <div class="ill levels"><svg width="56" height="50.4" viewBox="0 0 56 50.4" aria-hidden="true"><use href="#i-tqstar" x="46.00" y="3.65" width="10.00" height="9.50"/><use href="#i-tqstar" x="34.80" y="20.45" width="10.00" height="9.50"/><use href="#i-tqstar" x="46.00" y="20.45" width="10.00" height="9.50"/><use href="#i-tqstar" x="23.60" y="37.25" width="10.00" height="9.50"/><use href="#i-tqstar" x="34.80" y="37.25" width="10.00" height="9.50"/><use href="#i-tqstar" x="46.00" y="37.25" width="10.00" height="9.50"/></svg></div>
+          <p>well known<br>lesser known<br>least known</p>
+          <p class="across">A country with more stars is worth more points.</p>
         </div>
       </section>
       <section data-for="study">
@@ -8735,7 +8758,7 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
     tqSpotsFit(); tqLine(); tqClueFit(); measure();
   }
 
-  window.birdsEye = { trivia: { TQ, start: tqStart, enter: tqEnter, frame: tqFrame, saved: tqSaved, flown: tqFlown, dayQs: tqDayQs, qpts: tqQPts, score: tqDay, open: tqOpen, clueFit: tqClueFit, spotsFit: tqSpotsFit, BADFILL: TQ_BADFILL, page: () => TQ.page, ans: () => tqAns, close: tqClose, relay: tqRelay, results: tqResults, streak: tqStreak, dayOn: () => TQ.dayOn, dayOpen: tqDayOpen, dayFit: tqDayFit, dayRelay: tqDayRelay, dayTall: () => TQ.dayTall, cardSpots: tqCardSpots, view, address: ADDRESS, ask: (k) => { TQ.qs[TQ.i] = typeof k === 'string' ? tqByKind(k) : k; tqQuestion(TQ.i); },
+  window.birdsEye = { trivia: { TQ, start: tqStart, enter: tqEnter, frame: tqFrame, saved: tqSaved, flown: tqFlown, dayQs: tqDayQs, qpts: tqQPts, score: tqDay, open: tqOpen, clueFit: tqClueFit, spotsFit: tqSpotsFit, BADFILL: TQ_BADFILL, page: () => TQ.page, ans: () => tqAns, close: tqClose, relay: tqRelay, results: tqResults, streak: tqStreak, dayOn: () => TQ.dayOn, dayOpen: tqDayOpen, dayFit: tqDayFit, dayRelay: tqDayRelay, dayTall: () => TQ.dayTall, cardSpots: tqCardSpots, view, address: ADDRESS, rules: { need: TQ_NEED, start: TQ_START, add: TQ_ADD, cost: TQ_COST }, ask: (k) => { TQ.qs[TQ.i] = typeof k === 'string' ? tqByKind(k) : k; tqQuestion(TQ.i); },
     flashes: () => flashes.filter((f) => f.tq).map((f) => [f.c.name, f.col, f.k]), boxes: () => placed.map((b) => ({ name: b.name || (b.bird ? 'BIRD' : '?'), box: [b.x - b.half, b.y - b.up, b.x + b.half, b.y + b.down].map(Math.round), flag: !!b.flag, sub: b.sub || '', lines: b.lines || null })) },          // Trivia, for the tests
     idk, canIdk, goodFor, explore, glide: () => glide, glideP, glideLook, howTo, pair: () => view.pair, homeNote: () => { showTripNote(); showKnown(); measure(); }, stackLines: (id) => { const c = PLAY.find((q) => q.id === id); ownName = true; try { return stackForm(c, c.name, 'name', null).lines; } finally { ownName = false; } }, hoverBox: () => hoverBox, slerp, showLeg, legView, STILL_DEG, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, TRIVIA, endlessRound, rankedLevel, rankedRounds, easiest, flagClue, capClue, capFlagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     outlines: () => fx.filter((f) => f.lined && f.shownA > 0).map((f) => f.lined.id), OUTLINE, pull, pullBy, steerable, PULL_FULL, PULL_RING, hFor, look: () => gaze, looking, canLook, lookStart, lookEnd, lookAnswer, answerNamed: () => answerNamed, birdRing: () => { const g = project(unit(bird.lon, bird.lat)); return g && birdRing(g); }, answerRoom: () => gazeName, lookK: gazeK, plate: () => plateSays, capLineOf: (id) => capLine(PLAY.find((c) => c.id === id)), plateRoom: (h) => pointerPlate(h, 1, true), hoverNow: () => (hover ? hover.name : null), project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
