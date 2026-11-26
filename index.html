@@ -142,6 +142,11 @@ kbd.space { min-width: 88px; }
 #how .cols { display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 30px; }
 #how .shared { grid-template-columns: repeat(3, 1fr); align-items: start; padding-bottom: 20px; margin-bottom: 18px; border-bottom: var(--b1z) solid var(--paper-shade); }
 #how .shared .keys { align-self: center; }
+/* A narrow window that is tall (half of a big screen, 960 x 1040): the games two by two, each about as wide as its sheet from a
+   pause card, a sentence on 1 to 3 lines; in four columns a sentence ran to 7 short lines there (the player, 2026-11-26, by button
+   from picture HOWTO-narrow-question: "2x2 is fine"). Two by two is up to 856 px tall, so a narrow window that is short
+   (1024 x 768) keeps the four columns, which fit. Under 1150 px of width the cards are at their own size (view.ui is 1). */
+@media (max-width: 1149px) and (min-height: 890px) { #how:not([data-only]) .cols:not(.shared) { grid-template-columns: repeat(2, 1fr); row-gap: 30px; } }
 #how h3 { margin: 0 0 14px; font: 700 24px/1 var(--display); }
 #how .how, #how .keys { margin: 0; }
 /* Trivia's column, its third line: one, two and three stars, a row each, with the player's three words each level with
