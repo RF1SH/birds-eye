@@ -5963,6 +5963,7 @@ html #card.ghost ~ #place { visibility: visible; }
     S.gain = S.gain > 0 ? Math.max(0, S.gain - dt / 0.6) : Math.min(0, S.gain + dt / 0.6);
 
     if (!flying) {             // title and results: the globe turns slowly; drag it to turn it yourself
+      keyTurns(dt);
       if (globeHold.on) {          // an end globe paused by a press: everything holds, and the globe is the player's to turn
         if (drag.on || zoomedIn() || (globeHold.still += dt) < HOLD_SECS) return;          // zoomed in, it waits until it is zoomed out
         resumeGlobe();
@@ -6685,7 +6686,7 @@ html #card.ghost ~ #place { visibility: visible; }
   // follows the line really well"); their notes on it settled by button, 2026-11-16 (PLAN 108):
   // - the globe turns sideways to where the flight started, the bird standing there from the first frame ("it should
   //   already be there from the start when it turns to it, then pause for 1-2 secs, then take off. like I said"); it rests
-  //   END_REST seconds, takes off, flies the line flapping, lands at each stop and goes on ("lands, then goes on. but only if
+  //   REPLAY_REST seconds (0.2 since 2026-11-26), takes off, flies the line flapping, lands at each stop and goes on ("lands, then goes on. but only if
   //   you can make it look smooth and pretty and laglessly tasteful"); the red line to the postcard not delivered is drawn
   //   without it;
   // - the line being drawn is solid, the five before it dotted, older ones go; a ring where the line arrives;
@@ -6705,6 +6706,10 @@ html #card.ghost ~ #place { visibility: visible; }
   const REPLAY_READ = 1.2;
   // Once the lines have gone, the bird stands OFF_REST seconds in full view, then flies off the screen in OFF_SECS (flyOff).
   const OFF_REST = 0.5, OFF_SECS = 3;
+  // Seconds the bird stands on the start once the globe has turned to it, before it takes off. Until 2026-11-26 it stood
+  // END_REST (2 sec; the player, 2026-11-16: "then pause for 1-2 secs, then take off"); the player, 2026-11-26: "The bird
+  // shouldn't wait so long in the end globe before starting to take off in study mode end screen. 0.25 seconds at most."
+  const REPLAY_REST = 0.2;          // with the frame it takes to begin, under their quarter second
   // How the globe follows the line's tip: it holds still while the tip is within dz degrees of the middle, then turns at
   // gain times the distance past that (at most vmax degrees a second, eased in at soft); up and down more gently.
   const FOLLOW = { dz: 10, gain: 3, vmax: 60, soft: 4, gainY: 2, vmaxY: 30, softY: 2.5 };
@@ -6724,7 +6729,7 @@ html #card.ghost ~ #place { visibility: visible; }
     for (const a of atlasNames) if (a.seq < 0) a.seq = n;
     for (const d of S.drops) { const i = recs.findIndex((rec) => rec.it.kind === 'k' && rec.it.c.cap[0] === d.city); d.seq = i < 0 ? n : i + off; }
     const caps = recs.map((rec, i) => (rec.it.kind === 'k' ? { j: i + off, c: rec.it.c, name: rec.it.c.cap[0], p: pointOf(rec.it) } : null)).filter(Boolean);
-    S.replay = { Q, D, T, n, total: t, t: -END_REST, i: 0, k: 0, done: false, free: false, v: 0, w: 0, off: 0, caps,
+    S.replay = { Q, D, T, n, total: t, t: -REPLAY_REST, i: 0, k: 0, done: false, free: false, v: 0, w: 0, off: 0, caps,
       bird: { at: Q[0], h: 0, beat: 0, spread: 0.42, squash: 0, flying: false, a: 0, landings: 0 } };
     const [lon, lat] = lonLat(Q[0]);
     turnTo([lon, clamp(lat, -60, 75)]);
@@ -6912,6 +6917,8 @@ html #card.ghost ~ #place { visibility: visible; }
   // a results globe by hand ended its turn for good.)
   const HOLD_SECS = 5;
   const globeHold = { on: false, still: 0, down: null, at: null };
+  let keyTurn = false;          // an arrow key is turning an end screen's globe (keyTurns)
+  const ARROWS = new Map([['ArrowLeft', 'left'], ['a', 'left'], ['ArrowRight', 'right'], ['d', 'right'], ['ArrowUp', 'up'], ['w', 'up'], ['ArrowDown', 'down'], ['s', 'down']]);
   const turning = () => S.mode === 'over' && (S.replay ? !S.replay.done : !!S.legs && !!(atlas.to || S.tour || atlas.back));
   const zoomedIn = () => (atlas.zoom || 1) > 1.0001;
   function holdGlobe(press) {
@@ -6926,6 +6933,21 @@ html #card.ghost ~ #place { visibility: visible; }
     }
     globeHold.still = 0;
     return true;
+  }
+  // The arrow keys turn an end screen's globe as a pull of the mouse does (the player, 2026-11-26: "Why ... do the arrow
+  // keys not move the end results globe of other end screens too?"; until then they turned a globe only while looking
+  // around, lookTick): at that view's speed, about 520 px a second on the screen, within the pull's limits. The first frame
+  // of it is a press: a turn the globe was making pauses (holdGlobe) or ends; while a key is down the pause holds, and the
+  // plate by a resting pointer names what has come under it.
+  function keyTurns(dt) {
+    const ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0), iy = (keys.up ? 1 : 0) - (keys.down ? 1 : 0);
+    if (!(ix || iy) || S.mode !== 'over' || drag.on) { keyTurn = false; return; }
+    if (!keyTurn) { keyTurn = true; if (!holdGlobe(null)) { atlas.to = null; atlas.secs = 0; S.tour = null; atlas.back = null; if (S.replay) S.replay.free = true; } }
+    const k = 520 * view.ui * (cam.H / view.F) / RAD * dt;
+    atlas.lat = clamp(atlas.lat + iy * k, -60, 75);
+    atlas.lon = wrapLon(atlas.lon + (ix * k) / Math.max(0.2, Math.cos(atlas.lat * RAD)));
+    atlas.idle = 0; globeHold.still = 0;
+    if (mouse) hover = pointed(mouse[0], mouse[1]);
   }
   function resumeGlobe() {
     if (!globeHold.on) return;
@@ -7304,6 +7326,8 @@ html #card.ghost ~ #place { visibility: visible; }
     }
     if (k === 'e' && !e.repeat && S.paused && !$('end').hidden) { endFlight(); e.preventDefault(); return; }          // E ends a flight only where the pause card offers it
     if ((k === ' ' || k === 'Enter') && !e.repeat && looking() && !S.paused) lookEnd();          // looking around: the view comes back, and the same press goes on (the next location, or held, the take-off)
+    // On an end screen only a new press of an arrow key counts: a key still held from the flight does not turn the globe.
+    if (e.repeat && S.mode === 'over' && ARROWS.has(k) && !keys[ARROWS.get(k)]) { e.preventDefault(); return; }
     if (k === 'ArrowLeft' || k === 'a') keys.left = true;
     else if (k === 'ArrowRight' || k === 'd') keys.right = true;
     else if (k === 'ArrowUp' || k === 'w') keys.up = true;
