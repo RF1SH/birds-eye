@@ -738,6 +738,56 @@ html #card.ghost ~ #place { visibility: visible; }
 #faq .ruler .h2 { grid-row: 2; }
 #faq td.what { width: 38%; padding-right: 14px; }
 #faq p.credits { margin-top: 16px; font-size: 13px; color: var(--ink-soft); }
+
+/* ---------- Trivia: the bar of a question (PLAN, THE TRIVIA RETHINK, step 9, piece 2). The rules of the trial page the player flew
+   (audit/tt/trivia-faqsec.html), in the order they were written there: the later ones stand on the earlier. ---------- */
+.ticket.tq { gap: 18px; padding: 12px 14px 7px 16px; align-items: center; }
+.ticket.tq .addr { min-width: 0; max-width: 250px; }
+.ticket.tq .what { white-space: normal; text-wrap: balance; text-align: center; line-height: 1; min-height: 2em; display: flex; align-items: center; justify-content: center; }          /* room for two lines always: the bar keeps its height from question to question, and the map with it */
+.tq .places { display: flex; gap: 7px; align-items: flex-start; }
+.tq .pl { display: grid; justify-items: center; align-content: start; gap: 4px; min-width: 62px; max-width: 88px; }
+.tq .pl i { display: block; box-sizing: border-box; width: 48px; height: 32px; border: 2px solid #b9b2a0; border-radius: 2px; }
+.tq .pl img { display: block; height: 32px; width: auto; max-width: none; margin: 0; border: 1px solid var(--paper-shade); }
+.tq .pl img.cut { border-color: transparent; }          /* a flag that is not a rectangle (Nepal's) has no box round it: the game's own rule */
+.tq .pl span { display: block; min-height: 30px; font: 700 15px/1 var(--display); color: var(--ink); text-align: center; white-space: normal; text-wrap: balance; }
+#tq-box { padding: 6px 12px; }
+#console.v2 { position: relative; }          /* the note's line stands over the bar (.tq-foot) */
+.tq-foot { position: absolute; left: 0; bottom: calc(100% + 6px); box-sizing: border-box; max-width: 100%; padding: 5px 10px 6px; background: var(--paper); border: var(--b1z) solid var(--ink); border-radius: 3px; font: 400 13px/1.35 var(--text); color: var(--ink-soft); white-space: normal; text-wrap: balance; text-align: left; }
+.ticket.tq { display: grid; grid-template-columns: auto auto; grid-template-areas: "addr addr" "places go"; justify-content: center; column-gap: 18px; row-gap: 9px; padding: 12px 16px 8px; }
+.ticket.tq .addr { grid-area: addr; max-width: none; min-width: 0; }
+.ticket.tq .what { display: block; min-height: 0; line-height: 1.1; }
+.tq .places { grid-area: places; }
+#console.v2 { --addr: 322px; --clue: 21px; --pl: 80px; }          /* tried against all 150 clues and all 197 names at 1440 x 900, the tightest of the three windows (vb4.py) */
+/* EVERYTHING CENTERED (their note of 2026-11-25), measured by ink (vb6.py): the paper under the airmail edge is as high above the card's parts as under them (12 = 5 of the edge + 7), as wide left as right;
+   the card is one height at every question: room for a clue of three lines and, under a place, for a name's second line */
+#console.v2 .ticket.tq { display: flex; align-items: center; gap: 16px; padding: 12px 16px 7px 16px; box-sizing: border-box; min-height: calc(92px + 19px + 2 * var(--b2z)); }
+#console.v2 .ticket.tq .addr { max-width: var(--addr); min-width: 0; position: relative; top: -0.7px; }
+#console.v2 .ticket.tq .what { display: block; min-height: 0; font: 700 var(--clue)/22px var(--display); white-space: normal; text-wrap: balance; text-align: center; }          /* the lettering of a round's result; two lines at most (vb3.py), and the places hold the bar's height */
+#console.v2 .tq .places { gap: 6px; align-items: flex-start; }/* bz_patch.py: THEIR NOTE of 2026-11-25 after flying ("the font in the new bottom bar seems unnaturally small? the spacing of the elements in the box seems off?") */ #console.v2 .ticket.tq { gap: 0; padding: 12px 21px 7px 35px; } #console.v2 .ticket.tq .places { margin-left: 19px; }          /* with the 16 px beside an empty box inside its place and the 3 px beside the question's ink: 38 */ #console.v2 .ticket.tq .side { margin-left: 7px; } #console.v2 .ticket.tq .what.big { font: 700 30px/31px var(--display); } #console.v2 .ticket.tq .addr:has(.what.big) { top: -0.2px; }          /* by ink (bz4.py): a last line with a letter under the line stands 1.9 px low at 1913 x 1073, one without 2.2 px high; the middle of the two */          /* the game's own lettering for what is asked (.ticket: 700 30px) */
+/* cc_patch.py: the three flag spots closer */ #console.v2 .ticket.tq.snug { --pl: 64px; padding: 12px 13px 7px 27px; } #console.v2 .ticket.tq.snug .addr { max-width: 362px; } #console.v2 .ticket.tq.snug .places { gap: 10px; margin-left: 27px; } #console.v2 .ticket.tq.snug .pl i { width: var(--pl); }          /* an empty box is the place: what comes stands inside it */ #console.v2 .ticket.tq.snug .side { margin-left: 15px; } #console.v2 .ticket.tq.snug .pl .nm.long2 { font-size: 11px; line-height: 14px; }
+#console.v2 .tq .pl { gap: 4px; width: var(--pl); min-width: 0; max-width: none; }
+#console.v2 .tq .pl .wd { min-height: 0; height: 13px; font: 400 13px/1 var(--text); color: var(--ink-soft); white-space: nowrap; }          /* the bar's own small line ("Question 2 of 5", "points") */
+#console.v2 .tq .pl .wd .mk { display: flex; justify-content: center; align-items: center; gap: 2px; height: 13px; min-height: 0; }
+#console.v2 .tq .pl .wd svg { display: block; width: 13.5px; height: 13px; overflow: visible; }
+#console.v2 .tq .pl .nm { min-height: 0; height: 15px; overflow: visible; }          /* a place is its mark, its flag and ONE line of name, centered in the card; a second line of a long name hangs under it (it stood in room kept UNDER every name, which set every place 12 px high) */
+#console.v2 .tq .pl .nm.long { font-size: 12.5px; line-height: 15px; }          /* a name of more than 22 letters (Saint Vincent and the Grenadines, Central African Republic): smaller, so it too takes two lines */          /* room for a name of two lines always, as on today's card */
+#console.v2 .tq .side { display: grid; justify-items: center; position: relative; top: -1.4px; }          /* digits have no part under the line: their ink in the middle */
+#console.v2 .tq .side .qpts { grid-row: 1; grid-column: 1; }
+#console.v2 .tq .side .size { visibility: hidden; }          /* the widest reading of this question's points: the card is one width at every score */
+#console.v2 #tq-box > * { position: relative; top: 1.7px; }
+#console.v2 #tally > *, #console.v2 #trip-clock > * { position: relative; top: -1.6px; }          /* each cell's ink in the middle of its cell (a line's own room over and under its letters is not even) */
+#console.v2 #tally { box-sizing: border-box; min-width: 92px; }          /* room for 1,000: the bar is one width at every score */
+#console.v2 .tq .qpts { font: 700 30px/1 var(--display); white-space: nowrap; font-variant-numeric: tabular-nums; }          /* the form of a round's result (the number bold, its maximum gray) in the lettering of the day's points: one lettering for the player's numbers */
+#console.v2 .tq .qpts small { font-family: inherit; font-size: .6em; font-weight: 600; color: var(--ink-soft); margin-left: 1px; }
+/* the box beside the card: the five questions, the day's points, the clock, the quiet button; closed: the dark button in the room of the last two, so nothing moves */
+#console.v2 #tq-box { order: 1; } #console.v2 #tally { order: 2; } #console.v2 #trip-clock { order: 3; } #console.v2 #tq-give { order: 4; } #console.v2 #tq-on { order: 3; }
+#console.v2 #trip-clock { box-sizing: border-box; width: 142px; min-width: 0; }
+#console.v2 #tq-give { box-sizing: border-box; width: 98px; justify-items: center; }
+#console.v2 #tq-on { box-sizing: border-box; width: 240px; justify-items: center; }
+#console.v2 #trip-clock.tq .bar { display: block; }
+#console.v2 #trip-clock.tq .bar::after { display: none; }          /* no mark: nothing is lost at one spot of this line */
+#console.v2 #tally b { white-space: nowrap; }
+#console.v2 .tq .pl .wd svg.tqs-star { width: 13.5px; height: 13px; }
 </style>
 
 </head>
@@ -1796,7 +1846,7 @@ html #card.ghost ~ #place { visibility: visible; }
   const KINDS = ['c', 'k', 'f', 's'], REGIONS = ['World', 'Africa', 'Americas', 'Asia', 'Europe', 'Oceania'];
   // asked, games: Ranked's turns. games counts the Ranked games begun; asked holds, for a country, the game it was last asked in
   // told: how often a wrong landing has said why speed and energy use have an X (n, in the tutorial and the real games together), and the real games that have said it (day, ranked)
-  const save = { mem: {}, lately: [], flown: [], best: 0, sound: true, study: { kinds: KINDS.slice(), where: ['World'] }, trips: {}, endless: 0, skill: null, visited: false, asked: {}, games: 0, told: { n: 0 } };
+  const save = { mem: {}, lately: [], flown: [], best: 0, sound: true, study: { kinds: KINDS.slice(), where: ['World'] }, trips: {}, trivia: {}, endless: 0, skill: null, visited: false, asked: {}, games: 0, told: { n: 0 } };
   const wholeWorld = (w) => !w.length || w.includes('World') || REGIONS.every((r) => r === 'World' || w.includes(r));      // no region, World itself, or all five
   try {
     const got = JSON.parse(localStorage.getItem(KEY)) || {};
@@ -1823,6 +1873,8 @@ html #card.ghost ~ #place { visibility: visible; }
     if (rk && Number.isFinite(rk.score) && Number.isFinite(rk.energy) && Array.isArray(rk.rounds) && Array.isArray(rk.results) && Array.isArray(rk.at) && Array.isArray(rk.used)) save.ranked = rk;
     if (got.skill && got.skill.k && got.skill.r) save.skill = got.skill;
     if (got.trips && typeof got.trips === 'object') for (const k in got.trips) { const v = got.trips[k]; if (/^\d{4}-\d\d-\d\d$/.test(k) && v && Number.isFinite(v.score) && Array.isArray(v.rounds)) save.trips[k] = v; }
+    // Trivia's days (tqKeep): a day's questions as far as they were begun
+    if (got.trivia && typeof got.trivia === 'object') for (const k in got.trivia) { const v = got.trivia[k]; if (/^\d{4}-\d\d-\d\d$/.test(k) && v && Number.isFinite(v.score) && Array.isArray(v.qs) && v.qs.every((r) => r && typeof r.kind === 'string' && Array.isArray(r.found) && Array.isArray(r.wrong) && Number.isFinite(r.pts))) save.trivia[k] = v; }
     const fl = got.flight;
     if (fl && fl.n >= 1 && Number.isFinite(fl.energy) && Array.isArray(fl.bird) && Array.isArray(fl.log) && Array.isArray(fl.was)) save.flight = fl;
     const st = got.study;
@@ -1831,7 +1883,7 @@ html #card.ghost ~ #place { visibility: visible; }
     if (w && w.length) save.study.where = wholeWorld(w) ? ['World'] : w;
     if (got.visited === true) save.visited = true;
     if (got.told && typeof got.told === 'object') {
-      for (const k of ['day', 'ranked']) if (got.told[k] === true) save.told[k] = true;
+      for (const k of ['day', 'ranked', 'stars']) if (got.told[k] === true) save.told[k] = true;          // stars: Trivia's sentence on what a star means was shown (once a player)
       save.told.n = Number.isInteger(got.told.n) && got.told.n >= 0 ? got.told.n : (save.told.day ? 1 : 0) + (save.told.ranked ? 1 : 0);          // (a save of the day's first hours had no count)
     }
     if (got.scale === 2) save.scale = 2;          // saved since a round is worth what it is today
@@ -2330,8 +2382,28 @@ html #card.ghost ~ #place { visibility: visible; }
   const CAP_STAR = new Path2D('M0.00,-7.00 L1.85,-2.55 L6.66,-2.16 L3.00,0.97 L4.11,5.66 L0.00,3.15 L-4.11,5.66 L-3.00,0.97 L-6.66,-2.16 L-1.85,-2.55 Z');
   const markW = (size) => size * 0.92, markGap = (size) => size * 0.26;
   // a line under a name: how wide it is (the font is set by the caller), and the line drawn with its middle at x
-  const subWidth = (line, size) => (line.startsWith(CAP_MARK) ? markW(size) + markGap(size) + ctx.measureText(line.slice(CAP_MARK.length)).width : ctx.measureText(line).width);
+  // Trivia: a correct country's stars in the line under its name (the player's picks by button, 2026-11-25: "Stars in ink", "The mark, no word"). A line that
+  // begins with STEP_MARK and a digit 0 to 2 draws 1 to 3 stars before its text: the star of the capital's symbol without its ring (a ringed star stays the
+  // sign of a capital), as tall as that symbol in such a line, each with the lettering's paper edge round it.
+  const STEP_MARK = '\u2756';
+  const stepOne = (size) => size * 0.92, stepGap = (size) => size * 0.13;
+  const stepW = (k, size) => (k + 1) * stepOne(size) + k * stepGap(size) + size * 0.30;
+  function stepText(line, x, y, so) {
+    const k = +line[1], rest = line.slice(2).trim(), n = k + 1, one = stepOne(so.size), gap = stepGap(so.size);
+    ctx.font = '700 ' + so.size + 'px ' + DISPLAY; if ('letterSpacing' in ctx) ctx.letterSpacing = so.track || '0.05em';
+    const w = rest ? ctx.measureText(rest).width : 0, mw = n * one + (n - 1) * gap, sp = rest ? so.size * 0.30 : 0, left = x - (mw + sp + w) / 2;
+    const u = so.size * 0.92 / 14, edge = so.edge === undefined ? 3.5 : so.edge;
+    for (let j = 0; j < n; j++) {
+      ctx.save(); ctx.translate(left + j * (one + gap) + one / 2, y - so.size * 0.024 + 0.67 * u); ctx.scale(u, u);          // the ink's middle on the letters' middle (a star's shape reaches 7 up and 5.66 down)
+      if (edge) { ctx.lineWidth = 2 * edge / u * 0.5; ctx.strokeStyle = PAPER; ctx.stroke(CAP_STAR); }
+      ctx.fillStyle = INK; ctx.fill(CAP_STAR);
+      ctx.restore();
+    }
+    if (rest) text(rest, left + mw + sp + w / 2, y, so);
+  }
+  const subWidth = (line, size) => (line.startsWith(STEP_MARK) ? stepW(+line[1], size) + ctx.measureText(line.slice(2)).width : line.startsWith(CAP_MARK) ? markW(size) + markGap(size) + ctx.measureText(line.slice(CAP_MARK.length)).width : ctx.measureText(line).width);
   function subText(line, x, y, so) {
+    if (line.startsWith(STEP_MARK)) { stepText(line, x, y, so); return; }
     if (line.startsWith(POP_MARK)) so = Object.assign({}, so, { fill: INK_SOFT });          // the population: the least important line, in gray
     if (!line.startsWith(CAP_MARK)) { text(line, x, y, so); return; }
     const rest = line.slice(CAP_MARK.length), d = markW(so.size);
@@ -3540,7 +3612,7 @@ html #card.ghost ~ #place { visibility: visible; }
     return null;
   }
   let gazeName = null;          // the room of the correct location's name as it stands: the pointer on it answers for the answer's country (as on every globe: pointed)
-  const lookPointed = (x, y) => { if (S.game === 'study') return null; const b = gazeName; return b && Math.abs(b.x - x) < b.half && Math.abs(b.y - y) < b.tall ? { x, y, name: b.c.name, c: b.c, on: 'answer' } : pointed(x, y); };
+  const lookPointed = (x, y) => { if (S.game === 'study' || S.game === 'trivia') return null; const b = gazeName; return b && Math.abs(b.x - x) < b.half && Math.abs(b.y - y) < b.tall ? { x, y, name: b.c.name, c: b.c, on: 'answer' } : pointed(x, y); };
   function lookWheel(e) {
     if (S.paused) return;
     if (!looking()) { if (e.deltaY <= 0 || performance.now() - gazeOver < 400 || !lookStart()) return; }          // scrolling OUT begins it (not the tail of the scroll that has just ended it)
@@ -3627,8 +3699,10 @@ html #card.ghost ~ #place { visibility: visible; }
   let studyOpen = false;        // Study's choices are open on the home card: then the home globe shows where Study asks (showWhere)
   let runKind = 'day';          // a trip's kind: today's trip (day), Ranked (endless), the tutorial (tutor)
   // game: trip (today's trip, Ranked or the tutorial: runKind), study, free. Each button of the home card names its own.
+  // trivia: a day's five questions, begun by tqStart alone, which sets the day up first.
   function takeOff(game) {
     if (game === 'trip' && runKind === 'day' && tripDone()) return;          // one trip a day (one begun is carried on)
+    if (game !== 'trivia') tqOff();          // a trivia day's bar never stays under another game's flight
     S.game = game;
     Object.assign(S, { mode: 'fly', paused: false, t: 0, energy: TANK, n: 0, streak: 0, bestStreak: 0, firstTry: 0, fresh: 0, route: null, legs: null, tickets: [], last: null,
       spawnAt: 0, history: [], endAt: 0, look: null, capAt: null, capAlso: null, capMore: [], capFit: null, named: null, around: null, gain: 0, idle: 0, fails: new Map(), saw: new Map(), sawCap: new Set(), newC: 0, sawN: 0, intro: null, began: null, replay: null });
@@ -3762,6 +3836,7 @@ html #card.ghost ~ #place { visibility: visible; }
     bird.at = here.key;
     if (S.game === 'free') { (here.sea || here.wet ? sfx.splash : sfx.thud)(); showPlace(here); return; }
     if (S.game === 'trip') { tripLand(here, lon, lat); return; }
+    if (S.game === 'trivia') { tqLand(here, lon, lat, p); return; }
     studyLand(here, lon, lat, was, p);
     keepFlight();
   }
@@ -4583,7 +4658,7 @@ html #card.ghost ~ #place { visibility: visible; }
   // until their average Wikipedia rank was near the middle: 10 days of 365 went from easier to harder.)
   const DAYS = D.days || { start: '2026-11-15', list: [] };
   // Trivia's questions and its five for every day, the same for everyone (D.trivia, tools/build_trivia.py): a day's five climb, the easiest first; the FAQ's
-  // example question (faq) is on no day. The game around them is not built yet (PLAN, THE TRIVIA RETHINK, step 9): nothing reads this but the tests.
+  // example question (faq) is on no day. The game around them: the block "Trivia" near the end (tqStart); no button of the home card leads to it yet (PLAN, THE TRIVIA RETHINK, step 9).
   const TRIVIA = D.trivia || { start: '2026-11-26', worth: [], faq: -1, days: [], qs: [] };
   function makeTrip(day) {
     const n = DAYS.list.length, at = Math.round((Date.parse(day + 'T00:00:00Z') - Date.parse(DAYS.start + 'T00:00:00Z')) / 864e5);
@@ -5875,6 +5950,7 @@ html #card.ghost ~ #place { visibility: visible; }
   // Back to the title: the globe stays where you were and starts turning again.
   function goHome(keep) {          // keep (true): the globe stays turned as the player has it (Explore scrolled out to the whole globe)
     if (S.mode === 'title') return;
+    tqOff();          // Trivia: the day is in the save as it stands (tqKeep); a question left open closes at the next look (tqSaved)
     keep = keep === true;
     const wasLook = looking(), oldCorner = S.mode === 'fly' ? ghost($('corner')) : null;          // the corner's buttons fade out on the way, as the card does
     // From a flight the view goes home in one move, a click's move backwards (glide): where the bird stood glides to its
@@ -5920,7 +5996,7 @@ html #card.ghost ~ #place { visibility: visible; }
 
   // Day Trip and Ranked: no pausing while a round's stopwatch runs. A pause there stopped the clock with the clue
   // and the whole globe in view, and held the bird in the air for free. Between rounds pausing works as anywhere.
-  const inRound = () => S.mode === 'fly' && S.game === 'trip' && !!S.trip && !S.trip.wait;
+  const inRound = () => (S.mode === 'fly' && S.game === 'trip' && !!S.trip && !S.trip.wait) || tqOpen();          // an open trivia question is a round: its clock cannot be stopped either
   // Looking away in a round (another window, another tab) cannot be stopped, so the bird is held where it is and
   // the globe is hidden, but the stopwatch keeps counting: on coming back the time away is added to the round.
   // Outside a round the game stops itself only while the bird is in the air. ON THE GROUND THE GAME IS A MAP, AND A MAP
@@ -5943,10 +6019,11 @@ html #card.ghost ~ #place { visibility: visible; }
   function release() {
     if (!heldAt) return;
     if (S.trip && inRound()) S.trip.t0 -= (performance.now() - heldAt) / 1000;
+    if (tqOpen()) tqHeld((performance.now() - heldAt) / 1000, true);
     heldAt = 0;
     stage.classList.remove('held'); $('held').hidden = true;
   }
-  const keptOnHome = () => (S.game === 'study' ? S.n > 0 : S.game === 'trip' && !!S.trip && !S.trip.tutor && (!S.trip.endless || (S.trip.results.length > 0 && tripMore(S.trip))));
+  const keptOnHome = () => (S.game === 'trivia' ? TQ.on : S.game === 'study' ? S.n > 0 : S.game === 'trip' && !!S.trip && !S.trip.tutor && (!S.trip.endless || (S.trip.results.length > 0 && tripMore(S.trip))));
   // The pause card comes by hand (the corner's button, P, Esc) and for a Study flight left for another window with the
   // bird in the air. Explore has none: it is a map, and its corner holds what its pause card held (the player,
   // 2026-11-20: "Do you even need a pause screen? ... it's not like a dynamic game. It's more just like Google Maps, and
@@ -6235,7 +6312,8 @@ html #card.ghost ~ #place { visibility: visible; }
       const pulse = flashes.find((fl) => fl.c === c), on = under === c;
       ctx.globalAlpha = show * rimDot(s, 6 * view.mk);
       ctx.beginPath(); ctx.arc(s[0], s[1], 6 * view.mk, 0, 7);
-      ctx.fillStyle = pulse && Math.cos((pulse.t / pulse.secs) * pulse.pulses * 2 * Math.PI) > 0 ? PAPER : FILL[c.col];
+      // (a trivia country's own color, a tiny country's dot too: tqFlash)
+      ctx.fillStyle = pulse && pulse.tq && pulse.col ? '#' + rgb(FILL[c.col]).map((v, i) => Math.round(255 * (v + (rgb(pulse.col)[i] - v) * pulse.k)).toString(16).padStart(2, '0')).join('') : pulse && Math.cos((pulse.t / pulse.secs) * pulse.pulses * 2 * Math.PI) > 0 ? PAPER : FILL[c.col];
       ctx.fill();
       ctx.strokeStyle = on ? INK : PAPER; ctx.lineWidth = (on ? 2 : 1.5) * view.mk; ctx.stroke();
     }
@@ -6536,7 +6614,7 @@ html #card.ghost ~ #place { visibility: visible; }
       drawAir(x, y, size);
     }
     birdShape(x, y, size, bird.spread, bird.squash);
-    if (S.game !== 'free') drawStamina(x + 30 * size, y + 13 * size, k);
+    if (S.game !== 'free' && S.game !== 'trivia') drawStamina(x + 30 * size, y + 13 * size, k);
     if (bird.down && S.idle > IDLE_SLEEP) drawZzz(x + 10 * size, y - 14, S.idle - IDLE_SLEEP);
     ctx.globalAlpha = 1;
   }
@@ -7336,7 +7414,10 @@ html #card.ghost ~ #place { visibility: visible; }
     nameplate(below.sea ? null : below.c, nameOf(below), g[0], g[1] + 34, below.sea ? 'sea' : 'name', null, 1, Math.round(freePx() * 0.75 * (1 - 0.45 * clamp(bird.a, 0, 1))));     // smaller as you climb, so its flag never covers much
   }
   const countEl = $('count');
-  function drawHud() { countEl.textContent = S.trip ? S.trip.score : S.n; }
+  function drawHud() {
+    if (S.mode === 'fly' && S.game === 'trivia') { const h = num(tqDay()); if (countEl.textContent !== h) countEl.textContent = h; return; }          // Trivia: the day's points so far
+    countEl.textContent = S.trip ? S.trip.score : S.n;
+  }
 
   // On a machine that cannot keep up, draw the globe at a lower resolution rather than stutter.
   let before = performance.now(), slow = 0;
@@ -7347,11 +7428,12 @@ html #card.ghost ~ #place { visibility: visible; }
     const exploring = S.mode === 'fly' && S.game === 'free';
     if (!S.paused && !heldAt && !(exploring && (faqOn || howOn))) step(dt);          // a sheet over Explore: the flight waits under it
     lookTick(dt);
+    tqFrame();
     idkBtn.classList.toggle('off', S.mode === 'fly' && S.game === 'study' && (!bird.down || !!(S.tickets[0] && S.tickets[0].shown)));          // dimmed in the air and once the location is shown; never between two postcards
     const canPause = S.mode === 'fly' && !S.paused && !inRound() && !exploring;      // the pause button: there whenever pausing is allowed
     if (pauseBtn.hidden === canPause) pauseBtn.hidden = !canPause;
     if (cornerHome.hidden === exploring) cornerHome.hidden = cornerHow.hidden = cornerSound.hidden = !exploring;          // Explore's corner: what its pause card held, with no pause between
-    if (heldAt && S.trip) showClock(S.t - S.trip.t0 + (now - heldAt) / 1000);       // held: the stopwatch is seen to run on
+    if (heldAt && S.trip) showClock(S.t - S.trip.t0 + (now - heldAt) / 1000); else if (heldAt && tqOpen()) tqHeld((now - heldAt) / 1000, false);       // held: the stopwatch is seen to run on
     if (run.draw) draw();
     slow = ms > 40 ? slow + 1 : Math.max(0, slow - 2);
     if (slow > 45 && view.scale > 0.55) { view.scale *= 0.8; slow = 0; measure(); }
@@ -7399,6 +7481,8 @@ html #card.ghost ~ #place { visibility: visible; }
     }
     if (k === 'f' && !e.repeat && S.mode === 'fly' && S.game === 'study') { idk(); e.preventDefault(); return; }          // "I don't know" (the player, 2026-11-26: "F should be the button for i dont know")
     if (k === 'e' && !e.repeat && S.paused && !$('end').hidden) { endFlight(); e.preventDefault(); return; }          // E ends a flight only where the pause card offers it
+    // Trivia: Enter gives a question up and, once it is closed, brings the next; Space does that too once the bird has stood 0.8 sec at a closed question
+    if (TQ.on && S.mode === 'fly' && !S.paused && (k === 'Enter' || (k === ' ' && TQ.closed && bird.down && S.t - TQ.closedT >= 0.8))) { if (!e.repeat) tqEnter(); e.preventDefault(); return; }
     if ((k === ' ' || k === 'Enter') && !e.repeat && looking() && !S.paused) lookEnd();          // looking around: the view comes back, and the same press goes on (the next location, or held, the take-off)
     // On the home screen and an end screen only a new press of an arrow key counts: a key still held from the flight does not turn the globe.
     if (e.repeat && S.mode !== 'fly' && ARROWS.has(k) && !keys[ARROWS.get(k)]) { e.preventDefault(); return; }
@@ -7958,7 +8042,263 @@ html #card.ghost ~ #place { visibility: visible; }
   const speedAt = (a) => paceAt(a) * heightFor(a) / view.F * R_KM;
   // for the tests: the bird put somewhere by hand. That is no flight, so the view is the bird's own at once (no rest on the last landing's country still being handed back)
   const setBird = (lon, lat, a, down) => { Object.assign(bird, { lon, lat, a, va: 0, vx: 0, vy: 0, down: !!down }); S.capFit = null; fitClear(); };
-  window.birdsEye = { idk, canIdk, goodFor, explore, glide: () => glide, glideP, glideLook, howTo, pair: () => view.pair, homeNote: () => { showTripNote(); showKnown(); measure(); }, stackLines: (id) => { const c = PLAY.find((q) => q.id === id); ownName = true; try { return stackForm(c, c.name, 'name', null).lines; } finally { ownName = false; } }, hoverBox: () => hoverBox, slerp, showLeg, legView, STILL_DEG, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, TRIVIA, endlessRound, rankedLevel, rankedRounds, easiest, flagClue, capClue, capFlagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
+  // ---------- Trivia (PLAN, THE TRIVIA RETHINK): a question with several correct countries; the player lands in three of them ----------
+  // A day's five questions are the same for everyone (TRIVIA.days), the easiest first, worth 100, 150, 200, 250 and 300 points (TRIVIA.worth): 1,000 a day.
+  // A question opens with 45 sec on its clock (the player, 2026-11-25: "actually make it 45 seconds instead of 60"); a correct country adds 10 sec and an
+  // incorrect landing takes 10 sec; a landing in a country that is not counted (a close call, which the question's note explains) takes none. A question
+  // closes with three countries found, at 0 sec, or by "Give up" (Enter). Flying takes no energy. A country of 1, 2, 3 stars is worth 1 : 1.5 : 2 (their
+  // pick by button, 2026-11-25: "Three steps"); three countries of three stars are the question's whole worth.
+  // Every part of the screen is the player's pick from a trial page they flew or from a picture (audit/tt/trivia-faqsec.html; the plan's block "THE ORDER OF
+  // THE BUILD'S PIECES" lists the picked position of each of its switches). On that page a trivia flight flew as a Study flight. Here it is a game of its own
+  // (S.game 'trivia'), so nothing of Study's reaches it: the kept Study flight, Study's choice of region, the sleeping bird's fun fact, "I don't know",
+  // "End flight", and whatever Study gains later. Where it does as Study does, the line says so (lookPointed).
+  const TQ_NEED = 3, TQ_START = 45, TQ_ADD = 10, TQ_COST = 10;
+  const TQ_MULT = [1, 1.5, 2];          // a country of one, two, three stars
+  const TQ = { on: false, day: '', qs: [], i: 0, found: [], wrongs: [], calls: [], note: '', hist: [], rows: [], closed: false, closedT: 0, timeUp: false, end: 0, start0: TQ_START, waitView: false, lastT: 0, landFx: [] };
+  const tqC = (id) => PLAY.find((c) => c.id === id);
+  const tqByKind = (kind) => TRIVIA.qs.find((q) => q.kind === kind);
+  // a day's five: its place in the list is the days since the start, and the days come round again (as makeTrip's)
+  const tqDayQs = (day) => { const n = TRIVIA.days.length, at = Math.round((Date.parse(day + 'T00:00:00Z') - Date.parse(TRIVIA.start + 'T00:00:00Z')) / 864e5); return n ? TRIVIA.days[Number.isFinite(at) ? ((at % n) + n) % n : 0].map((k) => TRIVIA.qs[k]) : []; };
+  const tqStep = (q, id) => { const k = q.ids.indexOf(id); return k < 0 ? null : q.st[k]; };          // a correct country's stars, less one: 0 to 2
+  const tqQWorth = (i) => TRIVIA.worth[i];
+  // a question's points: three countries of three stars are its worth; rounded once
+  const tqQPts = (i, ids) => { const q = TQ.qs[i], unit = tqQWorth(i) / (2 * TQ_NEED); return Math.round(ids.slice(0, TQ_NEED).reduce((a, id) => a + unit * TQ_MULT[tqStep(q, id) || 0], 0)); };
+  const tqDay = () => TQ.hist.slice(0, TQ.i + 1).reduce((a, ids, i) => a + tqQPts(i, ids), 0);          // the day's points so far
+  const tqStars = (k) => ('<svg class="tqs-star" viewBox="-7 -7.3 14 13.3" aria-hidden="true"><path d="M0.00,-7.00 L1.85,-2.55 L6.66,-2.16 L3.00,0.97 L4.11,5.66 L0.00,3.15 L-4.11,5.66 L-3.00,0.97 L-6.66,-2.16 L-1.85,-2.55 Z" fill="' + INK + '"/></svg>').repeat(k + 1);
+  const tqMark = (q, id) => { const k = tqStep(q, id); return k == null ? '' : '<span class="mk" role="img" aria-label="' + (k + 1) + (k ? ' stars' : ' star') + '">' + tqStars(k) + '</span>'; };
+  // what a correct country adds to the clock, said in the landing's second line after its stars; the country that completes the question adds nothing
+  const tqPlus = () => (TQ.found.length < TQ_NEED ? ' (+' + TQ_ADD + ' sec)' : '');
+  const tqStepLine = (q, id) => STEP_MARK + tqStep(q, id) + tqPlus();          // drawn by subText
+
+  // What is kept of a day (save.trivia[day], in the form of Day Trip's save.trips): for each question begun its name in the bank (kind), the countries found
+  // in their order, the incorrect landings, its points as scored, and how it closed (how: 'all' three found, 'time' ran out, 'gave' up, 'left'). The
+  // question with no `how` yet stands open. Written as each thing happens, so nothing more is owed when the window goes.
+  function tqKeep(how) {
+    const T = save.trivia[TQ.day] || (save.trivia[TQ.day] = { score: 0, qs: [] });
+    T.qs[TQ.i] = { kind: TQ.qs[TQ.i].kind, found: TQ.found.slice(0, TQ_NEED), wrong: TQ.wrongs.slice(), pts: tqQPts(TQ.i, TQ.found) };
+    if (how) T.qs[TQ.i].how = how;
+    T.score = T.qs.reduce((a, r) => a + r.pts, 0);
+    persist();
+  }
+  const tqFlown = (day) => { const T = save.trivia[day]; return !!T && T.qs.length >= 5 && T.qs.every((r) => !!r.how); };          // a day counts once its fifth question is closed
+  // The day as kept, looked at before it is carried on or shown. A day begun before the day's five changed (they do when a question joins the bank): flown
+  // to its end it stays as it was flown; left part-way, or with a question that can no longer be read, it is free to fly again (Day Trip's rule:
+  // showTripNote). A question left open (Home, or the window closed) is closed with what was found: the clock cannot be stopped by leaving, any more than
+  // Day Trip's stopwatch (tripSettle), and the day carries on at the next question.
+  function tqSaved(day) {
+    const T = save.trivia[day], now = tqDayQs(day);
+    if (!T) return null;
+    if (T.qs.some((r) => !tqByKind(r.kind)) || (!tqFlown(day) && T.qs.some((r, i) => !now[i] || now[i].kind !== r.kind))) { delete save.trivia[day]; persist(); return null; }
+    const last = T.qs[T.qs.length - 1];
+    if (last && !last.how) { last.how = 'left'; persist(); }
+    return T;
+  }
+  // Today's five, or the rest of them. The flight starts as a Study flight does: on the ground where the home globe is looking, the view coming down on
+  // the bird (a question's first trip is about 4 sec of its 45: where the bird starts needs no rule; counted 2026-11-24).
+  function tqStart() {
+    if (S.mode !== 'title') return;
+    const day = today(), T = tqSaved(day), at = T ? T.qs.length : 0, qs = tqDayQs(day);
+    if (at >= 5 || qs.length < 5) return;          // the day is flown
+    Object.assign(TQ, { on: true, day, qs, i: at, hist: T ? T.qs.map((r) => r.found.slice()) : [], rows: T ? T.qs.map((r, i) => ({ q: qs[i], found: r.found.slice(), wrongs: r.wrong.slice(), how: r.how })) : [],
+      found: [], wrongs: [], calls: [], note: '', closed: false, landFx: [] });
+    takeOff('trivia');
+    S.energy = Infinity;          // flying takes no energy (as Explore's)
+    tqQuestion(at);
+  }
+  function tqClean() { for (let i = flashes.length - 1; i >= 0; i--) if (flashes[i].tq) flashes.splice(i, 1); }
+  function tqOff() {
+    if (!TQ.on) return;
+    TQ.on = false; tqClean();
+    const box = $('tq-box'); if (box) box.remove();
+    tqClockShow(false); tqFoot(); tqBtns(); $('console').classList.remove('v2'); $('trip-bar').style.background = '';
+    ticketsEl.replaceChildren();
+    $('count-what').textContent = 'delivered';
+  }
+  function tqQuestion(i) {
+    Object.assign(TQ, { i, found: [], wrongs: [], calls: [], note: '', closed: false, timeUp: false, start0: TQ_START, end: S.t + TQ_START, waitView: true, lastT: S.t });
+    tqClockShow(true);
+    tqClean();
+    tqLight(); tqCard(); tqKeep(); sfx.call();
+  }
+  // A country's own color while its question is open: found, the game's own light; an incorrect landing, a pale red that stays.
+  const TQ_BADFILL = '#' + rgb(SAND).map((v, i) => Math.round(255 * (v + (rgb(BAD)[i] - v) * 0.45)).toString(16).padStart(2, '0')).join('');
+  function tqFlash(c, col, k) { flash(c, 0, 1e9, col, k); flashes[flashes.length - 1].tq = true; }
+  function tqLight() {
+    tqClean();
+    for (const id of TQ.found) tqFlash(tqC(id), null, 0.95);
+    for (const id of TQ.wrongs) tqFlash(tqC(id), TQ_BADFILL, 1);
+  }
+  // WHAT A LANDING PUTS ON THE MAP: the flag and the name on the country with its bold border, by the built parts as Study's deliver and strand call them; no
+  // capital, the view stays, no wait before the next take-off (the player's choice on the trial page they flew, 2026-11-25: "flag and name only"). A landing
+  // that closes the question writes nothing: the closed question's screen names the countries.
+  function tqName(c, str, p, cls, sub, closes) {
+    if (closes) return null;
+    const first = fx.length;
+    let named;
+    if (cls === 'wrong') named = outlined(label(c, str, p, cls, GROUND, sub, UNDER), c);          // strand's own
+    else {          // deliver's own
+      const saved = Object.assign({}, cam), { row, stack } = ownForm(c, str, sub, null, saved.pxRad);
+      Object.assign(cam, saved);
+      named = label(c, str, row || stack ? c.u : p, cls, GROUND, sub, row ? AREA : stack || UNDER);
+      named.row = row;
+      outlined(named, c);
+    }
+    TQ.landFx = fx.slice(first);
+    return named;
+  }
+  function tqLandOff() {          // the question closes: a landing's names go
+    for (const f of TQ.landFx) if (f.lift === undefined) f.lift = f.t;
+    TQ.landFx = []; S.capAt = null; S.capAlso = null; S.capMore = []; S.capFit = null;
+  }
+  function tqLand(here, lon, lat, p) { const up = TQ.timeUp && !TQ.closed; tqLand0(here, lon, lat, p); if (up && !TQ.closed) tqClose(); }          // at 0 sec the bird comes down where it is: a correct country under it counts, then the question closes
+  function tqLand0(here, lon, lat, p) {
+    const q = TQ.qs[TQ.i], c = here && !here.sea && here.c && PLAY.includes(here.c) && !here.c.water ? here.c : null;
+    if (TQ.closed || !c) { (here && (here.sea || here.wet) ? sfx.splash : sfx.thud)(); return; }          // no guess: water, a land never asked, a closed question
+    if (TQ.found.includes(c.id) || TQ.wrongs.includes(c.id) || TQ.calls.includes(c.id)) { sfx.thud(); tqName(c, c.name + (q.notes[c.id] || q.out[c.id] ? '*' : ''), p, TQ.wrongs.includes(c.id) ? 'wrong' : 'name', null, TQ.timeUp); return; }          // landed here before: no second count
+    if (q.ids.includes(c.id)) {
+      TQ.found.push(c.id); TQ.end += TQ_ADD;
+      if (q.notes[c.id]) TQ.note = tqSay(c, q.notes[c.id], true);
+      ring(p, 4, 22, INK, 2.5, 0.45); tqName(c, c.name + (q.notes[c.id] ? '*' : ''), p, 'name', tqStepLine(q, c.id), TQ.timeUp || TQ.found.length >= TQ_NEED); sfx.drop();
+      tqLight(); tqCard(); tqKeep();
+      if (TQ.found.length >= TQ_NEED) tqClose();          // three found: the question closes by itself
+      return;
+    }
+    if (q.out[c.id]) { TQ.calls.push(c.id); TQ.note = tqSay(c, q.out[c.id], false); tqName(c, c.name + '*', p, 'name', null, TQ.timeUp); sfx.thud(); tqCard(); return; }          // not counted: its note, no time taken
+    TQ.wrongs.push(c.id); S.gain = -1; TQ.end -= TQ_COST;
+    ring(p, 6, 30, BAD, 2.5, 0.5); tqName(c, c.name, p, 'wrong', '−' + TQ_COST + ' sec', TQ.timeUp); sfx.miss();
+    tqLight(); tqCard(); tqKeep();          // the question stays open: the country keeps its pale red
+  }
+  function tqClose() {
+    const how = TQ.found.length >= TQ_NEED ? 'all' : TQ.timeUp ? 'time' : 'gave';
+    tqLandOff(); TQ.closed = true; TQ.closedT = S.t;
+    TQ.rows.push({ q: TQ.qs[TQ.i], found: TQ.found.slice(), wrongs: TQ.wrongs.slice(), how });
+    tqKeep(how);
+    tqLight(); tqCard();
+  }
+  function tqNext() {
+    if (TQ.i + 1 >= TQ.qs.length) { goHome(); return; }          // the day's card is not built yet (the plan's piece 4)
+    if (looking()) lookEnd();
+    tqQuestion(TQ.i + 1);
+  }
+  function tqEnter() {
+    if (!TQ.on || S.mode !== 'fly' || S.paused) return;
+    if (TQ.closed) { tqNext(); return; }
+    const air = !bird.down;
+    tqClose();
+    if (air) { bird.a = Math.min(bird.a, 0.02); bird.va = -0.2; bird.vx = bird.vy = 0; }          // given up in the air: the bird comes down where it is
+  }
+  function tqFrame() { if (TQ.on && S.mode === 'fly') tqClockTick(); }
+
+  // ---------- Trivia's clock ----------
+  function tqOpen() { return S.mode === 'fly' && S.game === 'trivia' && TQ.on && !TQ.closed; }
+  const tqSecs = (away) => Math.max(0, TQ.end - S.t - (away || 0)).toFixed(1) + ' sec';
+  function tqClockShow(on) {
+    const el = $('trip-clock'); el.hidden = !on; el.classList.toggle('tq', on);
+    if (on) $('trip-secs').textContent = tqSecs();
+  }
+  function tqHeld(away, back) { if (back) TQ.end -= away; else $('trip-secs').textContent = tqSecs(away); }          // Day Trip's stopwatch rule: the time away counts
+  function tqClockTick() {
+    if (TQ.closed || !TQ.end) return;
+    // the clock waits while the view comes down on the bird (a flight's start) or comes back from a look at the answers (Day Trip's stopwatch starts
+    // only once the view is there); a look-around of the player's own runs on the clock
+    if (TQ.waitView) { if (S.intro || S.blend < 1 || gaze) TQ.end += S.t - TQ.lastT; else TQ.waitView = false; }
+    TQ.lastT = S.t;
+    $('trip-secs').textContent = tqSecs(); tqLine();
+    if (S.t < TQ.end) return;
+    if (!TQ.timeUp) { TQ.timeUp = true; if (bird.down) { tqClose(); return; } }
+    if (!bird.down) {          // at 0 the bird comes down where it is; a correct country under it counts (tqLand), then the question closes
+      keys.left = keys.right = keys.up = keys.down = keys.flap = false; pull.at = null;
+      bird.a = Math.min(bird.a, 0.02); bird.va = Math.min(bird.va, -0.2); bird.vx = bird.vy = 0;
+    }
+  }
+  function tqLine() {          // the clock's line: full at the question's start, in the energy ring's own stages
+    const k = Math.min(1, Math.max(0, TQ.end - S.t) / (TQ.start0 || TQ_START)), b = $('trip-bar');
+    b.style.width = (100 * k).toFixed(2) + '%';
+    b.style.background = k >= 1 / 2 - 1e-6 ? GOOD : k > 1 / 3 ? YELLOW : k > 1 / 6 ? ORANGE : BAD;
+  }
+
+  // ---------- Trivia's bar ----------
+  // A note's line: a counted country's note as written (with the country's name before it where the note does not say it); a country that is not counted:
+  // said so first (the player, 2026-11-24: "it's not technically correct and then give like the note").
+  function tqFoot() {          // the note's line: over the bar's left end, as wide as the bar at most
+    const old = $('tq-foot'); if (old) old.remove();
+    if (!TQ.on || !TQ.note) return;
+    const foot = document.createElement('div'); foot.id = 'tq-foot'; foot.className = 'tq-foot'; foot.textContent = '* ' + TQ.note; $('console').appendChild(foot);
+    // no wider than its lines need: a note longer than the bar is broken into even lines (the box of a wrapped line would else keep the bar's whole width)
+    foot.style.whiteSpace = 'nowrap'; foot.style.maxWidth = 'none'; const one = foot.offsetWidth, room = $('console').clientWidth; foot.style.whiteSpace = foot.style.maxWidth = '';
+    if (one > room) foot.style.width = Math.min(room, Math.ceil(one / Math.ceil(one / room)) + 36) + 'px';
+  }
+  const tqSay = (c, note, counts) => (counts ? (note.includes(c.name) ? note : c.name + ': ' + note) : (the(c.name) + ' is not counted. ').replace(/^t/, 'T') + note);
+  // a clue worded for one country, said for several
+  const TQ_MANY = [[/^that has /, 'that have '], [/^that is /, 'that are '], [/^that was /, 'that were '], [/^that claims /, 'that claim '], [/^that uses /, 'that use '], [/^that hosts /, 'that host '],
+    [/ that drives /, ' that drive '], [/ but does not /, ' but do not '], [/ but is not /, ' but are not '], [/ its /g, ' their '], [/ of its own/, ' of their own']];
+  const tqMany = (t) => TQ_MANY.reduce((a, [re, to]) => a.replace(re, to), t);
+  function tqBtns() { for (const id of ['tq-on', 'tq-give', 'tq-next']) { const e = $(id); if (e) e.remove(); } }
+  // the question at 30 px wherever it fits on two lines, else at the small lettering (three lines at most); its column as wide as its widest line
+  function tqClueFit() {
+    const w = document.querySelector('#console.v2 .ticket.tq .what'); if (!w) return;
+    const a = w.parentNode, k = a.querySelector('.kind'), z = +getComputedStyle($('bottom')).zoom || 1;
+    const rows = () => { const r = document.createRange(); r.selectNodeContents(w); const m = new Map(); for (const x of r.getClientRects()) { const t = Math.round(x.top / 4); m.set(t, (m.get(t) || 0) + x.width); } return { n: m.size, wide: Math.max(0, ...m.values()) / z }; };
+    a.style.width = ''; w.classList.add('big'); let L = rows();
+    if (L.n > 2) { w.classList.remove('big'); L = rows(); }
+    const kw = k ? k.getBoundingClientRect().width / z : 0;
+    a.style.width = (Math.ceil(Math.max(L.wide, kw)) + 3) + 'px';          // 2 px of the column's own padding, 1 to spare
+    if (rows().n !== L.n) a.style.width = '';
+  }
+  window.addEventListener('resize', () => { if (TQ.on) { tqClueFit(); measure(); } });
+  // A face of the game's lettering is fetched at its first use. One that arrives after the bar was fitted: the bar is fitted again. (Until then the heading
+  // could be measured in the stand-in lettering, 166 px wide for 141, and the question's column stayed 10 px too wide: by chance, on the trial page too.)
+  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => { if (TQ.on) { tqSpotsFit(); tqClueFit(); measure(); } });
+  // A flag spot is 64 px. A name stands under its flag on one or two lines in the bar's lettering and may reach 2 px over each side of its spot (eight names are 1 to 4 px
+  // wider than a spot: Madagascar, Netherlands, ...); a name that needs more takes the smaller lettering a long name already has (Turkmenistan, Liechtenstein), then one step
+  // smaller still (Central African Republic, Saint Vincent and the Grenadines). A flag wider than the spot (Qatar's) is fitted to its width, in the middle of the flag's row.
+  function tqSpotsFit() {
+    const t = document.querySelector('#console.v2 .ticket.tq.snug'); if (!t) return;
+    const z = +getComputedStyle($('bottom')).zoom || 1;
+    for (const p of t.querySelectorAll('.pl')) {
+      const w = p.getBoundingClientRect().width / z, nm = p.querySelector('.nm'), img = p.querySelector('img');
+      if (nm && nm.textContent) {
+        const room = w + 4.5, read = () => { const r = document.createRange(); r.selectNodeContents(nm); const xs = [...r.getClientRects()].filter((x) => x.width > 0); return [new Set(xs.map((x) => Math.round(x.top / 4))).size, (Math.max(...xs.map((x) => x.right)) - Math.min(...xs.map((x) => x.left))) / z]; };          // lines, and the width of the ink
+        const fits = (most) => { nm.style.width = ''; let [n, ink] = read(); if (n <= 2 && ink <= most) return true; for (let x = Math.ceil(w); x <= most; x++) { nm.style.width = x + 'px'; [n, ink] = read(); if (n <= 2 && ink <= most) return true; } nm.style.width = ''; return false; };
+        nm.classList.remove('long2');
+        if (!fits(room)) { nm.classList.add('long'); if (!fits(room)) { nm.classList.add('long2'); fits(96); } }          // 15 px, else 12.5 px, else 11 px; the one name still wider (Saint Vincent and the Grenadines) takes the least width that holds it on two lines
+      }
+      if (img) { const fit = () => { const r = img.naturalWidth / img.naturalHeight; if (r * 32 > w + 0.5) { const h = w / r; img.style.width = w + 'px'; img.style.height = h + 'px'; img.style.margin = ((32 - h) / 2) + 'px 0'; } }; if (img.complete && img.naturalWidth) fit(); else img.addEventListener('load', fit); }
+    }
+  }
+  // The bar: one row, Day Trip's parts. The card: "Find 3 countries" (the player, 2026-11-25: 'we can say "find 3 countries..." not "3 of 11" etc.'), the
+  // question, the three flag spots (a found country's stars over its flag, its name under it; an empty box where a flag will stand), the question's points over
+  // its worth. The box beside the card: the five questions, the day's points with no maximum ("the end score shouldn't say out of 1,000. It should just say
+  // the score"), the clock, and a quiet "Give up" (the tutorial's "Skip"); closed, the dark way on in the room of the clock and that cell, so nothing moves.
+  function tqCard() {
+    const q = TQ.qs[TQ.i], last = TQ.i + 1 >= TQ.qs.length;
+    TQ.hist.length = Math.min(TQ.hist.length, TQ.i + 1); TQ.hist[TQ.i] = TQ.found.slice(0, TQ_NEED);
+    $('console').classList.add('v2');
+    const cell = (id) => { const c = tqC(id); return '<span class="pl"><span class="wd">' + tqMark(q, id) + '</span>' + flagImg(c, '') + '<span class="nm' + (c.name.length > 22 ? ' long' : '') + '">' + esc(c.name) + (q.notes[id] ? '*' : '') + '</span></span>'; };
+    const cells = TQ.found.slice(0, TQ_NEED).map(cell).concat(Array(Math.max(0, TQ_NEED - TQ.found.length)).fill('<span class="pl"><span class="wd"></span><i></i><span class="nm"></span></span>'));
+    const node = document.createElement('div');
+    node.className = 'ticket ask tq pale snug';
+    node.innerHTML = '<div class="addr"><span class="kind">Find ' + TQ_NEED + ' countries</span><span class="what">' + esc(tqMany(q.t)) + '</span></div><div class="places">' + cells.join('') + '</div>' +
+      '<div class="side"><div class="qpts">' + num(tqQPts(TQ.i, TQ.found)) + '<small>/' + tqQWorth(TQ.i) + '</small></div><div class="qpts size" aria-hidden="true">' + tqQWorth(TQ.i) + '<small>/' + tqQWorth(TQ.i) + '</small></div></div>';
+    ticketsEl.replaceChildren(node); tqFoot();
+    tqBtns();
+    const way = document.createElement('div');
+    way.className = 'tutor-btn';
+    if (TQ.closed) { way.id = 'tq-on'; way.innerHTML = '<button class="go" id="tq-next" type="button">' + (last ? 'See your day' : 'Next question') + '</button>'; }
+    else { way.id = 'tq-give'; way.innerHTML = '<button class="alt" id="tq-next" type="button">Give up</button>'; }
+    $('status').appendChild(way);
+    $('tq-next').addEventListener('click', (e) => { tqEnter(); e.currentTarget.blur(); stage.focus({ preventScroll: true }); });
+    let box = $('tq-box');
+    if (!box) { box = document.createElement('div'); box.className = 'tripbox'; box.id = 'tq-box'; $('status').insertBefore(box, $('trip-clock')); }
+    box.innerHTML = '<div class="row5">' + TQ.qs.map((x, j) => '<i' + (j < TQ.i || (j === TQ.i && TQ.closed) ? ' class="done"' : j === TQ.i ? ' class="now"' : '') + '></i>').join('') + '</div><span>Question ' + (TQ.i + 1) + ' of ' + TQ.qs.length + '</span>';
+    $('trip-clock').hidden = TQ.closed;          // Day Trip's way: no clock once the round is over
+    $('count').textContent = num(tqDay()); $('count-what').textContent = 'points';
+    tqSpotsFit(); tqLine(); tqClueFit(); measure();
+  }
+
+  window.birdsEye = { trivia: { TQ, start: tqStart, enter: tqEnter, frame: tqFrame, saved: tqSaved, flown: tqFlown, dayQs: tqDayQs, qpts: tqQPts, score: tqDay, open: tqOpen, clueFit: tqClueFit, spotsFit: tqSpotsFit, BADFILL: TQ_BADFILL, ask: (kind) => { TQ.qs[TQ.i] = tqByKind(kind); tqQuestion(TQ.i); },
+    flashes: () => flashes.filter((f) => f.tq).map((f) => [f.c.name, f.col, f.k]), boxes: () => placed.map((b) => ({ name: b.name || (b.bird ? 'BIRD' : '?'), box: [b.x - b.half, b.y - b.up, b.x + b.half, b.y + b.down].map(Math.round), flag: !!b.flag, sub: b.sub || '', lines: b.lines || null })) },          // Trivia, for the tests
+    idk, canIdk, goodFor, explore, glide: () => glide, glideP, glideLook, howTo, pair: () => view.pair, homeNote: () => { showTripNote(); showKnown(); measure(); }, stackLines: (id) => { const c = PLAY.find((q) => q.id === id); ownName = true; try { return stackForm(c, c.name, 'name', null).lines; } finally { ownName = false; } }, hoverBox: () => hoverBox, slerp, showLeg, legView, STILL_DEG, reached, globeHold, holdGlobe, resumeGlobe, skipToEnd, label: () => arrived, lonLat, projectAt: (p) => project(p), land, lit: () => ({ by: hover ? hover.name : null, country: under ? under.name : null, water: wet ? nameOf(wet) : null, line: under && under.zone && zoneShow() > 0 ? under.name : null }), firstVisit: () => firstVisit, tutorRound, names: () => atlasNames, recolour, goHome, makeTrip, tripEnd, tripNext, today, setRun: (k) => { runKind = k; }, fair: (km, kind) => fairSecs(km, kind), flightSecs, parFor, capKm, cheapFor, judge, ringKm, BURN, steps: D.steps, faqLegs: FAQ_LEGS, hardRow, roundWorth, landedBy, savedAsk, FIVE, ASKED, KNOWN, DAYS, TRIVIA, endlessRound, rankedLevel, rankedRounds, easiest, flagClue, capClue, capFlagClue, THE, atlas, beacon, flashes, S, bird, keys, cam, view, PLAY, ITEMS, WATERS, save, memOf, regionAt, locationAt, inZone, ZONED, kmToRings, reaches, seaEdge, bOf, pKnow, outside, sanded, inRound, FREE, FACTS, partAt, freeCities, fitv, landAt: (lon, lat) => { const p = LAND.find((q) => within(q, lon, lat)); return p ? p.id : null; }, held: () => !!heldAt, skill: () => save.skill, kmBetween, takeOff, step, target, goalOf, unit, heldRounds, nameBoxes,
     outlines: () => fx.filter((f) => f.lined && f.shownA > 0).map((f) => f.lined.id), OUTLINE, pull, pullBy, steerable, PULL_FULL, PULL_RING, hFor, look: () => gaze, looking, canLook, lookStart, lookEnd, lookAnswer, answerNamed: () => answerNamed, birdRing: () => { const g = project(unit(bird.lon, bird.lat)); return g && birdRing(g); }, answerRoom: () => gazeName, lookK: gazeK, plate: () => plateSays, capLineOf: (id) => capLine(PLAY.find((c) => c.id === id)), plateRoom: (h) => pointerPlate(h, 1, true), hoverNow: () => (hover ? hover.name : null), project: projectLL, unproject, speedAt, FLY_TOP, FIT_BACK, FINE_FROM, FINE_SECS, steerHeld: () => steerHeld, tripStreak, placed, seen: () => seen, onMap: () => onMap(), kmToCountry, drawGlobe: () => drawGlobe(null), gl, run, draw, heightFor, setBird, give: (key) => addTicket(ITEMS.find((it) => it.key === key)) };
 
   stage.classList.add('atlas');
