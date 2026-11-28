@@ -8339,7 +8339,7 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
     tqQuestion(at);
   }
   function tqUnlit() { for (let i = flashes.length - 1; i >= 0; i--) if (flashes[i].tq) flashes.splice(i, 1); }
-  function tqClean() { tqUnlit(); TQ.move = null; TQ.page = null; TQ.from = null; TQ.lift = false; tqAnsOff(); }          // a closed question's screen goes with its question
+  function tqClean() { tqUnlit(); TQ.move = null; TQ.page = null; TQ.from = null; TQ.lift = false; TQ.fall = false; tqAnsOff(); }          // a closed question's screen goes with its question
   function tqOff() {
     if (!TQ.on) return;
     TQ.on = false; tqDayOff(); tqClean();
@@ -8448,11 +8448,12 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
     const air = !bird.down;
     if (air) { const ll = lonLat(cam.n); TQ.from = { lon: ll[0], lat: ll[1], H: cam.H, cx: cam.cx, cy: cam.cy }; }
     tqClose();
-    if (air) { bird.a = Math.min(bird.a, 0.02); bird.va = -0.2; bird.vx = bird.vy = 0; }          // given up in the air: the bird comes down where it is
+    if (air) { TQ.fall = true; tqDown(); bird.va = -0.2; }          // given up in the air: the bird comes down where it is, held to that every frame until it is down (tqFrame)
   }
   function tqFrame() {
     if (!TQ.on || S.mode !== 'fly') return;
     tqAuto(); tqClockTick();
+    if (TQ.fall) { if (bird.down) TQ.fall = false; else tqDown(); }          // a question given up in the air: as at the clock's end
     if (TQ.closed && TQ.lift && tqLift()) TQ.lift = false;
     const M = TQ.move;
     if (M && gaze && !gaze.leaving) {
@@ -8835,10 +8836,15 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
     $('trip-secs').textContent = tqSecs(); tqLine();
     if (S.t < TQ.end) return;
     if (!TQ.timeUp) { TQ.timeUp = true; if (bird.down) { tqClose(); return; } }
-    if (!bird.down) {          // at 0 the bird comes down where it is; a correct country under it counts (tqLand), then the question closes
-      keys.left = keys.right = keys.up = keys.down = keys.flap = false; pull.at = null;
-      bird.a = Math.min(bird.a, 0.02); bird.va = Math.min(bird.va, -0.2); bird.vx = bird.vy = 0;
-    }
+    if (!bird.down) tqDown();          // at 0 the bird comes down where it is; a correct country under it counts (tqLand), then the question closes
+  }
+  // The bird comes down where it is, held to that every frame until it is down: at the clock's end in the air, and after a question given up in the air
+  // (TQ.fall). No key and no pull carry it on. (Until 2026-11-28 a give-up set the bird low once and left the keys: Space held through Enter took it to the
+  // top again, and it came down 3.45 sec after the close, Space let go 1.2 sec after Enter. A keyboard repeats only the last key pressed, so after Enter
+  // nothing but Space's release ended it. THE WHOLE LIST 125, measured with real keys in real time: audit/qh4.py.)
+  function tqDown() {
+    keys.left = keys.right = keys.up = keys.down = keys.flap = false; pull.at = null;
+    bird.a = Math.min(bird.a, 0.02); bird.va = Math.min(bird.va, -0.2); bird.vx = bird.vy = 0;
   }
   function tqLine() {          // the clock's line: full at the question's start, in the energy ring's own stages
     const k = Math.min(1, Math.max(0, TQ.end - S.t) / (TQ.start0 || TQ_START)), b = $('trip-bar');
