@@ -794,6 +794,7 @@ html #card.ghost ~ #place { visibility: visible; }
 #faq[data-sec="split"] h3 button { display: block; width: calc(100% + 16px); margin: 0 -8px; padding: 5px 8px; border-radius: 3px; }
 #faq[data-sec="split"] h3 button i { display: none; }
 #faq[data-sec="split"] h3 button[aria-expanded="true"], #faq[data-sec="split"] h3 button:hover { background: var(--paper-shade); }
+@media (max-height: 650px) { #faq[data-sec] h3 button { padding-top: 3px; padding-bottom: 3px; } }          /* a short window: the list's rows stand closer, as How to play's rows do there (12 px apart, 7 under 650 px of height): 6 px between two rows' words where 10 stand elsewhere, so the whole sheet is one screen at 1366 x 650 (THE WHOLE LIST 118 (a), the player's pick of 2026-11-28 from a picture: "Rows closer"); whole pixels keep the words as balanced in a row's shade as at 5 */
 #faq[data-sec="split"] .ans { grid-column: 2; grid-row: 2 / -1; align-self: stretch; margin: 0 0 -22px -20px; padding: 16px 0 22px 20px; border-left: 1px solid var(--paper-shade); }          /* the line between the list and the answer runs from the line under the title to the sheet's foot */
 #faq[data-sec="split"] .ans::before { content: attr(data-q); display: block; margin-bottom: 14px; font: 700 24px/1.05 var(--display); }
 #faq td.who { width: 1px; padding-right: 16px; white-space: nowrap; }
@@ -7817,7 +7818,7 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
   // Nothing on the sheet is a number typed in: every card, stamp, graph and figure is made here, when the sheet is
   // first opened, by the game's own rules (landingScore, resultHtml, roundWorth ...) from ONE example, so a change of a
   // rule redraws it. The example: round 3 of a Day Trip, Berlin, flown from where round 2 ended (Japan, found by its
-  // flag); the bird came down 22 km west of Berlin, or on Hamburg, 5.9 s after the clue, having flapped 0.5 s longer
+  // flag); the bird came down 100 km west of Berlin, or on Hamburg, 5.9 s after the clue, having flapped 0.5 s longer
   // than the flight needs.
   // The example day: five locations that never run together (the player's pick, 2026-11-18: a real day's five on the sheet
   // would give that day away; no day of the list has more than one of them in its round, and smoke holds it).
