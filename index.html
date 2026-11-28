@@ -8381,11 +8381,16 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
       named.row = row;
       outlined(named, c);
     }
-    TQ.landFx = fx.slice(first);
+    TQ.landFx.push(...fx.slice(first));          // every landing's names of the question, for its close (tqLandOff)
     return named;
   }
-  function tqLandOff() {          // the question closes: a landing's names go
-    for (const f of TQ.landFx) if (f.lift === undefined) f.lift = f.t;
+  // The question closes: a landing's names go, every one of the question's, each in a name's own fade (0.35 sec) from now. A name lifted at its take-off
+  // waits until 1.2 sec after its landing (label); the close brings that later lift forward to now. (Until 2026-11-28 the close lifted only a name not
+  // lifted yet, and of the last landing alone: a question given up while the bird still flew (Space held), within about a second of a landing, kept that
+  // landing's name on the closed question's screen for up to 1.25 sec. A close with the bird down never showed it: the closed question's view, the
+  // look-around, veils a landing's names in 0.25 sec. THE WHOLE LIST 120 (a), measured on the built page: audit/qh1.py, qh3.py.)
+  function tqLandOff() {
+    for (const f of TQ.landFx) if (f.lift === undefined || f.lift > f.t) f.lift = f.t;
     TQ.landFx = []; S.capAt = null; S.capAlso = null; S.capMore = []; S.capFit = null;
   }
   function tqLand(here, lon, lat, p) { const up = TQ.timeUp && !TQ.closed; tqLand0(here, lon, lat, p); if (up && !TQ.closed) tqClose(); }          // at 0 sec the bird comes down where it is: a correct country under it counts, then the question closes
