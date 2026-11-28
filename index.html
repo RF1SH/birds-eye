@@ -853,6 +853,7 @@ html #card.ghost ~ #place { visibility: visible; }
 /* Trivia, a closed question: the correct countries the player did not find, a list beside the globe (tqAnsCard) */
 #tq-ans { zoom: var(--ui, 1); grid-column: 1; grid-row: 1; justify-self: start; align-self: center; padding: 14px 15.5px 13px 16px; background: var(--paper); border: var(--b2z) solid var(--ink); border-radius: 3px; pointer-events: auto; }
 #tq-ans.bare { padding-bottom: 11px; }
+#tq-ans.under-pause { visibility: hidden; }          /* paused: the pause card takes the list's seat (setPaused); its box stays, so the globe beside it does not move */
 #tq-ans h3 { margin: 0 0 8px; font: 700 14px/1 var(--text); color: var(--ink-soft); text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
 #tq-ans .rows { display: grid; grid-auto-flow: column; grid-template-rows: repeat(var(--n), auto); gap: 1px 26px; }
 #tq-ans .r { display: grid; grid-template-columns: 60px var(--w, 150px) var(--s, 45px); column-gap: 9px; align-items: center; min-height: 30px; padding: 4px 8px; margin: 0 -8px; border-radius: 2px; }
@@ -6221,6 +6222,10 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
     // A landing's fact stands where the pause card does: it goes while the card is up and is back when the flight
     // carries on. Asleep there, the sleeping bird's postcard takes its place (the same fact, clear of the card).
     if (on && landFact) $('funfact').hidden = true;
+    // A closed trivia question's list stands where the pause card does: it is away while the card is up and back when the flight carries on (THE
+    // WHOLE LIST 116 (b): the card lay over the middle of the list, the list's ends above and under it; the player's pick by button, 2026-11-27, "Build it").
+    // Away by its look only (.under-pause): its box is the room the globe was fitted beside, and a lettering or a window change lays it again while paused.
+    $('tq-ans').classList.toggle('under-pause', on && S.game === 'trivia');
     if (on) {
       hideSleepFact();
       if (S.game === 'study' && bird.down) pauseFactTimer = setTimeout(() => { if (S.paused) showSleepFact(); }, IDLE_SLEEP * 1000);
@@ -8452,7 +8457,7 @@ body.tq-day #corner { visibility: hidden; }          /* the corner's two buttons
   // a player, what a star means (their pick, 2026-11-25: "A: the sentence"); then the notes of the countries counted with a note.
   const tqAns = $('tq-ans');
   const TQ_QUIET = 0.62;          // every country that is no answer: the paper's color at this strength
-  function tqAnsOff() { tqAns.hidden = true; tqAns.replaceChildren(); TQ.rowId = null; }
+  function tqAnsOff() { tqAns.hidden = true; tqAns.classList.remove('under-pause'); tqAns.replaceChildren(); TQ.rowId = null; }          // under-pause: Home from the pause card takes the list down with the pause still on
   function tqRowOn(id) {
     if (TQ.dayOn) { if (TQ.rowOn !== id) { TQ.rowOn = id; for (const r of $('daycard').querySelectorAll('tr.on [data-id]')) r.classList.toggle('lit', r.dataset.id === id); } return; }          // the day's card: the name is underlined
     if (tqAns.hidden || TQ.rowOn === id) return; TQ.rowOn = id; for (const r of tqAns.querySelectorAll('.r')) r.classList.toggle('on', r.dataset.id === id);
